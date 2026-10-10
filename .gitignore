@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+._*
+
+# Secrets
+env.sh
+.env
+.env.*
+!env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Obsidian
+.obsidian/workspace*.json
+.obsidian/cache
+
+# Editors
+.vscode/
+.idea/
