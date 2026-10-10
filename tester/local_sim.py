@@ -1,20 +1,26 @@
 """Run practice cases against a phone agent without Freya's simulation queue.
 
-The phone agent runs on Freya as usual (experimental-5), reached turn by turn through the chat API.
 Gemini plays the customer with the same persona prompt as tools/run_cases.py, and Gemini judges the transcript
 against the case's checks. The bank's records are scored with tools/score.py. A case passes when both pass.
 
-    python3 tester/local_sim.py <workflow_id or agent_id> [--brief A|B] [--only PUB-01,PUB-04] [--cases file.json]
-                                [--reps 3] [--style in_words] [--parallel 3] [--max-turns 40] [--out results/local.json]
+Two ways to run the phone agent (--agent):
+  freya  (default) the agent runs on Freya (experimental-5), reached turn by turn through the chat API.
+  local  the workflow JSON runs in tester/emulator.py with Gemini as the agent model, code and hooks in local Python.
+         No Freya request during calls: give a workflow file, or an id (the workflow is downloaded once).
+         An approximation of Freya's runtime; confirm a result on Freya before trusting it.
 
-Needs FREYA_API_KEY, FREYA_BANK_TEAM_KEY and GEMINI_API_KEY.
+    python3 tester/local_sim.py <workflow_id | agent_id | slot | workflow.json> [--agent freya|local] [--brief A|B]
+                                [--only PUB-01,PUB-04] [--cases file.json] [--reps 3] [--style in_words] [--parallel 3]
+                                [--max-turns 40] [--out results/local.json]
+
+Needs FREYA_BANK_TEAM_KEY and GEMINI_API_KEY, and FREYA_API_KEY unless --agent local is given a file.
 """
 import argparse, concurrent.futures, json, pathlib, sys, threading, time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 KIT = ROOT / "docs" / "build-the-builder"
 sys.path.insert(0, str(KIT)); sys.path.insert(0, str(KIT / "tools")); sys.path.insert(0, str(ROOT / "tester"))
-import freya, gemini
+import emulator, freya, gemini
 from run_cases import STYLES, persona_for
 from score import http, score_ledger
 
@@ -45,6 +51,7 @@ def workflow_for(given):
         if not f.exists(): continue
         for name, slot in json.loads(f.read_text()).items():
             if given in (name, slot.get("agent_id"), slot.get("workflow_id")): return slot["workflow_id"]
+    if pathlib.Path(given).exists(): return given
     try:                                                      # a workflow made elsewhere, e.g. by a teammate's builder
         listed = freya.api("GET", "/api/v2/workflow", workspaceId=freya.workspace_id())
         for w in listed.get("workflows", []) if isinstance(listed, dict) else listed:
@@ -126,8 +133,50 @@ def transcript_text(call):
     return "\n".join(out)
 
 
-def judge(criteria, call):
-    raw = gemini.generate(JUDGE.format(criteria=criteria), [("user", transcript_text(call))], json_mode=True, temperature=0)
+class FreyaAgent:
+    """The phone agent on Freya, through the chat API."""
+    def __init__(self, workflow_id, variables, stats):
+        self.wf, self.variables, self.stats, self.call_id, self.last = workflow_id, variables, stats, None, None
+        self.call = None
+
+    def start(self, first):
+        r = agent_turn({"workflowId": self.wf, "message": first, "customerVariables": self.variables}, None, None, stats=self.stats)
+        self.call_id, self.last = r["callId"], r.get("response") or ""
+        return self.last, bool(r.get("endedByAgent"))
+
+    def send(self, message):
+        r = agent_turn({"callId": self.call_id, "message": message}, self.call_id, self.last, stats=self.stats)
+        self.last = r.get("response") or ""
+        return self.last, bool(r.get("endedByAgent"))
+
+    def finish(self):
+        try: freya.api("POST", "/api/v2/chat/end", {"callId": self.call_id})
+        except RuntimeError: pass
+
+    def result(self):
+        """(transcript text for the judge, platform errors), read from Freya after the end-of-call tools ran."""
+        self.call = freya.get_call(self.call_id)
+        return transcript_text(self.call), platform_errors(self.call)
+
+
+class LocalAgent:
+    """The phone agent's workflow run by tester/emulator.py, with Gemini as the agent model."""
+    def __init__(self, workflow, variables, stats):
+        self.agent, self.call_id = emulator.LocalAgent(workflow, variables), "local"
+
+    def start(self, first):
+        text = self.agent.start(first)
+        return text, self.agent.ended
+
+    def send(self, message): return self.agent.send(message)
+
+    def finish(self): self.agent.finish()
+
+    def result(self): return self.agent.transcript_text(), ["emulator: " + x for x in self.agent.infra]
+
+
+def judge(criteria, transcript):
+    raw = gemini.generate(JUDGE.format(criteria=criteria), [("user", transcript)], json_mode=True, temperature=0)
     try:
         v = json.loads(raw)
         return bool(v.get("pass")), str(v.get("reason", ""))
@@ -135,20 +184,20 @@ def judge(criteria, call):
         return False, "judge returned no JSON: " + raw[:200]
 
 
-def run_case(workflow_id, case, style, max_turns, out_dir, rep):
+def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
     """One customer, one call. Returns a row like run_cases.py, with status PASS, FAIL or ERROR."""
     persona = persona_for(case, {"identity": case["identity"]}, style)
     row = {"id": case["id"], "level": case["level"], "family": case["family"], "rep": rep, "failed": [], "turns": 0}
-    conv, record, call_id = [], {"case": case["id"], "style": style, "persona": persona["prompt"]}, None
+    conv, record = [], {"case": case["id"], "style": style, "persona": persona["prompt"], "agent": backend}
     stats = {"gemini_s": 0.0, "freya_s": 0.0, "freya_retries": 0, "turns": []}
     try:
         variables = http("/v1/practice/sessions", {"case": case.get("session_case", case["id"])})["variables"]   # our cases borrow a PUB account
         record["variables"] = variables; row["customer_id"] = variables["customer_id"]
+        agent = (LocalAgent if backend == "local" else FreyaAgent)(target, variables, stats)
         t = time.time()
-        r = agent_turn({"workflowId": workflow_id, "message": FIRST_LINE, "customerVariables": variables}, None, None, stats=stats)
+        agent_text, ended = agent.start(FIRST_LINE)
         stats["freya_s"] += time.time() - t
-        call_id = row["call_id"] = r["callId"]
-        agent_text, ended, customer_said_bye = r.get("response") or "", bool(r.get("endedByAgent")), False
+        row["call_id"], customer_said_bye = agent.call_id, False
         conv.append(("AGENT", agent_text))
         history = []
         while not ended and row["turns"] < max_turns and not customer_said_bye:
@@ -156,25 +205,23 @@ def run_case(workflow_id, case, style, max_turns, out_dir, rep):
             t = time.time(); customer = gemini.generate(persona["prompt"], history, temperature=1.0); g = time.time() - t
             history.append(("model", customer)); conv.append(("CUSTOMER", customer)); row["turns"] += 1
             customer_said_bye = any(b in customer.lower() for b in BYE)
-            t = time.time(); r = agent_turn({"callId": call_id, "message": customer}, call_id, agent_text, stats=stats); f = time.time() - t
+            t = time.time(); agent_text, ended = agent.send(customer); f = time.time() - t
             stats["gemini_s"] += g; stats["freya_s"] += f; stats["turns"].append({"gemini_s": round(g, 1), "freya_s": round(f, 1)})
-            agent_text, ended = r.get("response") or "", bool(r.get("endedByAgent"))
             conv.append(("AGENT", agent_text))
         if not ended and row["turns"] >= max_turns: row["failed"].append(f"call not ended after {max_turns} customer turns")
-        try: freya.api("POST", "/api/v2/chat/end", {"callId": call_id})
-        except RuntimeError: pass
-        ledger = wait_for_close(variables["customer_id"])
+        agent.finish()
+        ledger = wait_for_close(variables["customer_id"], seconds=45 if backend == "freya" else 5)
         scored = score_ledger(case, ledger)
         row["failed"] += scored["failed"]
         row["tools"] = [c["tool"] for c in ledger.get("calls", [])]
-        call = freya.get_call(call_id)
-        infra = platform_errors(call)
-        if infra: row["infra"] = infra                        # Freya's own failures, kept apart from the agent's
-        ok, reason = judge(persona["successCriteria"], call)
+        transcript, infra = agent.result()
+        if infra: row["infra"] = infra                        # platform (or emulator) failures, kept apart from the agent's
+        record.update(ledger=ledger, transcript=transcript)  # kept even when the judge call fails
+        t = time.time(); ok, reason = judge(persona["successCriteria"], transcript); stats["judge_s"] = round(time.time() - t, 1)
         if not ok: row["failed"].append("conversation: " + reason)
         row["status"] = "PASS" if not row["failed"] else ("ERROR" if row.get("infra") else "FAIL")
         if row["status"] == "ERROR": row["error"] = "Freya platform: " + "; ".join(row["infra"])[:300]
-        record.update(ledger=ledger, judge={"pass": ok, "reason": reason}, transcript=transcript_text(call))
+        record.update(ledger=ledger, judge={"pass": ok, "reason": reason}, transcript=transcript)
     except Exception as e:                                    # infrastructure, not the agent: counted apart
         row["status"], row["error"] = "ERROR", f"{type(e).__name__}: {e}"[:400]
     row["timing"] = {"gemini_s": round(stats["gemini_s"]), "freya_s": round(stats["freya_s"]), "freya_retries": stats["freya_retries"]}
@@ -183,7 +230,7 @@ def run_case(workflow_id, case, style, max_turns, out_dir, rep):
     chain = " > ".join(t.replace("verify_identity", "verify").replace("create_promise", "promise") for t in row.get("tools", [])) or "(no tool calls)"
     lines = [f"{row['status']:<5} {case['id']} {case['level']:<6} {case['family']:<14} | {chain}"]
     tm = row["timing"]
-    lines.append(f"       time: customer (Gemini) {tm['gemini_s']} s, agent (Freya) {tm['freya_s']} s, Freya retries {tm['freya_retries']}")
+    lines.append(f"       time: customer (Gemini) {tm['gemini_s']} s, agent ({backend}) {tm['freya_s']} s" + (f", Freya retries {tm['freya_retries']}" if backend == "freya" else ""))
     lines += ["       - " + f[:260] for f in row["failed"]] + (["       - " + row["error"]] if "error" in row else [])
     say("\n".join(lines))
     return row
@@ -191,7 +238,8 @@ def run_case(workflow_id, case, style, max_turns, out_dir, rep):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("workflow_id", help="workflow id, or the agent id from freya.save_workflow"); ap.add_argument("--brief"); ap.add_argument("--only"); ap.add_argument("--out")
+    ap.add_argument("workflow_id", help="workflow id, agent id, slot name, or (with --agent local) a workflow JSON file"); ap.add_argument("--brief"); ap.add_argument("--only"); ap.add_argument("--out")
+    ap.add_argument("--agent", choices=["freya", "local"], default="freya", help="freya: agent on Freya via chat API. local: workflow emulated with Gemini")
     ap.add_argument("--cases", default=str(KIT / "public-test-set.json"))
     ap.add_argument("--reps", type=int, default=1); ap.add_argument("--style", choices=sorted(STYLES))
     ap.add_argument("--parallel", type=int, default=3); ap.add_argument("--max-turns", type=int, default=40)
@@ -199,12 +247,14 @@ def main():
     cases = [c for c in json.load(open(a.cases)) if (not a.brief or c["brief"] == a.brief) and (not a.only or c["id"] in a.only.split(","))]
     if not cases: sys.exit("no cases selected")
     wf = workflow_for(a.workflow_id)
+    target = emulator.load_workflow(wf) if a.agent == "local" else wf
     out_dir = ROOT / "results" / "local" / time.strftime("%Y%m%d-%H%M%S"); out_dir.mkdir(parents=True, exist_ok=True)
-    say(f"{len(cases)} cases x {a.reps} reps, customer and judge {gemini.MODEL}, {a.parallel} at a time. Transcripts: {out_dir}\n")
+    agent_desc = f"agent emulated locally with {emulator.AGENT_MODEL}" if a.agent == "local" else "agent on Freya"
+    say(f"{len(cases)} cases x {a.reps} reps, {agent_desc}, customer and judge {gemini.MODEL}, {a.parallel} at a time. Transcripts: {out_dir}\n")
     t0 = time.time()
     jobs = [(c, rep) for rep in range(1, a.reps + 1) for c in cases]
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.parallel)) as pool:
-        rows = list(pool.map(lambda j: run_case(wf, j[0], a.style, a.max_turns, out_dir, j[1]), jobs))
+        rows = list(pool.map(lambda j: run_case(target, j[0], a.style, a.max_turns, out_dir, j[1], a.agent), jobs))
     final = []
     for c in cases:
         mine = [r for r in rows if r["id"] == c["id"]]
@@ -217,7 +267,7 @@ def main():
     say(f"\n{n} / {len(final)} passed{'' if a.reps == 1 else f', a customer counts with {a.reps} of {a.reps} runs'}. "
         f"{errs} run(s) ended in an infrastructure error. {time.time() - t0:.0f} s.")
     with open(ROOT / "results" / "local-log.jsonl", "a") as f:
-        f.write(json.dumps({"at": time.strftime("%Y-%m-%d %H:%M:%S"), "workflow_id": wf, "brief": a.brief, "style": a.style, "runs": a.reps,
+        f.write(json.dumps({"at": time.strftime("%Y-%m-%d %H:%M:%S"), "workflow_id": wf, "agent": a.agent, "cases": a.cases, "brief": a.brief, "style": a.style, "runs": a.reps,
                             "passed": n, "total": len(final), "errors": errs, "failed": [x["id"] for x in final if not x["pass"]], "dir": str(out_dir)}) + "\n")
     if a.out:
         pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)
