@@ -52,6 +52,23 @@ def flatten(prefix, v, out):
         out[prefix] = text_of(v) if isinstance(v, bool) else v
 
 
+def endpoints_of(workflow):
+    """Workflow tool name -> the bank API endpoint it calls (last URL path segment), for every api_call tool anywhere in the workflow.
+    The judge reads endpoint names: Freya's judge accepted `transfer_support` for "transfer_to_agent called" and `api_call` for get_account,
+    so a judge that fails on the workflow's own tool names would be stricter than the real one."""
+    out = {}
+    def scan(tools):
+        for t in tools or []:
+            f = t.get("function") or {}
+            url = ((f.get("parameters") or {}).get("properties") or {}).get("url", {}).get("default")
+            if f.get("handler") == "__function__:api_call" and isinstance(url, str) and f.get("name"):
+                out[f["name"]] = url.rstrip("/").rsplit("/", 1)[-1] or f["name"]
+    scan(workflow.get("tools"))
+    for n in list((workflow.get("nodes") or {}).values()) + list((workflow.get("global_nodes") or {}).values()):
+        scan(n.get("tools")); scan(n.get("pre_actions"))
+    return out
+
+
 def dig(obj, path):
     for k in path.split("."):
         if isinstance(obj, dict) and k in obj: obj = obj[k]
@@ -72,6 +89,7 @@ class LocalAgent:
         self.temperature = float(llm.get("temperature") or 0.7)
         self.max_tokens = int(llm.get("maxTokens") or 1000)
         self.warnings = []        # agent behaviour worth a look (silent turn, parallel tool calls, model-filled lifecycle fields)
+        self.endpoints = endpoints_of(workflow)
         self.path = []            # nodes entered, in order, like Freya's node_enter events
         self.started_at = datetime.datetime.now()
         self.events = []          # ("user"|"agent", text) | ("call", name, args, by_model, raw_part) | ("result", name, result)
@@ -492,13 +510,13 @@ class LocalAgent:
         self.lifecycle("end_of_call")
 
     def transcript_text(self):
-        out = []
+        out, ep = [], self.endpoints
         for e in self.events:
             if e[0] == "user": out.append("CUSTOMER: " + e[1])
             elif e[0] == "agent": out.append("AGENT: " + e[1])
-            elif e[0] == "call" and not e[1].startswith("transition_to_"): out.append(f"TOOL CALL {e[1]}: {json.dumps(e[2], default=str)[:400]}")
+            elif e[0] == "call" and not e[1].startswith("transition_to_"): out.append(f"TOOL CALL {ep.get(e[1], e[1])}: {json.dumps(e[2], default=str)[:400]}")
             elif e[0] == "result" and e[1] == "engine": out.append(f"ENGINE: {json.dumps(e[2])[:200]}")
             elif e[0] == "result" and e[1] != "code_exec" and not e[1].startswith("transition_to_"):
                 r = e[2].get("data", e[2]) if isinstance(e[2], dict) else e[2]
-                out.append(f"TOOL RESULT {e[1]}: {json.dumps(r, default=str)[:400]}")
+                out.append(f"TOOL RESULT {ep.get(e[1], e[1])}: {json.dumps(r, default=str)[:400]}")
         return "\n".join(out)

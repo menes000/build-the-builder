@@ -70,7 +70,37 @@
 | OUR-24 kayıtlı sözü değiştir | FAIL (1 rep) | ajan tasarımı (= OUR-13) | söz kaydedilince hemen kapanış; müşteri "Cuma'ya alalım" diyemiyor, kural 36 cümlesi hiç söylenemiyor |
 | OUR-25 doğrulama öncesi "konuşmak istemiyorum" | FAIL 3/3 koşu | ajan (model kararı, kararlı) | ilk redde `transition_to_close_declined` çağrıldı; kural 15 "önce bir kez açıkla" atlandı. OUR-05 (açık "vermem") 2/2 geçiyor. Freya'da doğrulanmalı |
 
-**Dora'ya iletilecek (öncelik sırası):** (1) söz sonrası anında kapanış: OUR-13 + OUR-24; Brief A metni "transfer follows a recorded promise" ve kural 36'yı açıkça anıyor, gizli sette olması muhtemel. (2) `test_variables.customer_id` (chat API). (3) tool adları API adlarıyla aynı olsun (OUR-10/11 judge). (4) OUR-25: "I don't want to talk" ilk seferde kapanış.
+## Resmi yol vs lokal (10 Eki 21:05, `run_coverage.py`, Freya simülasyon + Freya judge, 28 vaka, 1 koşu, 178 sn, sim `4e297550`)
+| Vaka | Freya resmi | Lokal (Gemini) | Yorum |
+|---|---|---|---|
+| 24 vaka | PASS | PASS | birebir aynı |
+| OUR-13, OUR-24 | FAIL | FAIL | **doğrulandı**: söz sonrası anında kapanış (ajan tasarımı) |
+| OUR-25 | FAIL | FAIL 3/3 | **doğrulandı**, experimental-5'te de aynı transcript: ilk "I don't want to talk"ta `close_declined`, kural 15 açıklaması yok |
+| OUR-15 | FAIL | PASS 2/2 | Freya ajanı belirsiz tarih + "bilmiyorum" sonrası deadline (23 Eki) yerine Cuma 16'yı önerdi (kural 21 → deadline; kural 30 "non-answer → deneme 1 = Cuma" ile çakışıyor, Dora'nın prompt'u 30'u seçmiş). Gemini ajan doğru yaptı → emülatör bu tür prompt-yorum farklarını yakalayamaz |
+| OUR-10, OUR-11 | PASS | 10: 1/2→2/2, 11: 0/2 | Freya judge `transfer_support` ve `api_call` (get_account) adlarını affetti; lokal judge affetmiyordu → judge'a artık URL'deki API uç adı gösteriliyor (`endpoints_of`). Tool adı bulgusu Dora için düşük öncelik oldu |
+
+Sonuç: emülatör 28 vakanın 26'sında Freya ile aynı karar (2 farkın biri judge katılığı, düzeltildi; biri model farkı). Pazar için lokal test güvenilir; model-yorum farkları için az sayıda resmi koşu ayrılmalı.
+
+**Dora'ya iletilecek (öncelik sırası):** (0) OUR-15: belirsiz tarih sonrası "bilmiyorum" → kural 21 deadline önerisi; şu an deneme-1 Cuma'ya gidiyor (Freya'da düştü). (0b) OUR-25: "konuşmak istemiyorum" ilk seferde kapanış; kural 15 "önce bir kez açıkla" + kural 45 "iki kez" (Freya'da düştü). Eski liste: (1) söz sonrası anında kapanış: OUR-13 + OUR-24; Brief A metni "transfer follows a recorded promise" ve kural 36'yı açıkça anıyor, gizli sette olması muhtemel. (2) `test_variables.customer_id` (chat API). (3) tool adları API adlarıyla aynı olsun (OUR-10/11 judge). (4) OUR-25: "I don't want to talk" ilk seferde kapanış.
+
+## Dora'ya builder bulguları (FREYA/ kod incelemesi, 10 Eki 21:30; biz dokunmuyoruz, Dora'ya iletilecek)
+Önem sırasıyla. Hepsi hedeflenen davranışa değil, final brief'inde (başka kelimeler/alanlar) kırılmaya dair.
+| # | Bulgu | Yer | Öneri |
+|---|---|---|---|
+| 1 | Debt statement'ta `'collections team about a late payment'` sabit; `DEBT_RULE` parametresi kullanılmıyor. Brief C "arrears team / overdue payment" der → yanlış cümle + "brief değeri kodda" kural ihlali | `builder/compile/codegen.py:248` | CallSpec'e `debt_intro_sentence` alanı, codegen onu kullansın |
+| 2 | Sözlü söylenen alanlar talimat gelince aynen okunuyor: `after_failed_text` string replace ile cümleye çevriliyor; Brief C extraction "Say they should use the app or a branch; say nothing about the balance." üretti → ajan bunu söyler. `paid.say` benzer (`_sentence` sadece "Say that" soyuyor) | `compiler.py:221`, `compiler.py:67` | Şemada "exact spoken sentence, first person"; compiler'da "Say/Tell" ile başlıyorsa reddet/retry |
+| 3 | Hook'lar mock'un hata metnine bağımlı: pre-hook reddi (`date='REJECTED'`) post-hook'ta `'must be'/'invalid'/'REJECTED'/'already'` string'lerinden anlaşılıyor. Final mock başka metin dönerse ret → "servis hatası" → 2. seferde `no_promise/service_error`. `callback_post`, `note_post` aynı | `codegen.py:398, 564` | pre-hook `vars['promise_precheck']='rejected'` yazsın, post-hook önce onu okusun |
+| 4 | Parser kırılgan: tool adı `path.strip('/')` (prefix'li path → KeyError), `servers` yoksa URL boş, openapi YAML → crash, brief PDF/docx → `read_text` crash | `builder/extract/tools.py:27`, `extractor.py:27` | Son path segmenti; `servers` yoksa hata ver; yaml fallback; binary brief'te pdftotext/pandoc veya net hata |
+| 5 | 30 dk bütçe aşılabilir: deadline sadece test başlamadan önce kontrol ediliyor; 24. dk'da başlayan `run_cases` 11 dk sürebilir | `builder/main.py:110` | `subprocess.run(..., timeout=kalan)` |
+| 6 | CallSpec ↔ openapi anlamsal doğrulama yok (outcome/reason, queue, identity field, note reason enum'ları). Bir yazım farkı = 0 puan | `extractor.py` / yeni `lint_spec` | enum'ları openapi ile karşılaştır, hatayı extractor'a retry olarak geri ver (altyapı var) |
+| 7 | Tek-ürünlü spec + 2 ürünlü müşteri = her promise REJECTED (`product_id` alanı yok → `pid=''`). README: "Final customers can have up to three products" | `codegen.py:321`, `compiler.py:165` | `product_id` alanı her zaman; çok-ürün mantığı runtime `n_products`'a göre |
+| 8 | `test_variables.customer_id='c_test'` chat API'de gerçek id'yi eziyor (simülasyonda sorun yok) | `compiler.py:378` | Sil, maliyeti sıfır |
+| 9 | Söz sonrası transfer imkânsız (Brief A kural 46 son satır, Brief B kural 10): tek üründe `promise_state==recorded` tool sonucunda anında kapanıyor → OUR-13/24 | `compiler.py:318` | Kapanışı tool transition / bye intent yap; post-hook'lar `vars['outcome']/['reason']`'ı anında yazsın (müşteri kapatırsa `close_call` doğru gitsin). Aynı önlem platformun `agent_config`'e eklediği `end_call` tool'u için de gerekli |
+| 10 | Tool adları `transfer_general/support/restructuring` ≠ API `transfer_to_agent`; bizim judge OUR-10/11'i düşürüyor, Freya judge PUB-09'u geçiriyor (tool adını görmüyor olabilir) | `compiler.py:181` | Belirsiz; alternatif tek `transfer_to_agent`, `queue` enum model-filled + pre-hook doğrulama |
+| 11 | `human_request` Brief C extraction'da null → security node'da transfer tool yok. Brief A kural 45 "doğrulama öncesi de geçerli" | `fixtures/callspec_brief_c.claude.json`, `compiler.py:264` | Extractor varsayılanı `special.human` olsun |
+| 12 | Küçük: `promise_post` tek üründe de "call transition_to_close_done" diyor (tool yok); bilinmeyen product type → floor 0 → her tutar kabul; `scan.py` CLOSE_INVALID Brief A outcome listesine sabit; `verify_post` "Both security answers" (3 soruda yanlış, dahili) | `codegen.py:428, 163`, `test/scan.py:58` | fallback `minimum_payment`/`instalment_amount`; listeyi spec'ten al |
+
+**Not:** OUR-25 (ilk redde kapanış) sonucu Gemini ajanla alındı; Dora'ya iletmeden önce Freya'da (`run_coverage`) doğrula. OUR-21 check'i kural 26+30 okuması; kural 31 "reddedilen teklifi tekrarlama" ile çelişebilir, FAIL gelirse sınıf "kural belirsizliği".
 
 ## İkinci ajanın incelemesi (10 Eki 21:00) ve yapılanlar
 | # | Bulgu | Karar / yapılan |
@@ -97,7 +127,8 @@
 ## Sıradaki adımlar
 - [ ] (onay bekliyor) `ours-a-chattest` kopyasını oluştur, 18 vakayı Freya modunda koş, lokal ile karşılaştır → emülatör kalibrasyonu (`path` alanı bunun için).
 - [ ] Lokal 18 vaka --reps 2 koşusu: `results/coverage-local-v2.json` (10 Eki 20:40 başladı). Yeni 10 vaka: `results/coverage-local-new.json`.
-- [ ] (Dora'yla koordine) `python3 tester/run_coverage.py a1230ea7-d704-4c24-8b07-d44e3f1d9b8a --cases tester/coverage-cases.json --out results/coverage-freya.json` → Freya judge ile lokal judge karşılaştır, `--judge-view` seç.
+- [x] Resmi koşu yapıldı (21:05): 24/28, `results/coverage-freya.json`. `--judge-view tools` Freya'ya yakın (tool adları artık API adı).
+- [ ] OUR-15 ve OUR-25 Dora düzeltince resmi yolda `--only OUR-13,OUR-15,OUR-24,OUR-25` tekrar.
 - [ ] Coverage tablosu `--reps 2`, sonuç Dora'nın `NOTES.md`'sine "Coverage set" başlığıyla (vaka, rep başına pass/fail, sınıf, tek satır kanıt).
 - [ ] Dora'ya bulgular: `c_test` / test_variables, tool adları (OUR-10/11), OUR-13.
 - [ ] Brief B (`ours-ab`) için çok ürünlü coverage vakaları.

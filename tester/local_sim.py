@@ -139,9 +139,9 @@ def behaviour_flags(call):
     return out
 
 
-def transcript_text(call):
-    """User and agent lines plus the tool calls, as plain text for the judge."""
-    out = []
+def transcript_text(call, endpoints=None):
+    """User and agent lines plus the tool calls, as plain text for the judge. `endpoints` maps workflow tool names to bank API names."""
+    out, ep = [], endpoints or {}
     for m in call.get("messages", []):
         role, text = m.get("role"), m.get("message") or ""
         if role == "assistant": out.append("AGENT: " + text)
@@ -152,16 +152,18 @@ def transcript_text(call):
             if ev.get("event") == "function_call_start":
                 args = ev.get("args") or {}
                 args = args.get("body", args) if isinstance(args, dict) else args
-                out.append(f"TOOL CALL {ev.get('function')}: {json.dumps(args)[:400]}")
+                out.append(f"TOOL CALL {ep.get(ev.get('function'), ev.get('function'))}: {json.dumps(args)[:400]}")
             elif ev.get("event") == "function_call_complete":
                 res = ev.get("result")
                 res = res.get("data", res) if isinstance(res, dict) else res
-                out.append(f"TOOL RESULT {ev.get('function')}: {json.dumps(res)[:400]}")
+                out.append(f"TOOL RESULT {ep.get(ev.get('function'), ev.get('function'))}: {json.dumps(res)[:400]}")
     return "\n".join(out)
 
 
 class FreyaAgent:
     """The phone agent on Freya, through the chat API."""
+    endpoints = {}                                                 # set once per run from the workflow JSON (main)
+
     def __init__(self, workflow_id, variables, stats):
         self.wf, self.variables, self.stats, self.call_id, self.last = workflow_id, variables, stats, None, None
         self.call = None
@@ -193,7 +195,7 @@ class FreyaAgent:
     def result(self):
         """(transcript text for the judge, platform errors, behaviour flags, node path), read from Freya after the end-of-call tools ran."""
         self.call = freya.get_call(self.call_id)
-        return transcript_text(self.call), platform_errors(self.call), behaviour_flags(self.call), node_path(self.call)
+        return transcript_text(self.call, self.endpoints), platform_errors(self.call), behaviour_flags(self.call), node_path(self.call)
 
 
 class LocalAgent:
@@ -303,6 +305,9 @@ def main():
     if not cases: sys.exit("no cases selected")
     wf = workflow_for(a.workflow_id)
     target = emulator.load_workflow(wf) if a.agent == "local" else wf
+    if a.agent == "freya":
+        try: FreyaAgent.endpoints = emulator.endpoints_of(emulator.load_workflow(wf))      # one GET, so the judge reads API names
+        except Exception as e: say(f"(could not load the workflow for tool names: {e})")
     out_dir = ROOT / "results" / "local" / time.strftime("%Y%m%d-%H%M%S"); out_dir.mkdir(parents=True, exist_ok=True)
     agent_desc = f"agent emulated locally with {emulator.AGENT_MODEL}" if a.agent == "local" else "agent on Freya"
     say(f"{len(cases)} cases x {a.reps} reps, {agent_desc}, customer and judge {gemini.MODEL} (judge sees: {a.judge_view}), {a.parallel} at a time. Transcripts: {out_dir}\n")
