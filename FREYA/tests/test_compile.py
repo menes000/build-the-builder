@@ -1,0 +1,61 @@
+"""Compiled workflow structure, date facts, field mapping."""
+import json
+import sys
+from pathlib import Path
+
+from conftest import ROOT, tool
+
+sys.path.insert(0, str(ROOT))
+from builder.compile.selfcheck import facts_preview  # noqa: E402
+
+
+def test_single_product_shape(wf_a):
+    n = wf_a["nodes"]
+    assert "security_explain" in n and "after_promise" in n and "close_on_goodbye" in n and "close_on_transfer" in n
+    assert [t["function"]["name"] for t in n["negotiate"]["tools"]] == ["create_promise", "note_refusal", "transfer_to_agent"]
+    assert [t["function"]["name"] for t in n["after_promise"]["tools"]] == ["transfer_to_agent"]
+    assert n["negotiate"]["transitions"][0]["target_node"] == "after_promise"
+    assert "customer_id" not in wf_a["test_variables"]
+    sec = tool(wf_a, "security", "transfer_to_agent")
+    assert sec["function"]["parameters"]["properties"]["body"]["properties"]["queue"]["default"] == "general"
+
+
+def test_multi_product_shape(wf_ab):
+    n = wf_ab["nodes"]
+    assert "after_promise" not in n
+    assert "add_note" in [t["function"]["name"] for t in n["negotiate"]["tools"]]
+    first = n["negotiate"]["transitions"][0]
+    assert first["target_node"] == "close_promise" and len(first["condition"]["conditions"]) > 10  # counter combos
+
+
+def test_dates_brief_a(wf_a):
+    v = facts_preview(wf_a, "2026-10-14T11:00", [{"product_id": "p1", "type": "car_loan", "past_due": 1250.0, "days_late": 14, "instalment_amount": 400.0}])
+    f = json.loads(v["facts_json"])[0]
+    assert f["band"] == "late" and f["deadline"] == "2026-10-23" and f["att1"] == "2026-10-16" and f["floor"] == 400.0
+    v = facts_preview(wf_a, "2026-10-14T11:00", [{"product_id": "p1", "type": "personal_loan", "past_due": 540.0, "days_late": 5, "instalment_amount": 180.0}])
+    f = json.loads(v["facts_json"])[0]
+    assert f["band"] == "early" and f["deadline"] == "2026-11-02"  # 12 business days, 26 Oct holiday skipped
+    assert "2026-10-26" not in f["valid"] and "2026-10-27" in f["valid"]
+    assert v["debt_statement"].startswith("Thank you, the security check is complete. I am calling from the collections team about a late payment.")
+    assert "collections team" in v["debt_statement"] and v["next_question"] == "What is your date of birth?"
+    assert v["outcome"] == "no_promise" and v["reason"] == "refused"
+
+
+def test_renamed_api_is_mapped(wf_c_renamed):
+    sec = tool(wf_c_renamed, "security", "verify_identity")
+    assert sec["response_mapping"][0]["path"] == "data.id_state"
+    assert any(c.get("variable") == "verify_identity_response.data.fully_verified"
+               for c in wf_c_renamed["nodes"]["security"]["transitions"][0]["condition"]["conditions"])
+    cp = tool(wf_c_renamed, "negotiate", "create_promise")
+    keys = cp["function"]["parameters"]["properties"]["body"]["properties"].keys()
+    assert "promise_date" in keys and "payment_amount" in keys
+    assert wf_c_renamed["nodes"]["load_account"]["response_mapping"][0]["path"] == "data.accounts"
+    v = facts_preview(wf_c_renamed, "2026-10-14T11:00", [{"product_id": "p1", "type": "credit_card", "last4": "9015", "overdue_amount": 510, "days_overdue": 16, "min_payment": 153}])
+    assert v["account_state"] == "ok" and json.loads(v["facts_json"])[0]["floor"] == 153
+
+
+def test_no_brief_values_in_compiler_code():
+    """Brief A constants must not live in the compiler; they come from the CallSpec."""
+    src = "".join(Path(p).read_text() for p in (ROOT / "builder/compile").glob("*.py") if p.name != "selfcheck.py")  # selfcheck holds sample data only
+    for leak in ("2026-10-26", "4821", "collections team", "12th business", "Freya Bank"):
+        assert leak not in src, leak
