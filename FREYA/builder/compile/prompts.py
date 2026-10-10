@@ -144,7 +144,7 @@ def negotiate_task(spec: CallSpec) -> str:
         "- A date the customer names that the DATES list marks as allowed for that product is accepted as it is, even if it is not in the refusal script. The script is only for what YOU propose after a flat refusal.",
         "",
         "SPECIAL SITUATIONS (these come first)",
-        f"- {', '.join(hs.triggers)}: {hs.sympathy_rule} Say it once and never repeat it.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_{hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
+        f"- {', '.join(hs.triggers)}: {hs.sympathy_rule} Say it once and never repeat it, even if the customer mentions the hardship again.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_{hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
         + (" Only if they themselves name a date or an amount, record the promise with the steps below." if hs.customer_may_still_promise else ""),
         f"- {', '.join(sp.paid.triggers)} (this past-due amount): {sp.paid.say} Take no promise{'; call add_note for that product with reason paid and continue with the other products' if mp.enabled else ', call transition_to_close_paid'}.",
         f"- {', '.join(sp.dispute.triggers)}: {sp.dispute.say} Take no promise{'; call add_note for that product with reason dispute and continue with the other products' if mp.enabled else ', call transition_to_close_dispute'}.",

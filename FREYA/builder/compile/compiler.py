@@ -341,12 +341,21 @@ def compile_workflow(spec: CallSpec) -> dict:
             tool_tr("close_refused", "The persuasion attempts are used up and the customer still refuses, or said twice they do not want to talk"),
             tool_tr("close_service_error", "create_promise failed twice and nothing was recorded"),
         ]
-    neg_transitions.append(bye_tr("close_done" if mp.enabled else "close_refused"))
+    neg_transitions.append(bye_tr("close_on_goodbye"))
+    situation = {
+        "name": "situation", "type": "string", "min_confidence": 0.6,
+        "enum_values": ["hardship", "paid", "dispute", "plan", "human", "refusal", "negotiating"],
+        "description": ("The customer's situation from their LAST message, for closing the call correctly if they hang up. "
+                        f"hardship: {', '.join(hs.triggers)}. paid: says they already paid. dispute: says the debt or product is not theirs. "
+                        f"plan: asks for {' or '.join(sp.restructuring.triggers)}. human: insists on a person. refusal: refuses to pay with no date or amount. "
+                        "negotiating: proposes or discusses a date or an amount. Leave empty when nothing new was said about this."),
+    }
     nodes["negotiate"] = conv(
         "negotiate", prompts.negotiate_task(spec),
         on_enter={"type": "tts", "text": "{{debt_statement}}"}, first_only=True,
-        tools=neg_tools, transitions=neg_transitions,
+        tools=neg_tools, transitions=neg_transitions, extraction=[situation],
         max_turns=60 if mp.enabled else 40, cap_to="close_refused")
+    closes["close_on_goodbye"] = None  # placeholder, replaced below
 
     nodes["third_party"] = conv(
         "third_party", prompts.third_party_task(spec), first_only=True,
@@ -361,8 +370,14 @@ def compile_workflow(spec: CallSpec) -> dict:
         ],
         max_turns=20, cap_to="close_no_callback")
 
+    closes.pop("close_on_goodbye", None)
     for nm, (o, r, text) in closes.items():
         nodes[nm] = code_node(nm, codegen.close_hint_code(o, r, text), "decide_outcome")
+    goodbye_map = {
+        "hardship": list(closes["close_hardship"]), "paid": list(closes["close_paid"]), "dispute": list(closes["close_dispute"]),
+        "default": list(closes["close_refused"]),
+    }
+    nodes["close_on_goodbye"] = code_node("close_on_goodbye", codegen.close_on_goodbye_code(goodbye_map), "decide_outcome")
     farewells = {
         "paid": closes["close_paid"][2],
         "no_promise": closes["close_refused"][2],

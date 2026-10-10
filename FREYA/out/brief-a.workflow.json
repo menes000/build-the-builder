@@ -580,7 +580,7 @@
   "negotiate": {
    "name": "negotiate",
    "node_type": "conversation",
-   "task_message": "The customer is verified. You have just told them about the late payment and asked whether they can pay today.\n\nTOOL RULES\n- create_promise: only after the customer says a clear yes to your read-back. date as YYYY-MM-DD. amount_kind: 'full' when the agreed amount is the full past-due amount, 'floor' when it is the floor, otherwise 'custom' with the amount as a number.\n- If create_promise fails, follow what_to_do_next: call it once more with the same values. If it says the date or amount is not allowed, tell the customer it cannot be accepted and offer a valid option.\n- When a rule below says to call a tool or a transition, call it. Saying it is not enough.\n\nACCOUNT\n{{offers_text}}\n- Today: {{today_text}}. Tomorrow: {{tomorrow_text}}.\n- A date the customer names that the DATES list marks as allowed for that product is accepted as it is, even if it is not in the refusal script. The script is only for what YOU propose after a flat refusal.\n\nSPECIAL SITUATIONS (these come first)\n- illness, a death in the family, job loss: Say one short sentence of sympathy. Say it once and never repeat it. Make no persuasion attempt. Offer once to connect them with the support team. If they accept, call transfer_support. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no. Only if they themselves name a date or an amount, record the promise with the steps below.\n- I already paid (this past-due amount): Say that payments can take one business day to appear. Take no promise, call transition_to_close_paid.\n- This debt is not mine, I never had this product, the product was closed or paid off in the past: Do not argue. Take no promise, call transition_to_close_dispute.\n- a new payment plan, lower instalments: do not describe any plan. Call transfer_restructuring.\n- A request for a human: ask once whether you can help first. If they insist, call transfer_general.\n- If they say a second time that they do not want to talk: call transition_to_close_refused.\n\nHOW TO GET THE PROMISE\n1. Ask for the full past-due amount first. Never ask how much they can pay; you propose every amount.\n2. Only if they say the AMOUNT is too much (too high, cannot afford that much): offer the floor once, Say that the rest stays overdue. Ask when they can pay it. Do not attach a date to this offer. From then on never propose the full amount again. If they refuse the floor amount, that is a flat refusal (step 6). 'I cannot pay today', 'no', or a no to a date is NOT an amount objection: it is a flat refusal (step 6) or a date question (step 4), and the amount stays the full amount.\n3. An amount from the floor up to the full amount, both included, is accepted. Below the floor: say it cannot be accepted and offer the floor once. If the customer does not accept the floor, treat it as a flat refusal.\n4. Dates: look up every date the customer names in the DATES list and do what it says. Say the latest date you can accept is the deadline and offer it. If the customer refuses the deadline, treat it as a flat refusal.\n5. If the customer gives a vague period (next week, end of the month, when my salary comes), ask once for the exact day. If they still give none, propose the deadline.\n6. A flat refusal (A flat refusal or a non-answer. A no to paying today with no date and no amount is a flat refusal. A date or an amount the customer proposes is never a refusal.) uses one persuasion attempt. The number of attempts allowed and the attempt-1 date are in ACCOUNT:\n   - Attempt 1: propose the full past-due amount (or the floor, if the customer already said the full amount is too much) on the last business day of this week. If today is that day, propose the last business day of next week.\n   - Attempt 2, late band only: propose the floor amount on the deadline.\n   - When the attempts are used up, stop. Do not repeat an offer the customer already refused. When the allowed attempts are used up and they still refuse, call transition_to_close_refused.\n   Whenever you propose the floor, Say that the rest stays overdue.\n   A date or an amount the customer proposes is never a refusal: handle it with steps 2 to 5.\n7. When the amount and the date are agreed: read back product, amount, date (date with weekday, day and month), then ask \"Do you confirm?\". Call create_promise only after a clear yes. If they change the date or the amount, check it again and read it back again.\n8. A recorded promise cannot be changed or cancelled in the same call; they can change it in the mobile app.\n\nDATES (every date the customer may name, and what to do)\n{{calendar_text}}\n\n'Next <weekday>' means that weekday in the following calendar week. 'This <weekday>' means the one in the current week. 'Next Friday' said on a Friday is the Friday of the following week.\n{{weekday_text}}\n\nOTHER RULES\n- If the customer says the full amount is too much, offer the floor once. If the customer refuses the floor, treat it as a flat refusal. Attempt 2 may name the floor again, on the deadline.\n- First ask: 'Can you make this payment today?'\n- The hardship rule comes before the persuasion and restructuring rules.\n- Rule 39 (already paid) covers only a payment of this past-due amount; a claim that the product was closed or paid off in the past is a dispute.",
+   "task_message": "The customer is verified. You have just told them about the late payment and asked whether they can pay today.\n\nTOOL RULES\n- create_promise: only after the customer says a clear yes to your read-back. date as YYYY-MM-DD. amount_kind: 'full' when the agreed amount is the full past-due amount, 'floor' when it is the floor, otherwise 'custom' with the amount as a number.\n- If create_promise fails, follow what_to_do_next: call it once more with the same values. If it says the date or amount is not allowed, tell the customer it cannot be accepted and offer a valid option.\n- When a rule below says to call a tool or a transition, call it. Saying it is not enough.\n\nACCOUNT\n{{offers_text}}\n- Today: {{today_text}}. Tomorrow: {{tomorrow_text}}.\n- A date the customer names that the DATES list marks as allowed for that product is accepted as it is, even if it is not in the refusal script. The script is only for what YOU propose after a flat refusal.\n\nSPECIAL SITUATIONS (these come first)\n- illness, a death in the family, job loss: Say one short sentence of sympathy. Say it once and never repeat it, even if the customer mentions the hardship again. Make no persuasion attempt. Offer once to connect them with the support team. If they accept, call transfer_support. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no. Only if they themselves name a date or an amount, record the promise with the steps below.\n- I already paid (this past-due amount): Say that payments can take one business day to appear. Take no promise, call transition_to_close_paid.\n- This debt is not mine, I never had this product, the product was closed or paid off in the past: Do not argue. Take no promise, call transition_to_close_dispute.\n- a new payment plan, lower instalments: do not describe any plan. Call transfer_restructuring.\n- A request for a human: ask once whether you can help first. If they insist, call transfer_general.\n- If they say a second time that they do not want to talk: call transition_to_close_refused.\n\nHOW TO GET THE PROMISE\n1. Ask for the full past-due amount first. Never ask how much they can pay; you propose every amount.\n2. Only if they say the AMOUNT is too much (too high, cannot afford that much): offer the floor once, Say that the rest stays overdue. Ask when they can pay it. Do not attach a date to this offer. From then on never propose the full amount again. If they refuse the floor amount, that is a flat refusal (step 6). 'I cannot pay today', 'no', or a no to a date is NOT an amount objection: it is a flat refusal (step 6) or a date question (step 4), and the amount stays the full amount.\n3. An amount from the floor up to the full amount, both included, is accepted. Below the floor: say it cannot be accepted and offer the floor once. If the customer does not accept the floor, treat it as a flat refusal.\n4. Dates: look up every date the customer names in the DATES list and do what it says. Say the latest date you can accept is the deadline and offer it. If the customer refuses the deadline, treat it as a flat refusal.\n5. If the customer gives a vague period (next week, end of the month, when my salary comes), ask once for the exact day. If they still give none, propose the deadline.\n6. A flat refusal (A flat refusal or a non-answer. A no to paying today with no date and no amount is a flat refusal. A date or an amount the customer proposes is never a refusal.) uses one persuasion attempt. The number of attempts allowed and the attempt-1 date are in ACCOUNT:\n   - Attempt 1: propose the full past-due amount (or the floor, if the customer already said the full amount is too much) on the last business day of this week. If today is that day, propose the last business day of next week.\n   - Attempt 2, late band only: propose the floor amount on the deadline.\n   - When the attempts are used up, stop. Do not repeat an offer the customer already refused. When the allowed attempts are used up and they still refuse, call transition_to_close_refused.\n   Whenever you propose the floor, Say that the rest stays overdue.\n   A date or an amount the customer proposes is never a refusal: handle it with steps 2 to 5.\n7. When the amount and the date are agreed: read back product, amount, date (date with weekday, day and month), then ask \"Do you confirm?\". Call create_promise only after a clear yes. If they change the date or the amount, check it again and read it back again.\n8. A recorded promise cannot be changed or cancelled in the same call; they can change it in the mobile app.\n\nDATES (every date the customer may name, and what to do)\n{{calendar_text}}\n\n'Next <weekday>' means that weekday in the following calendar week. 'This <weekday>' means the one in the current week. 'Next Friday' said on a Friday is the Friday of the following week.\n{{weekday_text}}\n\nOTHER RULES\n- If the customer says the full amount is too much, offer the floor once. If the customer refuses the floor, treat it as a flat refusal. Attempt 2 may name the floor again, on the deadline.\n- First ask: 'Can you make this payment today?'\n- The hardship rule comes before the persuasion and restructuring rules.\n- Rule 39 (already paid) covers only a payment of this past-due amount; a claim that the product was closed or paid off in the past is a dispute.",
    "tools": [
     {
      "type": "function",
@@ -945,7 +945,7 @@
      }
     },
     {
-     "target_node": "close_refused",
+     "target_node": "close_on_goodbye",
      "description": "The customer says goodbye, hangs up, or clearly ends the conversation",
      "condition": {
       "operator": "matches_intent",
@@ -958,6 +958,23 @@
     "text": "{{debt_statement}}"
    },
    "max_node_turns": 40,
+   "extraction_schema": [
+    {
+     "name": "situation",
+     "type": "string",
+     "min_confidence": 0.6,
+     "enum_values": [
+      "hardship",
+      "paid",
+      "dispute",
+      "plan",
+      "human",
+      "refusal",
+      "negotiating"
+     ],
+     "description": "The customer's situation from their LAST message, for closing the call correctly if they hang up. hardship: illness, a death in the family, job loss. paid: says they already paid. dispute: says the debt or product is not theirs. plan: asks for a new payment plan or lower instalments. human: insists on a person. refusal: refuses to pay with no date or amount. negotiating: proposes or discusses a date or an amount. Leave empty when nothing new was said about this."
+    }
+   ],
    "max_turn_transition": "close_refused",
    "on_enter_first_entry_only": true
   },
@@ -1781,6 +1798,47 @@
         "code": {
          "type": "string",
          "default": "try:\n    vars['hint_outcome'] = 'no_promise'\n    vars['hint_reason'] = 'service_error'\n    vars['hint_farewell'] = 'I am sorry, I cannot reach your account details right now because of a technical problem. Thank you for your time. Goodbye.'\nexcept Exception:\n    pass\n"
+        },
+        "timeout_ms": {
+         "type": "number",
+         "default": 10000
+        }
+       }
+      }
+     }
+    }
+   ],
+   "transitions": [
+    {
+     "target_node": "decide_outcome",
+     "description": "always",
+     "condition": {
+      "operator": "always"
+     }
+    }
+   ]
+  },
+  "close_on_goodbye": {
+   "name": "close_on_goodbye",
+   "node_type": "code",
+   "passthrough": true,
+   "passthrough_default_transition": "decide_outcome",
+   "on_enter": {
+    "type": "silent"
+   },
+   "disable_inactivity_monitor": true,
+   "pre_actions": [
+    {
+     "type": "function",
+     "function": {
+      "name": "code_exec",
+      "handler": "__function__:code_exec",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string",
+         "default": "M = {'hardship': ['no_promise', 'hardship', 'Thank you for your time, NAME. Goodbye.'], 'paid': ['paid', '', 'Thank you for letting me know. Payments can take one business day to appear. Thank you for your time, NAME. Goodbye.'], 'dispute': ['no_promise', 'dispute', 'I understand. Thank you for your time, NAME. Goodbye.'], 'default': ['no_promise', 'refused', 'I understand. Thank you for your time, NAME. Goodbye.']}\ntry:\n    sit = str(vars.get('situation') or '').strip().lower()\n    o, r, f = M.get(sit) or M.get('default')\n    vars['hint_outcome'] = o\n    vars['hint_reason'] = r\n    vars['hint_farewell'] = f\nexcept Exception:\n    try:\n        o, r, f = M.get('default')\n        vars['hint_outcome'] = o\n        vars['hint_reason'] = r\n        vars['hint_farewell'] = f\n    except Exception:\n        pass\n"
         },
         "timeout_ms": {
          "type": "number",

@@ -649,6 +649,29 @@ def close_hint_code(outcome: str, reason: str, farewell: str) -> str:
             "    pass\n")
 
 
+def close_on_goodbye_code(mapping: dict) -> str:
+    """When the customer says goodbye in the negotiation, pick the closing hint from the extracted `situation`.
+
+    mapping: situation value -> (outcome, reason, farewell); key 'default' for anything else.
+    """
+    return "M = " + _lit(mapping) + r'''
+try:
+    sit = str(vars.get('situation') or '').strip().lower()
+    o, r, f = M.get(sit) or M.get('default')
+    vars['hint_outcome'] = o
+    vars['hint_reason'] = r
+    vars['hint_farewell'] = f
+except Exception:
+    try:
+        o, r, f = M.get('default')
+        vars['hint_outcome'] = o
+        vars['hint_reason'] = r
+        vars['hint_farewell'] = f
+    except Exception:
+        pass
+'''
+
+
 def decide_outcome_code(spec: CallSpec, promise_farewell: str, farewells: dict | None = None) -> str:
     """Final outcome from state. Overrides the hint when a transfer or a promise happened."""
     c = spec.closing

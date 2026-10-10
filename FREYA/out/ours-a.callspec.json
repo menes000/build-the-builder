@@ -27,7 +27,7 @@
  "address_customer_as": "{{title}} {{last_name}}",
  "turn_style": "one or two short sentences per turn",
  "opening": {
-  "first_sentence": "Hello, I am a digital assistant calling from Freya Bank, and this call is recorded.",
+  "first_sentence": "Hello, I am a digital assistant calling from Freya Bank, and we record this call.",
   "ask_person_question": "Am I speaking with {{title}} {{last_name}}?",
   "confirmation_examples": [
    "yes",
@@ -627,6 +627,90 @@
    ]
   }
  ],
+ "field_map": {
+  "req": {
+   "verify_identity": {
+    "customer_id": "customer_id",
+    "field": "field",
+    "answer": "answer"
+   },
+   "get_account": {
+    "customer_id": "customer_id"
+   },
+   "create_promise": {
+    "customer_id": "customer_id",
+    "product_id": "product_id",
+    "amount": "amount",
+    "date": "date"
+   },
+   "add_note": {
+    "customer_id": "customer_id",
+    "product_id": "product_id",
+    "reason": "reason",
+    "text": "text"
+   },
+   "schedule_callback": {
+    "customer_id": "customer_id",
+    "date": "date",
+    "time": "time"
+   },
+   "transfer_to_agent": {
+    "customer_id": "customer_id",
+    "queue": "queue"
+   },
+   "close_call": {
+    "customer_id": "customer_id",
+    "outcome": "outcome",
+    "reason": "reason"
+   }
+  },
+  "resp": {
+   "verify_identity": {
+    "ok": "ok",
+    "error": "error",
+    "verified": "verified",
+    "all_verified": "all_verified",
+    "wrong_answers_left": "wrong_answers_left",
+    "hint": "hint"
+   },
+   "get_account": {
+    "ok": "ok",
+    "error": "error",
+    "products": "products"
+   },
+   "create_promise": {
+    "ok": "ok",
+    "error": "error",
+    "promise_id": "promise_id"
+   },
+   "add_note": {
+    "ok": "ok",
+    "error": "error"
+   },
+   "schedule_callback": {
+    "ok": "ok",
+    "error": "error"
+   },
+   "transfer_to_agent": {
+    "ok": "ok",
+    "error": "error"
+   },
+   "close_call": {
+    "ok": "ok",
+    "error": "error"
+   }
+  },
+  "product": {
+   "product_id": "product_id",
+   "type": "type",
+   "card_last4": "card_last4",
+   "past_due": "past_due",
+   "days_late": "days_late",
+   "minimum_payment": "minimum_payment",
+   "instalment_amount": "instalment_amount"
+  },
+  "warnings": []
+ },
  "global_extra_rules": [],
  "source_notes": [
   "Hand-written from Brief A for compiler development."

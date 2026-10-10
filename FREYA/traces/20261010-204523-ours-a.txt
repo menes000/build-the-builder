@@ -1,0 +1,10 @@
+[    0.0s] start: label=ours-a
+[    0.0s] note: text=briefs=['kit/briefs/brief-a.md'] openapi=/Users/doraalkan/Desktop/FREYA/kit/tools/openapi.json slot=ours-a model=claude-opus-5-5 budget_min=4.0
+[    0.0s] note: text=using CallSpec from fixtures/callspec_brief_a.json (no extraction)
+[    0.0s] note: text=compiled 27 nodes -> /Users/doraalkan/Desktop/FREYA/out/ours-a.workflow.json
+[    0.7s] note: text=dryRun valid
+[    4.0s] created_on_freya: what=workflow slot=ours-a tag=v1 workflow_id=76b6ef99-1679-4369-be3a-4580b853a8a8 agent_id=a1230ea7-d704-4c24-8b07-d44e3f1d9b8a version=8
+[  140.2s] test: name=practice brief A style=corrects passed=9 total=10 seconds=136 failed=["PUB-05: outcome ('no_promise', 'refused'), expected ('no_promise', 'hardship'); conversation: The assistant failed the 'one sentence of sympathy' criterion because it provided a sympathy sentence in Message 8"] simulation_id=c6d87651-cf71-4c00-b56f-00fe1bc57f7b
+[  140.7s] note: text=fix round 1: not enough budget left (1 min); keeping v1
+[  140.9s] note: text=exported /Users/doraalkan/Desktop/FREYA/out/ours-a.export.workflow.json
+[  140.9s] end: total_seconds=141 workflow_id=76b6ef99-1679-4369-be3a-4580b853a8a8 agent_id=a1230ea7-d704-4c24-8b07-d44e3f1d9b8a export=/Users/doraalkan/Desktop/FREYA/out/ours-a.export.workflow.json tests={'A': '9/10'}

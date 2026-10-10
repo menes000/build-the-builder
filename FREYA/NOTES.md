@@ -75,3 +75,7 @@
 - Yarın: API key testi; deneme sayacı; builder'ın kendi düzeltme döngüsü; kapsama seti (Mehmet); tool API cevap alanlarını openapi'den okuma; öğlen dondurma.
 - 21:00 **Tool API alan eşlemesi**: `tools.field_map()` canonical→gerçek ad (exact → eşanlamlı → gevşek eşleme → uyarı). codegen/compiler tüm banka alanlarını eşlemeden okuyor. Test: briefs_extra/brief-c/openapi-renamed.json (12 alan yeniden adlandırılmış) → derleme, selfcheck, dryRun OK.
 - 21:35 **Fix loop uçtan uca** (ext-a, Brief A, --style pieces, --fix-rounds 1): extraction 59 s → test 8/10 → Claude revizyonu 69 s ($0.42; hardship teklifi bir kez, belirsiz dönemde tek soru) → yeniden derle (v3) → test **10/10**. Toplam 351 s. Trace: traces/20261010-203007-ext-a.txt. Yapısal koruma (tatil/bant/outcome/kimlik soruları değişmez) geçti.
+- 21:50 Fallback senaryoları: (1) test dosyasız koşu (Brief C) 61 s, export+trace OK; (2) dar bütçe (4 dk): test koştu 9/10, fix turu "bütçe yetersiz" diye atlandı, export OK.
+- PUB-05 corrects: müşteri "hoşça kalın" deyince veda geçişi sabit `refused`'a gitti (bağlam hardship'ti) + sempati tekrarı. v9/v15: negotiate'e `situation` extraction (hardship/paid/dispute/plan/human/refusal/negotiating) + `close_on_goodbye` kod node'u bağlama göre kapanış seçiyor; "müşteri tekrar anlatsa da sempati bir kez".
+- A v9 (22:05): corrects **10/10**, plain **10/10**. Bağlama göre veda kapanışı ve sempati kuralı doğrulandı.
+## Gün sonu 2 (22:05): son sürümler A v9, AB v14. Yarın: API key testi, deneme sayacı (B PUB-12), Mehmet kapsama seti, öğlen dondurma, akşam final.
