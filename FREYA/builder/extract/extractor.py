@@ -24,7 +24,18 @@ def _schema_text() -> str:
 def _brief_text(brief_paths: list[str]) -> str:
     parts = []
     for p in brief_paths:
-        parts.append(f"\n\n===== FILE: {p} =====\n{Path(p).read_text()}")
+        path = Path(p)
+        if path.suffix.lower() == ".pdf":
+            try:
+                import subprocess
+                text = subprocess.run(["pdftotext", "-layout", str(path), "-"], capture_output=True, text=True, timeout=60).stdout
+            except Exception:
+                text = ""
+            if not text.strip():
+                text = f"(PDF could not be converted to text: {path.name}; read it with the Read tool at {path.resolve()})"
+        else:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        parts.append(f"\n\n===== FILE: {p} =====\n{text}")
     return "".join(parts)
 
 
@@ -77,9 +88,18 @@ def extract_callspec(brief_paths: list[str], out_path: str, trace, model: str | 
         raw = out.read_text()
         try:
             spec = CallSpec.model_validate_json(raw)
-            trace.note(f"extraction attempt {attempt + 1}: CallSpec valid ({len(raw)} bytes)")
-            return spec
         except (ValidationError, ValueError) as e:
             errors = str(e)[:6000]
             trace.note(f"extraction attempt {attempt + 1}: schema errors: {errors[:300]}")
+            continue
+        problems = []
+        if openapi_path:
+            from .tools import field_map, lint_spec, parse_openapi
+            problems = lint_spec(spec, parse_openapi(openapi_path), field_map(openapi_path))
+        if problems:
+            errors = "The values below do not match the tool API (copy enum values exactly from the API file):\n- " + "\n- ".join(problems)
+            trace.note(f"extraction attempt {attempt + 1}: {len(problems)} API mismatch(es): {problems[0][:200]}")
+            continue
+        trace.note(f"extraction attempt {attempt + 1}: CallSpec valid ({len(raw)} bytes)")
+        return spec
     raise RuntimeError(f"CallSpec extraction failed after {1 + max_retries} attempts: {errors[:500]}")

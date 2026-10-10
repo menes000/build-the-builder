@@ -53,7 +53,7 @@ class Identity(BaseModel):
     max_wrong_total: int = Field(description="Total wrong answers that end the check")
     retry_hints: list[RetryHint] = []
     wrong_answer_may_be_repeated: bool = True
-    after_failed_text: str = Field(description="What to tell the customer after the check failed, e.g. use the app or a branch")
+    after_failed_text: str = Field(description="The exact sentence the agent SAYS to the customer after the check failed, in the agent's own voice, e.g. 'Please use the mobile app or visit a branch.' Not an instruction, not 'Say that...'")
     failed_close: Outcome
     decline: DeclinePolicy
     human_request: Optional["HumanRequest"] = None
@@ -173,7 +173,7 @@ class Hardship(BaseModel):
 
 class SimpleCase(BaseModel):
     triggers: list[str]
-    say: str = Field("", description="What the agent must say, if the brief requires a sentence")
+    say: str = Field("", description="The exact sentence the agent SAYS in this case, in the agent's own voice (e.g. 'Payments can take one business day to appear.'), or empty. Never an instruction such as 'Say that...'")
     take_promise: bool = False
     close: Outcome
 
@@ -283,6 +283,7 @@ class CallSpec(BaseModel):
     third_party: ThirdParty
     identity: Identity
     debt_statement_rule: str = Field(description="What must be said after verification: team, product in words, amount, days late")
+    debt_intro_sentence: str = Field("", description="The exact first sentence after verification, in the agent's voice, that names the team and the purpose, e.g. 'I am calling from the collections team about a late payment.' The product, amount and days late are added by the builder.")
     products: list[ProductType]
     dates: Dates
     amounts: Amounts

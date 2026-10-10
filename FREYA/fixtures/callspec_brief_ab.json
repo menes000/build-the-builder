@@ -116,7 +116,7 @@
    }
   ],
   "wrong_answer_may_be_repeated": true,
-  "after_failed_text": "Tell the customer to use the mobile app or a branch. Do not state the debt.",
+  "after_failed_text": "Please use the Freya Bank mobile app or visit a branch.",
   "failed_close": {
    "outcome": "not_verified",
    "reason": "failed"
@@ -255,7 +255,7 @@
    "triggers": [
     "I already paid"
    ],
-   "say": "Say that payments can take one business day to appear.",
+   "say": "Payments can take one business day to appear.",
    "take_promise": false,
    "close": {
     "outcome": "paid",
@@ -429,5 +429,6 @@
  "global_extra_rules": [],
  "source_notes": [
   "Hand-written from Brief A + Brief B for compiler development."
- ]
+ ],
+ "debt_intro_sentence": "I am calling from the collections team about a late payment."
 }

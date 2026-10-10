@@ -1,6 +1,8 @@
 """CallSpec -> Freya workflow JSON. Deterministic; no LLM. Patterns follow kit docs and the verified example builder."""
 from __future__ import annotations
 
+import re
+
 from ..extract.callspec import CallSpec, Outcome, Tool
 from . import codegen, prompts
 
@@ -65,14 +67,13 @@ def conv(name, task, tools=(), transitions=(), on_enter=None, extraction=(), max
 
 
 def _sentence(rule: str) -> str:
-    """'Say that payments can take one business day to appear.' -> 'Payments can take one business day to appear.'"""
-    s = rule.strip()
-    for pre in ("Say that ", "say that ", "Say ", "say "):
-        if s.startswith(pre):
-            s = s[len(pre):]
-            break
+    """Turn an instruction-shaped text into the spoken sentence: 'Say that X.' -> 'X.'; 'Tell the customer to use Y' -> 'Please use Y.'"""
+    s = rule.strip().strip('"').strip("'")
+    s = re.sub(r"^(say|tell the customer|tell them|explain|state)\s+(that\s+|to\s+)?", "", s, flags=re.I)
+    s = re.sub(r"^(they|he|she) (should|can|may) ", "please ", s, flags=re.I)
+    s = re.sub(r"^(the customer|customers) (should|can|may) ", "please ", s, flags=re.I)
     s = s[:1].upper() + s[1:]
-    return s if s.endswith(".") else s + "."
+    return s if s.endswith((".", "!", "?")) else s + "."
 
 
 # ----------------------------------------------------------------------------- tools
@@ -171,12 +172,11 @@ def compile_workflow(spec: CallSpec) -> dict:
         tb.rq("create_promise", "amount"): tb.model_field("create_promise", tb.rq("create_promise", "amount"), desc_override="The agreed amount as a number, only when amount_kind is custom.", type_override="number"),
         tb.rq("create_promise", "date"): tb.model_field("create_promise", tb.rq("create_promise", "date"), desc_override="The agreed payment date, YYYY-MM-DD."),
     }
-    if mp.enabled:
-        promise_body[tb.rq("create_promise", "product_id")] = tb.model_field("create_promise", tb.rq("create_promise", "product_id"), desc_override="product_id of this product from ACCOUNT, e.g. p1. Copy it exactly.")
+    promise_body[tb.rq("create_promise", "product_id")] = tb.model_field("create_promise", tb.rq("create_promise", "product_id"), desc_override="product_id of this product from ACCOUNT, e.g. p1. Copy it exactly.")
     create_promise = tb.api_tool(
         "create_promise", "create_promise",
         "Record ONE payment promise for ONE product. CALL it only after the customer said a clear yes to your read-back of product, amount and date.",
-        promise_body, required=["amount_kind", tb.rq("create_promise", "date")] + ([tb.rq("create_promise", "product_id")] if mp.enabled else []),
+        promise_body, required=["amount_kind", tb.rq("create_promise", "date"), tb.rq("create_promise", "product_id")],
         pre=codegen.promise_pre(spec), post=codegen.promise_post(spec),
         mapping=[("data.promise_state", "promise_state")] + ([("data.all_products_done", "all_products_done")] if mp.enabled else []))
 
@@ -187,14 +187,19 @@ def compile_workflow(spec: CallSpec) -> dict:
          tb.rq("schedule_callback", "time"): tb.model_field("schedule_callback", tb.rq("schedule_callback", "time"), desc_override="Callback time, HH:MM, 24-hour.")},
         required=[tb.rq("schedule_callback", "date"), tb.rq("schedule_callback", "time")], pre=codegen.callback_pre(spec), post=codegen.callback_post(spec), mapping=[("data.cb_state", "cb_state")])
 
-    def xfer(queue: str, when: str) -> dict:
-        return tb.api_tool("transfer_to_agent", f"transfer_{queue}", when, {tb.rq("transfer_to_agent", "queue"): {"type": "string", "default": queue}},
-                           post=codegen.transfer_post(queue, spec), mapping=[("data.xfer_state", f"xfer_{queue}_state")])
-
     hs = sp.hardship
-    transfer_support = xfer(hs.offer_queue, f"Transfer the call to the {hs.offer_queue} team. CALL it only when a customer with {', '.join(hs.triggers)} accepts your offer to connect them.")
-    transfer_restructuring = xfer(sp.restructuring.queue, f"Transfer the call to the {sp.restructuring.queue} team. CALL it when the customer asks for {' or '.join(sp.restructuring.triggers)}.")
-    transfer_general = xfer(sp.human.queue, "Transfer the call to a human agent. CALL it only when the customer still insists on a human" + (" after you asked once whether you can help." if sp.human.ask_once_if_can_help else "."))
+    qf = tb.field("transfer_to_agent", tb.rq("transfer_to_agent", "queue"))
+    queues = list(qf.enum) if qf and qf.enum else list(dict.fromkeys([hs.offer_queue, sp.restructuring.queue, sp.human.queue]))
+    transfer_to_agent = tb.api_tool(
+        "transfer_to_agent", "transfer_to_agent",
+        f"Hand the call to a person. CALL it with queue '{hs.offer_queue}' only when a customer with {', '.join(hs.triggers)} accepts your offer; "
+        f"with queue '{sp.restructuring.queue}' when the customer asks for {' or '.join(sp.restructuring.triggers)}; "
+        f"with queue '{sp.human.queue}' only when the customer still insists on a human" + (" after you asked once whether you can help." if sp.human.ask_once_if_can_help else "."),
+        {tb.rq("transfer_to_agent", "queue"): {"type": "string", "enum": queues, "default": "{{transfer_queue_choice}}",
+                                                "description": "Which team: " + ", ".join(queues)}},
+        required=[tb.rq("transfer_to_agent", "queue")], pre=codegen.transfer_pre(spec, queues), post=codegen.transfer_post(spec),
+        mapping=[("data.xfer_state", "xfer_state")])
+    transfer_support = transfer_restructuring = transfer_general = transfer_to_agent
 
     add_note = None
     if mp.enabled:
@@ -227,7 +232,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         f"close_xfer_{hs.offer_queue}": (hs.accept_close.outcome, hs.accept_close.reason, f"I am connecting you with our {hs.offer_queue} team now. Thank you for your time. Goodbye."),
         f"close_xfer_{sp.restructuring.queue}": (sp.restructuring.close.outcome, sp.restructuring.close.reason, "I am connecting you with the team that handles payment plans now. Thank you for your time. Goodbye."),
         f"close_xfer_{sp.human.queue}": (sp.human.close.outcome, sp.human.close.reason, "I am connecting you with a colleague now. Thank you for your time. Goodbye."),
-        "close_failed": (idn.failed_close.outcome, idn.failed_close.reason, f"I am sorry, I could not verify your identity. {idn.after_failed_text.replace('Tell the customer to ', 'Please ').replace('Do not state the debt.', '').strip()} Thank you for your time. Goodbye."),
+        "close_failed": (idn.failed_close.outcome, idn.failed_close.reason, f"I am sorry, I could not verify your identity. {_sentence(idn.after_failed_text.split(';')[0].replace('Do not state the debt.', ''))} Thank you for your time. Goodbye."),
         "close_declined": (idn.decline.close.outcome, idn.decline.close.reason, "I understand. Without the security questions I cannot continue. Thank you for your time. Goodbye."),
         "close_callback": (tp.callback_close.outcome, tp.callback_close.reason, "Thank you, we will call back then. Thank you for your time. Goodbye."),
         "close_no_callback": (tp.no_callback_close.outcome, tp.no_callback_close.reason, "Thank you, we will try again another time. Thank you for your time. Goodbye."),
@@ -270,6 +275,8 @@ def compile_workflow(spec: CallSpec) -> dict:
             nodes[nm] = conv(nm, prompts.retry_task(spec), extraction=[line_status],
                              transitions=opening_routes() + [bye_tr("close_unclear"), always(nxt)], first_only=True, max_turns=4, cap_to=nxt)
 
+    if idn.human_request is None:
+        idn.human_request = sp.human  # a human request is handled before verification too unless the brief says otherwise
     sec_tools = [verify_identity] + ([transfer_general] if idn.human_request else [])
     first_q = idn.questions[0]
     nodes["security"] = conv(
@@ -280,7 +287,7 @@ def compile_workflow(spec: CallSpec) -> dict:
             go("load_account", "All security answers verified", grp(eq("id_state", "verified"),
                eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "true"), eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "True"))),
             go("close_failed", "The identity check failed", grp(eq("id_state", "failed"))),
-        ] + ([go(f"close_xfer_{sp.human.queue}", "Transferred to a human", grp(eq(f"xfer_{sp.human.queue}_state", "done")))] if idn.human_request else []) + [
+        ] + ([go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done")))] if idn.human_request else []) + [
             tool_tr("close_declined", "The customer declined the security questions twice, or said twice they do not want to talk"),
             bye_tr("close_declined"),
         ],
@@ -304,11 +311,8 @@ def compile_workflow(spec: CallSpec) -> dict:
     nodes["account_facts"] = code_node("account_facts", codegen.facts_code(spec), "close_account_error",
                                        transitions=[go("negotiate", "Account facts ready", grp(eq("account_state", "ok")))])
 
-    neg_tools = [create_promise, transfer_support, transfer_restructuring, transfer_general] + ([add_note] if add_note else [])
-    xfer_routes = [
-        go(f"close_xfer_{q}", f"Transferred to {q}", grp(eq(f"xfer_{q}_state", "done")))
-        for q in dict.fromkeys([hs.offer_queue, sp.restructuring.queue, sp.human.queue])
-    ]
+    neg_tools = [create_promise, transfer_to_agent] + ([add_note] if add_note else [])
+    xfer_routes = [go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done")))]
     if mp.enabled:
         # done when promises + notes >= n_products, enumerated from the engine's own success counters (robust to parallel tool calls)
         combos = []
@@ -324,7 +328,9 @@ def compile_workflow(spec: CallSpec) -> dict:
         promise_route = go("close_promise", "Every product has a promise or a note", {"logic": "or", "conditions": [eq("all_products_done", "yes")] + combos})
         service_route = []
     else:
-        promise_route = go("close_promise", "The promise was recorded", grp(eq("promise_state", "recorded")))
+        # after a recorded promise the agent says the confirmation sentence and stays one turn, so the customer can
+        # still ask for a person or a plan (a transfer after a promise closes as transferred); the model closes with a tool
+        promise_route = tool_tr("close_promise", "The promise is recorded and the customer has nothing else")
         service_route = [go("close_service_error", "The promise service failed twice", grp(eq("promise_state", "failed_twice"), gt("create_promise_failure_count", 1)))]
     neg_transitions = [promise_route] + service_route + xfer_routes
     if mp.enabled:
@@ -378,6 +384,13 @@ def compile_workflow(spec: CallSpec) -> dict:
         "default": list(closes["close_refused"]),
     }
     nodes["close_on_goodbye"] = code_node("close_on_goodbye", codegen.close_on_goodbye_code(goodbye_map), "decide_outcome")
+    transfer_map = {
+        hs.offer_queue: list(closes[f"close_xfer_{hs.offer_queue}"]),
+        sp.restructuring.queue: list(closes[f"close_xfer_{sp.restructuring.queue}"]),
+        sp.human.queue: list(closes[f"close_xfer_{sp.human.queue}"]),
+        "default": list(closes[f"close_xfer_{sp.human.queue}"]),
+    }
+    nodes["close_on_transfer"] = code_node("close_on_transfer", codegen.close_on_goodbye_code(transfer_map, var="transfer_queue"), "decide_outcome")
     farewells = {
         "paid": closes["close_paid"][2],
         "no_promise": closes["close_refused"][2],
@@ -399,9 +412,10 @@ def compile_workflow(spec: CallSpec) -> dict:
                 "spoken_message": {"type": "string", "default": "{{farewell}}"}}}}},
     }
 
-    test_vars = {"customer_id": "c_test", "now": "2026-01-05T11:00"}
+    test_vars = {"now": "2026-01-05T11:00"}  # no customer_id: in the chat API a test value would override the real one
     for v in spec.call_variables:
-        test_vars.setdefault(v.name, {"first_name": "Test", "last_name": "Customer", "title": "Mr"}.get(v.name, "x"))
+        if v.name != "customer_id":
+            test_vars.setdefault(v.name, {"first_name": "Test", "last_name": "Customer", "title": "Mr"}.get(v.name, "x"))
 
     return {
         "initial_node": "setup",

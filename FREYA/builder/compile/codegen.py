@@ -44,6 +44,7 @@ def facts_code(spec: CallSpec) -> str:
         "CB_TODAY": cb.allow_today, "CB_NBD": cb.allow_next_business_day, "CB_LATER": cb.must_be_later_than_now,
         "MULTI": spec.multi_product.enabled,
         "DEBT_RULE": spec.debt_statement_rule,
+        "DEBT_INTRO": (spec.debt_intro_sentence or "").strip(),
         "PF": (spec.field_map or {}).get("product") or {},
         "PRODUCTS_KEY": ((spec.field_map or {}).get("resp", {}).get("get_account") or {}).get("products", "products"),
         "DEFAULT_OUTCOME": [spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason],
@@ -166,6 +167,13 @@ try:
             past = float(pf(p, 'past_due') or 0)
             dl = int(float(pf(p, 'days_late') or 0))
             floor = float(pf(p, pt.get('floor') or '') or 0) if pt else 0.0
+            if not floor:
+                for fk in ('minimum_payment', 'instalment_amount'):
+                    if pf(p, fk):
+                        floor = float(pf(p, fk) or 0)
+                        break
+            if not floor:
+                floor = round(past, 2)
             label = (pt.get('label') or typ.replace('_', ' ')).replace('{card_last4}', str(pf(p, 'card_last4') or ''))
             b = band_for(dl) or dict()
             if b.get('bd') is not None:
@@ -253,8 +261,10 @@ try:
             q = 'Can you make this payment today?'
         vars['outcome'] = VERIFIED_DEFAULT[0]
         vars['reason'] = VERIFIED_DEFAULT[1]
-        vars['debt_statement'] = ('Thank you, the security check is complete. I am calling from the ' + 'collections team about a late payment. '
-                                  + ' '.join(sents) + ' ' + q)
+        intro = DEBT_INTRO if DEBT_INTRO else 'I am calling about an overdue payment.'
+        if not intro.endswith('.'):
+            intro = intro + '.'
+        vars['debt_statement'] = ('Thank you, the security check is complete. ' + intro + ' ' + ' '.join(sents) + ' ' + q)
         vars['account_state'] = 'ok'
     else:
         vars['account_state'] = 'missing'
@@ -369,6 +379,10 @@ try:
                     good = False
             except Exception:
                 pass
+        try:
+            vars['promise_precheck'] = 'ok' if good else 'rejected'
+        except Exception:
+            pass
         if not good:
             b[R['date']] = 'REJECTED'
 except Exception:
@@ -379,7 +393,7 @@ except Exception:
 def promise_post(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
     F = ((spec.field_map or {}).get("resp", {}).get("create_promise") or {})
-    return "MULTI = " + _lit(multi) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
+    return "MULTI = " + _lit(multi) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 import json
 try:
     if isinstance(result, dict):
@@ -404,9 +418,14 @@ try:
                 done = []
             done.append(dict(pid=pid))
             vars['promises_json'] = json.dumps(done)
+            try:
+                vars['outcome'] = PROMISE_OUTCOME
+                vars['reason'] = ''
+            except Exception:
+                pass
             d['promise_state'] = 'recorded'
-            d['what_to_do_next'] = 'The promise is recorded.'
-        elif 'unknown customer' in err or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower() or 'already' in err.lower():
+            d['what_to_do_next'] = 'The promise is recorded.' + ('' if MULTI else ' Say exactly: "' + AFTER_RECORD + '" Then ask whether there is anything else. If the customer says no or says goodbye, call transition_to_close_promise. If they ask for a person or a payment plan, use transfer_to_agent.')
+        elif str(vars.get('promise_precheck') or '') == 'rejected' or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower() or 'already' in err.lower():
             d['promise_state'] = 'rejected'
             d['error'] = 'not allowed by bank rules'
             d['what_to_do_next'] = 'NOT recorded: this product, date or amount breaks the bank rules (allowed dates: business days from today to that product deadline; allowed amounts: floor to full past-due amount; one promise per product). Tell the customer it cannot be accepted and offer a valid option following your rules. Never say it is recorded.'
@@ -436,7 +455,7 @@ try:
             if facts and all(f['pid'] in handled for f in facts):
                 vars['all_products_done'] = 'yes'
                 d['all_products_done'] = 'yes'
-                d['what_to_do_next'] = str(d.get('what_to_do_next') or '') + ' Every product now has a promise or a note: say goodbye in one sentence and call transition_to_close_done.'
+                d['what_to_do_next'] = str(d.get('what_to_do_next') or '') + (' Every product now has a promise or a note: say goodbye in one sentence and call transition_to_close_done.' if MULTI else '')
             else:
                 d['all_products_done'] = 'no'
         except Exception:
@@ -472,6 +491,10 @@ try:
             done = json.loads(str(vars.get('promises_json') or '[]'))
             if any(str(x.get('pid')) == pid for x in done):
                 ok = False
+        except Exception:
+            pass
+        try:
+            vars['note_precheck'] = 'ok' if ok else 'rejected'
         except Exception:
             pass
         if not ok:
@@ -522,7 +545,7 @@ try:
             except Exception:
                 pass
         else:
-            d['note_state'] = 'rejected'
+            d['note_state'] = 'rejected' if str(vars.get('note_precheck') or '') == 'rejected' or d.get(F['error']) else 'failed'
             d['what_to_do_next'] = 'The note was not accepted (unknown product or reason, or that product already has a promise). Use a product_id from the account and a listed reason.'
 except Exception:
     pass
@@ -555,6 +578,10 @@ try:
             good = False
         if CB_LATER and dt == str(vars.get('today_iso') or '') and tm <= str(vars.get('now_hm') or ''):
             good = False
+        try:
+            vars['cb_precheck'] = 'ok' if good else 'rejected'
+        except Exception:
+            pass
         if not good:
             b[R['date']] = 'REJECTED'
 except Exception:
@@ -576,7 +603,7 @@ try:
         if str(d.get(F['ok'])).lower() == 'true':
             d['cb_state'] = 'booked'
             d['what_to_do_next'] = 'The callback is booked.'
-        elif 'unknown customer' in err or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower():
+        elif str(vars.get('cb_precheck') or '') == 'rejected' or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower():
             try:
                 n = int(vars.get('cb_reject_count') or 0)
             except Exception:
@@ -601,9 +628,30 @@ except Exception:
 '''
 
 
-def transfer_post(queue: str, spec: CallSpec | None = None) -> str:
+def transfer_pre(spec: CallSpec, queues: list[str]) -> str:
+    R = ((spec.field_map or {}).get("req", {}).get("transfer_to_agent") or {})
+    return "QUEUES = " + _lit(list(queues)) + "\nR = " + _lit({k: R.get(k, k) for k in ("queue",)}) + r'''
+try:
+    b = config.get('body')
+    if isinstance(b, dict):
+        q = str(b.get(R['queue']) or '').strip()
+        if QUEUES and q not in QUEUES:
+            low = {x.lower(): x for x in QUEUES}
+            q = low.get(q.lower(), q)
+        try:
+            vars['last_transfer_queue'] = q
+            vars['xfer_precheck'] = 'ok' if (not QUEUES or q in QUEUES) else 'rejected'
+        except Exception:
+            pass
+        b[R['queue']] = q
+except Exception:
+    pass
+'''
+
+
+def transfer_post(spec: CallSpec | None = None) -> str:
     F = (((spec.field_map if spec else None) or {}).get("resp", {}).get("transfer_to_agent") or {})
-    return "Q = " + _lit(queue) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
+    return "F = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 try:
     if isinstance(result, dict):
         result.pop('header', None)
@@ -614,13 +662,13 @@ try:
         if str(d.get(F['ok'])).lower() == 'true':
             d['xfer_state'] = 'done'
             try:
-                vars['transfer_queue'] = Q
+                vars['transfer_queue'] = str(vars.get('last_transfer_queue') or '')
             except Exception:
                 pass
             d['what_to_do_next'] = 'Transferred.'
         else:
             d['xfer_state'] = 'failed'
-            d['what_to_do_next'] = 'The transfer failed. Tell the customer you could not transfer the call right now.'
+            d['what_to_do_next'] = 'The transfer failed (unknown queue or service error). Tell the customer you could not transfer the call right now.'
 except Exception:
     pass
 '''
@@ -649,14 +697,14 @@ def close_hint_code(outcome: str, reason: str, farewell: str) -> str:
             "    pass\n")
 
 
-def close_on_goodbye_code(mapping: dict) -> str:
-    """When the customer says goodbye in the negotiation, pick the closing hint from the extracted `situation`.
+def close_on_goodbye_code(mapping: dict, var: str = "situation") -> str:
+    """Pick the closing hint from a variable (`situation` on goodbye, `transfer_queue` after a transfer).
 
-    mapping: situation value -> (outcome, reason, farewell); key 'default' for anything else.
+    mapping: variable value -> (outcome, reason, farewell); key 'default' for anything else.
     """
-    return "M = " + _lit(mapping) + r'''
+    return "M = " + _lit(mapping) + "\nV = " + _lit(var) + r'''
 try:
-    sit = str(vars.get('situation') or '').strip().lower()
+    sit = str(vars.get(V) or '').strip().lower()
     o, r, f = M.get(sit) or M.get('default')
     vars['hint_outcome'] = o
     vars['hint_reason'] = r

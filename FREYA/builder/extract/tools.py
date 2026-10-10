@@ -7,8 +7,23 @@ from pathlib import Path
 from .callspec import Tool, ToolField
 
 
+def load_openapi(path: str | Path) -> dict:
+    """JSON or YAML OpenAPI file."""
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    try:
+        return json.loads(text)
+    except ValueError:
+        import yaml  # type: ignore
+        return yaml.safe_load(text)
+
+
+def tool_name(path: str) -> str:
+    """'/v1/verify_identity' -> 'verify_identity' (the seven tool names stay the same; prefixes may not)."""
+    return path.strip("/").split("/")[-1]
+
+
 def parse_openapi(path: str | Path) -> list[Tool]:
-    d = json.loads(Path(path).read_text())
+    d = load_openapi(path)
     base = (d.get("servers") or [{}])[0].get("url", "").rstrip("/")
     tools: list[Tool] = []
     for p, ops in d.get("paths", {}).items():
@@ -24,13 +39,13 @@ def parse_openapi(path: str | Path) -> list[Tool]:
                 description=prop.get("description", "") or "",
                 required=name in req,
             ))
-        tools.append(Tool(name=p.strip("/"), url=f"{base}{p}", summary=op.get("summary", "") or "", fields=fields))
+        tools.append(Tool(name=tool_name(p), url=f"{base}{p}", summary=op.get("summary", "") or "", fields=fields))
     return tools
 
 
 def response_fields(path: str | Path) -> dict[str, set[str]]:
     """Tool name -> set of top-level response property names (for lint)."""
-    d = json.loads(Path(path).read_text())
+    d = load_openapi(path)
     out: dict[str, set[str]] = {}
     for p, ops in d.get("paths", {}).items():
         op = ops.get("post") or next(iter(ops.values()))
@@ -39,7 +54,7 @@ def response_fields(path: str | Path) -> dict[str, set[str]]:
         names = set(props.keys())
         prods = props.get("products", {}).get("items", {}).get("properties") or {}
         names |= {f"products.{k}" for k in prods}
-        out[p.strip("/")] = names
+        out[tool_name(p)] = names
     return out
 
 
@@ -126,13 +141,13 @@ _TOOL_RESP = {
 
 def field_map(path: str | Path) -> dict:
     """{'req': {tool: {canon: actual}}, 'resp': {tool: {canon: actual}}, 'product': {canon: actual}, 'warnings': [...]}"""
-    d = json.loads(Path(path).read_text())
+    d = load_openapi(path)
     warnings: list[str] = []
     req: dict[str, dict[str, str]] = {}
     resp: dict[str, dict[str, str]] = {}
     product: dict[str, str] = {}
     for p, ops in d.get("paths", {}).items():
-        tool = p.strip("/")
+        tool = tool_name(p)
         op = ops.get("post") or next(iter(ops.values()))
         rq = (op.get("requestBody", {}).get("content", {}).get("application/json", {}).get("schema", {}).get("properties") or {})
         rs = (op.get("responses", {}).get("200", {}).get("content", {}).get("application/json", {}).get("schema", {}).get("properties") or {})
@@ -155,3 +170,59 @@ def req_name(fm: dict, tool: str, canon: str) -> str:
 
 def resp_name(fm: dict, tool: str, canon: str) -> str:
     return (fm.get("resp", {}).get(tool) or {}).get(canon, canon)
+
+
+
+# ----------------------------------------------------------------------------- CallSpec vs tool API
+def lint_spec(spec, tools: list[Tool], fm: dict) -> list[str]:
+    """Values the CallSpec sends to the bank must exist in the tool API's enums. Returns problems (empty = fine)."""
+    by = {t.name: t for t in tools}
+
+    def enum_of(tool: str, canon: str) -> list[str]:
+        t = by.get(tool)
+        if not t:
+            return []
+        actual = req_name(fm, tool, canon)
+        for f in t.fields:
+            if f.name == actual:
+                return list(f.enum)
+        return []
+
+    errs = []
+    outcomes = enum_of("close_call", "outcome")
+    queues = enum_of("transfer_to_agent", "queue")
+    fields = enum_of("verify_identity", "field")
+    reasons = enum_of("add_note", "reason")
+    closes = []
+    for row in spec.closing.outcomes:
+        closes.append(("closing.outcomes", row.outcome))
+    sp = spec.special
+    for name, oc in (("opening.unclear_close", spec.opening.unclear_close), ("identity.failed_close", spec.identity.failed_close),
+                     ("identity.decline.close", spec.identity.decline.close), ("third_party.callback_close", spec.third_party.callback_close),
+                     ("third_party.no_callback_close", spec.third_party.no_callback_close), ("third_party.wrong_number_close", spec.third_party.wrong_number_close),
+                     ("third_party.deceased_close", spec.third_party.deceased_close), ("persuasion.refused_close", spec.persuasion.refused_close),
+                     ("special.hardship.accept_close", sp.hardship.accept_close), ("special.hardship.decline_close", sp.hardship.decline_close),
+                     ("special.paid.close", sp.paid.close), ("special.dispute.close", sp.dispute.close), ("special.restructuring.close", sp.restructuring.close),
+                     ("special.human.close", sp.human.close), ("confirm.failed_twice_close", spec.confirm.failed_twice_close)):
+        closes.append((name, oc.outcome))
+    if outcomes:
+        for where, val in closes:
+            if val not in outcomes:
+                errs.append(f"{where}: outcome '{val}' is not in close_call.outcome enum {outcomes}")
+        if spec.closing.promise_outcome not in outcomes:
+            errs.append(f"closing.promise_outcome '{spec.closing.promise_outcome}' not in {outcomes}")
+    if queues:
+        for where, q in (("special.hardship.offer_queue", sp.hardship.offer_queue), ("special.restructuring.queue", sp.restructuring.queue), ("special.human.queue", sp.human.queue)):
+            if q not in queues:
+                errs.append(f"{where}: queue '{q}' is not in transfer_to_agent.queue enum {queues}")
+        if spec.identity.human_request and spec.identity.human_request.queue not in queues:
+            errs.append(f"identity.human_request.queue '{spec.identity.human_request.queue}' not in {queues}")
+    if fields:
+        for q in spec.identity.questions:
+            if q.field not in fields:
+                errs.append(f"identity.questions: field '{q.field}' is not in verify_identity.field enum {fields}")
+    if reasons and spec.multi_product.enabled:
+        for r in spec.multi_product.note_reasons:
+            if r not in reasons:
+                errs.append(f"multi_product.note_reasons: '{r}' is not in add_note.reason enum {reasons}")
+    return errs

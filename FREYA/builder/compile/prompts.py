@@ -103,7 +103,7 @@ def security_task(spec: CallSpec) -> str:
     ]
     if idn.human_request:
         hr = idn.human_request
-        parts.append(f"- If the customer asks for a human: {'ask once whether you can help first. If they insist, ' if hr.ask_once_if_can_help else ''}call transfer_{hr.queue}.")
+        parts.append(f"- If the customer asks for a human: {'ask once whether you can help first. If they insist, ' if hr.ask_once_if_can_help else ''}call transfer_to_agent with queue {hr.queue}.")
     parts.append(f"- After the check fails: {idn.after_failed_text}")
     return "\n".join(parts) + _rules(idn.extra_rules)
 
@@ -144,12 +144,12 @@ def negotiate_task(spec: CallSpec) -> str:
         "- A date the customer names that the DATES list marks as allowed for that product is accepted as it is, even if it is not in the refusal script. The script is only for what YOU propose after a flat refusal.",
         "",
         "SPECIAL SITUATIONS (these come first)",
-        f"- {', '.join(hs.triggers)}: {hs.sympathy_rule} Say it once and never repeat it, even if the customer mentions the hardship again.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_{hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
+        f"- {', '.join(hs.triggers)}: {hs.sympathy_rule} Say it once and never repeat it, even if the customer mentions the hardship again.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_to_agent with queue {hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
         + (" Only if they themselves name a date or an amount, record the promise with the steps below." if hs.customer_may_still_promise else ""),
         f"- {', '.join(sp.paid.triggers)} (this past-due amount): {sp.paid.say} Take no promise{'; call add_note for that product with reason paid and continue with the other products' if mp.enabled else ', call transition_to_close_paid'}.",
         f"- {', '.join(sp.dispute.triggers)}: {sp.dispute.say} Take no promise{'; call add_note for that product with reason dispute and continue with the other products' if mp.enabled else ', call transition_to_close_dispute'}.",
-        f"- {', '.join(sp.restructuring.triggers)}: {'do not describe any plan. ' if sp.restructuring.do_not_describe_plan else ''}Call transfer_{sp.restructuring.queue}.",
-        f"- A request for a human: {'ask once whether you can help first. If they insist, ' if sp.human.ask_once_if_can_help else ''}call transfer_{sp.human.queue}.",
+        f"- {', '.join(sp.restructuring.triggers)}: {'do not describe any plan. ' if sp.restructuring.do_not_describe_plan else ''}Call transfer_to_agent with queue {sp.restructuring.queue}.",
+        f"- A request for a human: {'ask once whether you can help first. If they insist, ' if sp.human.ask_once_if_can_help else ''}call transfer_to_agent with queue {sp.human.queue}.",
         "- If they say a second time that they do not want to talk: call transition_to_close_refused.",
         "",
         "HOW TO GET THE PROMISE",

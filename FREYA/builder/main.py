@@ -35,7 +35,7 @@ from .extract.tools import field_map, parse_openapi  # noqa: E402
 from .trace import Trace  # noqa: E402
 
 
-def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trace, style: str | None = None, only: list[str] | None = None) -> dict | None:
+def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trace, style: str | None = None, only: list[str] | None = None, timeout_s: float | None = None) -> dict | None:
     """Run the kit's practice customers against the agent. Returns the parsed result or None."""
     cmd = [sys.executable, str(KIT / "tools" / "run_cases.py"), agent_id, "--brief", brief, "--cases", cases, "--out", str(out_json)]
     if style:
@@ -43,7 +43,11 @@ def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trac
     if only:
         cmd += ["--only", ",".join(only)]
     t0 = time.time()
-    p = subprocess.run(cmd, cwd=KIT, capture_output=True, text=True)
+    try:
+        p = subprocess.run(cmd, cwd=KIT, capture_output=True, text=True, timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        trace.note(f"run_cases {brief}: stopped after {int(timeout_s or 0)} s (time budget); result discarded")
+        return None
     sys.stdout.write(p.stdout)
     if p.returncode != 0:
         trace.note(f"run_cases {brief} failed: {p.stderr[-500:]}")
@@ -122,7 +126,7 @@ def main(argv=None) -> int:
             if time.time() > deadline - 60:
                 trace.note(f"budget exhausted, skipping test {brief}")
                 break
-            res[brief] = run_cases(agent_id, brief, a.cases, out_dir / f"{slot}{tag}.test-{brief}.json", trace, style=a.style)
+            res[brief] = run_cases(agent_id, brief, a.cases, out_dir / f"{slot}{tag}.test-{brief}.json", trace, style=a.style, timeout_s=max(30, deadline - time.time() - 45))
         return res
 
     def score(res: dict) -> tuple[int, int]:
