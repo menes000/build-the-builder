@@ -97,9 +97,8 @@ def security_task(spec: CallSpec) -> str:
         "- If the customer gives only part of an answer, ask for the rest before calling the tool.",
         "- If the customer corrects themselves, use the corrected value.",
         "- After each result, follow what_to_do_next.",
-        f"- If the customer will not answer{', or asks what the call is about instead of answering' if idn.decline.asking_purpose_counts_as_decline else ''}: {idn.decline.explain_once_text} and ask again. "
-        f"If they refuse a second time{', or ask a second time what the call is about' if idn.decline.asking_purpose_counts_as_decline else ''}, call transition_to_close_declined.",
-        "- If the customer says twice that they do not want to talk, call transition_to_close_declined.",
+        f"- The FIRST time the customer will not answer, says they do not want to talk{', or asks what the call is about instead of answering' if idn.decline.asking_purpose_counts_as_decline else ''}: do NOT close. {idn.decline.explain_once_text} and ask the question again. "
+        f"Only if they refuse a SECOND time{', or ask a second time what the call is about' if idn.decline.asking_purpose_counts_as_decline else ''}, or say a second time that they do not want to talk, call transition_to_close_declined. Never call it after a single refusal.",
     ]
     if idn.human_request:
         hr = idn.human_request
@@ -157,7 +156,7 @@ def negotiate_task(spec: CallSpec) -> str:
         f"2. Only if they say the AMOUNT is too much (too high, cannot afford that much): offer the floor{' once' if a.floor_offer_once else ''}, {a.floor_offer_text} Ask when they can pay it. Do not attach a date to this offer. From then on never propose the full amount again. If they refuse the floor amount, that is a flat refusal (step 6). 'I cannot pay today', 'no', or a no to a date is NOT an amount objection: it is a flat refusal (step 6) or a date question (step 4), and the amount stays the full amount.",
         f"3. {a.customer_amount_rule}",
         f"4. Dates: look up every date the customer names in the DATES list and do what it says. {spec.dates.after_deadline_rule}",
-        f"5. {spec.dates.vague_period_rule}",
+        f"5. {spec.dates.vague_period_rule} A vague period, and a 'I don't know' after you asked for the exact day, are NOT a flat refusal and use NO persuasion attempt: propose the deadline date itself (the full amount, or the floor if they said the amount is too much), not the attempt-1 date. Only an outright no with no date and no amount is a flat refusal.",
         f"6. A flat refusal ({p.flat_refusal_definition}) uses one persuasion attempt. The number of attempts allowed and the attempt-1 date are in ACCOUNT{' per product' if mp.enabled else ''}:",
     ]
     for r in p.attempt_rules:

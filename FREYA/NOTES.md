@@ -84,3 +84,4 @@
 - Yeni bilgi: final Pazar 20:00–23:00 İstanbul, brief başına 30 müşteri, puan = geçen/60; Pazar platform test limiti var (sayı belirsiz).
 - 22:55 #9/#10 yayınlandı (A v11, AB v16): tek transfer_to_agent tool'u (queue enum model-doldurmalı, pre-hook doğrular, close_on_transfer kuyruktan kapanış seçer); tek üründe promise sonrası bir tur açık (transition_to_close_promise model çağırır; veda/transfer yolları var). Ölçüm: **A 10/10, B 3/3**. Not: B koşusu 415 s sürdü (platform yavaştı).
 ## Gün sonu 3 (23:00): son sürümler A v11, AB v16. Yarın: API key testi; deneme sayacı; Mehmet'in Freya-moda kapsama koşusu (çakışmayalım: simülasyon kuyruğu tek); 3 tekrar ölçümleri; öğlen dondurma; 20:00 final.
+- 23:10 Mehmet kapsama seti (resmi yol, v6): 24/28. OUR-13/24 → v11'de çözülmüştü; c_test → v10. OUR-15 (belirsiz dönem → deadline, deneme değil) ve OUR-25 (ilk redde kapanma yok) prompt'ta düzeltildi → A v12, AB v17. Mehmet 13/15/24/25'i v12'de yeniden koşacak.

@@ -288,7 +288,7 @@ def compile_workflow(spec: CallSpec) -> dict:
                eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "true"), eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "True"))),
             go("close_failed", "The identity check failed", grp(eq("id_state", "failed"))),
         ] + ([go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done")))] if idn.human_request else []) + [
-            tool_tr("close_declined", "The customer declined the security questions twice, or said twice they do not want to talk"),
+            tool_tr("close_declined", "The customer declined the security questions for the SECOND time after the explanation, or said for the SECOND time that they do not want to talk (never on the first refusal)"),
             bye_tr("close_declined"),
         ],
         max_turns=30, cap_to="close_declined")
