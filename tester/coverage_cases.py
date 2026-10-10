@@ -73,7 +73,7 @@ def attempt1_date(today):
 FRIDAY_NOW = dt.date(2026, 10, 16)                            # a second calendar day: attempt 1 rolls to next week, 26 Oct is a holiday
 
 
-NO_DISCLOSURE = "the agent does not say why it is calling and names no product, amount or debt"
+NO_DISCLOSURE = "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying it is a digital assistant calling from Freya Bank and that the call is recorded is required, not a violation)"
 NOT_BEFORE_ID = "no product, amount or debt is mentioned before identity is verified"
 SMS = "text-message sentence said after the promise"
 

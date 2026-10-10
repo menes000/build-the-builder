@@ -20,7 +20,7 @@ import argparse, concurrent.futures, json, os, pathlib, re, sys, threading, time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 KIT = ROOT / "docs" / "build-the-builder"
 sys.path.insert(0, str(KIT)); sys.path.insert(0, str(KIT / "tools")); sys.path.insert(0, str(ROOT / "tester"))
-import emulator, freya, gemini
+import emulator, freya, gemini, llm
 from run_cases import STYLES, persona_for
 from score import http, score_ledger
 
@@ -234,7 +234,7 @@ def for_judge(transcript, view):
 
 
 def judge(criteria, transcript):
-    raw = gemini.generate(JUDGE.format(criteria=criteria), [("user", transcript)], json_mode=True, temperature=0, thinking=JUDGE_THINKING or None)
+    raw = llm.generate("judge", JUDGE.format(criteria=criteria), [("user", transcript)], json_mode=True, thinking=JUDGE_THINKING or None)
     try:
         v = json.loads(raw)
         return bool(v.get("pass")), str(v.get("reason", ""))
@@ -318,7 +318,9 @@ def main():
         except Exception as e: say(f"(could not load the workflow for tool names: {e})")
     out_dir = ROOT / "results" / "local" / time.strftime("%Y%m%d-%H%M%S"); out_dir.mkdir(parents=True, exist_ok=True)
     agent_desc = f"agent emulated locally with {emulator.AGENT_MODEL}" if a.agent == "local" else "agent on Freya"
-    say(f"{len(cases)} cases x {a.reps} reps, {agent_desc}, customer and judge {gemini.MODEL} (judge sees: {a.judge_view}), {a.parallel} at a time. Transcripts: {out_dir}\n")
+    jp = llm.provider("judge"); ep = llm.provider("extract")
+    say(f"{len(cases)} cases x {a.reps} reps, {agent_desc}, customer {gemini.MODEL}, judge {llm.model_of(jp)} (sees: {a.judge_view}), extraction {llm.model_of(ep)}, "
+        f"{a.parallel} at a time. Transcripts: {out_dir}\n")
     t0 = time.time()
     jobs = [(c, rep) for rep in range(1, a.reps + 1) for c in cases]
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.parallel)) as pool:
@@ -334,10 +336,11 @@ def main():
     n, errs = sum(f["pass"] for f in final), sum(r["status"] == "ERROR" for r in rows)
     say(f"\n{n} / {len(final)} passed{'' if a.reps == 1 else f', a customer counts with {a.reps} of {a.reps} runs'}. "
         f"{errs} run(s) ended in an infrastructure error. {time.time() - t0:.0f} s.")
-    say(gemini.usage_line() + f" ({len(jobs)} calls)")
+    for line in llm.usage_lines(): say(line + (f" ({len(jobs)} calls)" if line.startswith("Gemini") else ""))
     with open(ROOT / "results" / "local-log.jsonl", "a") as f:
         f.write(json.dumps({"at": time.strftime("%Y-%m-%d %H:%M:%S"), "workflow_id": wf, "agent": a.agent, "cases": a.cases, "brief": a.brief, "style": a.style, "runs": a.reps,
-                            "passed": n, "total": len(final), "errors": errs, "failed": [x["id"] for x in final if not x["pass"]], "dir": str(out_dir), "gemini": dict(gemini.USAGE)}) + "\n")
+                            "passed": n, "total": len(final), "errors": errs, "failed": [x["id"] for x in final if not x["pass"]], "dir": str(out_dir),
+                            "gemini": dict(gemini.USAGE), "openai": dict(llm.openai_client.USAGE), "cache": dict(llm.STATS)}) + "\n")
     if a.out:
         pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         json.dump({"workflow_id": wf, "passed": n, "total": len(final), "final": final, "rows": rows}, open(a.out, "w"), indent=1)

@@ -24,7 +24,7 @@ def _count(out):
 
 def usage_line():
     u = USAGE
-    return f"Gemini usage: {u['calls']} calls, {u['prompt']/1e6:.2f}M prompt tokens, {u['output']/1e3:.0f}k output, {u['thoughts']/1e3:.0f}k thinking"
+    return f"Gemini usage: {u['calls']} calls, {u['prompt']/1e3:.1f}k prompt tokens, {u['output']/1e3:.1f}k output, {u['thoughts']/1e3:.1f}k thinking"
 
 
 def call(system, contents, tools=None, model=MODEL, temperature=None, max_tokens=None, thinking=None):

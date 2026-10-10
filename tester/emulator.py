@@ -17,7 +17,7 @@ confirm on Freya before trusting a result.
 """
 import copy, datetime, json, os, re, urllib.error, urllib.request
 
-import gemini
+import gemini, llm
 
 AGENT_MODEL = os.environ.get("EMU_AGENT_MODEL", gemini.MODEL)        # writes the agent's replies
 ENGINE_MODEL = os.environ.get("EMU_ENGINE_MODEL", gemini.MODEL)      # extraction and routing
@@ -174,7 +174,7 @@ class LocalAgent:
                   '\nAnswer with JSON only: {"matches": [numbers]}. An empty list when none matches.\n\nConditions:\n' +
                   "\n".join(f"{i}. {self.sub(d)}" for i, d in enumerate(descriptions)))
         try:
-            raw = gemini.generate(prompt, [("user", convo or "(no conversation yet)")], json_mode=True, model=ENGINE_MODEL, temperature=0, thinking=ENGINE_THINKING or None)
+            raw = llm.generate("route", prompt, [("user", convo or "(no conversation yet)")], json_mode=True, thinking=ENGINE_THINKING or None)
             return {int(i) for i in json.loads(raw).get("matches", [])}
         except Exception as e:
             self.infra.append(f"routing model: {e}"[:200]); return set()
@@ -231,7 +231,7 @@ class LocalAgent:
                   '\nAnswer with JSON only: {"values": {"name": value or null, ...}, "confidence": {"name": 0.0 to 1.0, ...}}. '
                   "Confidence is how sure you are of each value; 1.0 only when the user said it plainly.")
         try:
-            got = json.loads(gemini.generate(prompt, [("user", self.lookup("system.conversation.last-10"))], json_mode=True, model=ENGINE_MODEL, temperature=0, thinking=ENGINE_THINKING or None))
+            got = json.loads(llm.generate("extract", prompt, [("user", self.lookup("system.conversation.last-10"))], json_mode=True, thinking=ENGINE_THINKING or None))
         except Exception as e:
             self.infra.append(f"extraction model: {e}"[:200]); return
         if not isinstance(got, dict): return

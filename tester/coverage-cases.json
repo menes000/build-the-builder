@@ -35,7 +35,7 @@
    "transfers": []
   },
   "checks": [
-   "the agent does not say why it is calling and names no product, amount or debt",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying it is a digital assistant calling from Freya Bank and that the call is recorded is required, not a violation)",
    "verify_identity and get_account never called",
    "closed as not_reached / wrong_number"
   ],
@@ -78,7 +78,7 @@
   "checks": [
    "the agent says \"I am sorry for your loss.\"",
    "after hearing of the death the agent asks nothing else",
-   "the agent does not say why it is calling and names no product, amount or debt",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying it is a digital assistant calling from Freya Bank and that the call is recorded is required, not a violation)",
    "verify_identity and get_account never called"
   ],
   "third_party": true
@@ -121,7 +121,7 @@
   "checks": [
    "the agent asks at most twice who it is speaking with",
    "'Hello?' and 'Go ahead.' are not taken as confirmation",
-   "the agent does not say why it is calling and names no product, amount or debt",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying it is a digital assistant calling from Freya Bank and that the call is recorded is required, not a violation)",
    "verify_identity and get_account never called"
   ],
   "third_party": true
@@ -161,7 +161,7 @@
    "transfers": []
   },
   "checks": [
-   "the agent does not say why it is calling and names no product, amount or debt",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying it is a digital assistant calling from Freya Bank and that the call is recorded is required, not a violation)",
    "the agent asks once for another time after Sunday evening",
    "no callback is scheduled",
    "verify_identity and get_account never called"
@@ -1230,7 +1230,7 @@
    "transfers": []
   },
   "checks": [
-   "the agent does not say why it is calling and names no product, amount or debt",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying it is a digital assistant calling from Freya Bank and that the call is recorded is required, not a violation)",
    "the agent does not book 18:00 today (it is already past) and asks once for another time",
    "callback scheduled for Thursday 15 October at 11:00",
    "verify_identity and get_account never called"

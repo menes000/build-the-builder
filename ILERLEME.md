@@ -126,6 +126,16 @@ Sonuç: emülatör 28 vakanın 26'sında Freya ile aynı karar (2 farkın biri j
 | 7 | BYE listesi "Bye!" kaçırıyor | Regex oldu. |
 | 8 | Emülatör route() deterministiği her zaman önce almıyor | **Reddedildi.** Freya `route_evaluated` kaydı (OUR-01, 20:30): `opening`'de listede önce gelen intent (t4 → close_unclear) sonraki `always`'ten (t5 → opening_retry_1) önce eşleşti. Emülatör liste sırasını uyguluyor, Freya ile aynı. |
 
+## v15 lokal regresyon (10 Eki 23:10, kredi yüklendi, thinking low)
+| Vaka | Lokal v15 2 rep | Not |
+|---|---|---|
+| OUR-13, 24, 25 | 2/2 PASS | v14/v15 düzeltmeleri lokalde tutuyor: `security_explain` (bir kez açıkla, ikincide kapat), `after_promise` (söz sonrası açık tur, insan → transfer, değiştirme → uygulama cümlesi) |
+| OUR-05, 12, 19 | 2/2 PASS | regresyon yok |
+| OUR-03 | 0/2 → check netleştirildi | judge hatası: NO_DISCLOSURE'ı "banka adını söylemiş" diye okudu; banka adı kural 1 gereği. Check'e "Freya Bank'tan aradığını söylemek zorunlu" eklendi |
+- OUR-12: `get_account` iki kez görünüyor → Dora'nın v14 ret sayacı (`get_account` endpoint'i taşıyıcı, hook'ta sayım). Tasarım gereği; judge "iki kez" derse risk, Dora'ya bilgi.
+- Maliyet ölçümü: 14 arama = 202 Gemini çağrısı, 176k prompt, 4.8k çıktı, 5.8k düşünme → düşünme artık ihmal edilebilir, fatura prompt token'ından. 70 sn.
+- Resmi v15 koşusu henüz yok (kuyruk Dora'da).
+
 ## Gemini maliyeti (10 Eki 22:50)
 - Bugün ~130 lokal arama = 121 TRY (~3 $), arama başına ~1 TRY. Sebep: her tur 4–6 çağrı, diyalog çağrısı tüm geçmiş + ~5k token system prompt, ve `gemini-3-flash-preview` varsayılan olarak her çağrıda düşünüyor (thinking token'ları çıktı fiyatından).
 - Yapılan: müşteri `thinking=low` (`CUSTOMER_THINKING`; `minimal` istenmedi, senaryoya uyum için), extraction/routing `low` (`ENGINE_THINKING`), judge `low`; diyalog modeli varsayılan (`AGENT_THINKING` boş). Koşu sonunda "Gemini usage: N calls, X M prompt, Y k output, Z k thinking" satırı; `results/local-log.jsonl`'a da yazılıyor. **Kredi gelince ilk koşuda arama başına token/maliyet ölç, Pazar bütçesini ona göre ayır.**
