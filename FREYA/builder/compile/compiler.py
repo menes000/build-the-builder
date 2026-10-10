@@ -81,6 +81,15 @@ class ToolBox:
     def __init__(self, spec: CallSpec):
         self.spec = spec
         self.by_name: dict[str, Tool] = {t.name: t for t in spec.tools}
+        self.fm = spec.field_map or {}
+
+    def rq(self, tool: str, canon: str) -> str:
+        """Actual request field name for a canonical one."""
+        return (self.fm.get("req", {}).get(tool) or {}).get(canon, canon)
+
+    def rs(self, tool: str, canon: str) -> str:
+        """Actual response field name for a canonical one."""
+        return (self.fm.get("resp", {}).get(tool) or {}).get(canon, canon)
 
     def url(self, name: str) -> str:
         t = self.by_name.get(name)
@@ -99,7 +108,7 @@ class ToolBox:
 
     def api_tool(self, tool_name: str, fn_name: str, desc: str, body: dict, required=(), retries=0, pre="", post="", mapping=(),
                  lifecycle=None) -> dict:
-        props = {"customer_id": {"type": "string", "default": "{{customer_id}}"}}
+        props = {self.rq(tool_name, "customer_id"): {"type": "string", "default": "{{customer_id}}"}}
         props.update(body)
         cfg = {"timeoutMs": 12000, "maxRetries": retries}
         if lifecycle:
@@ -151,36 +160,36 @@ def compile_workflow(spec: CallSpec) -> dict:
     verify_identity = tb.api_tool(
         "verify_identity", "verify_identity",
         "Check ONE security answer. CALL it every time the customer gives a complete answer to a security question.",
-        {"field": {"type": "string", "enum": field_enum, "default": "{{field}}",
+        {tb.rq("verify_identity", "field"): {"type": "string", "enum": field_enum, "default": "{{field}}",
                    "description": "Which question was answered: " + " or ".join(field_enum) + "."},
-         "answer": tb.model_field("verify_identity", "answer", desc_override="; ".join(f"{q.field}: {q.answer_format}" for q in idn.questions))},
-        required=["field", "answer"], post=codegen.verify_post(spec), mapping=[("data.id_state", "id_state")])
+         tb.rq("verify_identity", "answer"): tb.model_field("verify_identity", tb.rq("verify_identity", "answer"), desc_override="; ".join(f"{q.field}: {q.answer_format}" for q in idn.questions))},
+        required=[tb.rq("verify_identity", "field"), tb.rq("verify_identity", "answer")], post=codegen.verify_post(spec), mapping=[("data.id_state", "id_state")])
 
     promise_body = {
         "amount_kind": {"type": "string", "enum": ["full", "floor", "custom"], "default": "{{amount_kind}}",
                         "description": "full: the full past-due amount of this product. floor: the floor of this product. custom: another agreed amount (then also give amount)."},
-        "amount": tb.model_field("create_promise", "amount", desc_override="The agreed amount as a number, only when amount_kind is custom.", type_override="number"),
-        "date": tb.model_field("create_promise", "date", desc_override="The agreed payment date, YYYY-MM-DD."),
+        tb.rq("create_promise", "amount"): tb.model_field("create_promise", tb.rq("create_promise", "amount"), desc_override="The agreed amount as a number, only when amount_kind is custom.", type_override="number"),
+        tb.rq("create_promise", "date"): tb.model_field("create_promise", tb.rq("create_promise", "date"), desc_override="The agreed payment date, YYYY-MM-DD."),
     }
     if mp.enabled:
-        promise_body["product_id"] = tb.model_field("create_promise", "product_id", desc_override="product_id of this product from ACCOUNT, e.g. p1. Copy it exactly.")
+        promise_body[tb.rq("create_promise", "product_id")] = tb.model_field("create_promise", tb.rq("create_promise", "product_id"), desc_override="product_id of this product from ACCOUNT, e.g. p1. Copy it exactly.")
     create_promise = tb.api_tool(
         "create_promise", "create_promise",
         "Record ONE payment promise for ONE product. CALL it only after the customer said a clear yes to your read-back of product, amount and date.",
-        promise_body, required=["amount_kind", "date"] + (["product_id"] if mp.enabled else []),
+        promise_body, required=["amount_kind", tb.rq("create_promise", "date")] + ([tb.rq("create_promise", "product_id")] if mp.enabled else []),
         pre=codegen.promise_pre(spec), post=codegen.promise_post(spec),
         mapping=[("data.promise_state", "promise_state")] + ([("data.all_products_done", "all_products_done")] if mp.enabled else []))
 
     schedule_callback = tb.api_tool(
         "schedule_callback", "schedule_callback",
         "Book a callback for the customer. CALL it as soon as the person gives a day and a time inside the allowed callback window.",
-        {"date": tb.model_field("schedule_callback", "date", desc_override="Callback date, YYYY-MM-DD."),
-         "time": tb.model_field("schedule_callback", "time", desc_override="Callback time, HH:MM, 24-hour.")},
-        required=["date", "time"], pre=codegen.callback_pre(spec), post=codegen.callback_post(spec), mapping=[("data.cb_state", "cb_state")])
+        {tb.rq("schedule_callback", "date"): tb.model_field("schedule_callback", tb.rq("schedule_callback", "date"), desc_override="Callback date, YYYY-MM-DD."),
+         tb.rq("schedule_callback", "time"): tb.model_field("schedule_callback", tb.rq("schedule_callback", "time"), desc_override="Callback time, HH:MM, 24-hour.")},
+        required=[tb.rq("schedule_callback", "date"), tb.rq("schedule_callback", "time")], pre=codegen.callback_pre(spec), post=codegen.callback_post(spec), mapping=[("data.cb_state", "cb_state")])
 
     def xfer(queue: str, when: str) -> dict:
-        return tb.api_tool("transfer_to_agent", f"transfer_{queue}", when, {"queue": {"type": "string", "default": queue}},
-                           post=codegen.transfer_post(queue), mapping=[("data.xfer_state", f"xfer_{queue}_state")])
+        return tb.api_tool("transfer_to_agent", f"transfer_{queue}", when, {tb.rq("transfer_to_agent", "queue"): {"type": "string", "default": queue}},
+                           post=codegen.transfer_post(queue, spec), mapping=[("data.xfer_state", f"xfer_{queue}_state")])
 
     hs = sp.hardship
     transfer_support = xfer(hs.offer_queue, f"Transfer the call to the {hs.offer_queue} team. CALL it only when a customer with {', '.join(hs.triggers)} accepts your offer to connect them.")
@@ -189,20 +198,20 @@ def compile_workflow(spec: CallSpec) -> dict:
 
     add_note = None
     if mp.enabled:
-        rf = tb.field("add_note", "reason")
+        rf = tb.field("add_note", tb.rq("add_note", "reason"))
         reasons = list(rf.enum) if rf and rf.enum else list(mp.note_reasons)
         add_note = tb.api_tool(
             "add_note", "add_note",
             "Record why ONE product ends without a promise. CALL it once for each product that gets no promise, with that product_id and the reason.",
-            {"product_id": tb.model_field("add_note", "product_id", desc_override="product_id from ACCOUNT, e.g. p2. Copy it exactly."),
-             "reason": {"type": "string", "enum": reasons, "default": "{{note_reason}}", "description": "One of: " + ", ".join(reasons)}},
-            required=["product_id", "reason"], pre=codegen.note_pre(spec, reasons), post=codegen.note_post(spec),
+            {tb.rq("add_note", "product_id"): tb.model_field("add_note", tb.rq("add_note", "product_id"), desc_override="product_id from ACCOUNT, e.g. p2. Copy it exactly."),
+             tb.rq("add_note", "reason"): {"type": "string", "enum": reasons, "default": "{{note_reason}}", "description": "One of: " + ", ".join(reasons)}},
+            required=[tb.rq("add_note", "product_id"), tb.rq("add_note", "reason")], pre=codegen.note_pre(spec, reasons), post=codegen.note_post(spec),
             mapping=[("data.note_state", "note_state"), ("data.all_products_done", "all_products_done")])
 
     close_call = tb.api_tool(
         "close_call", "close_call", "Record how the call ended.",
-        {"outcome": {"type": "string", "default": "{{outcome}}"}, "reason": {"type": "string", "default": "{{reason}}"}},
-        required=["outcome"], pre=codegen.close_pre(spec), lifecycle="end_of_call")
+        {tb.rq("close_call", "outcome"): {"type": "string", "default": "{{outcome}}"}, tb.rq("close_call", "reason"): {"type": "string", "default": "{{reason}}"}},
+        required=[tb.rq("close_call", "outcome")], pre=codegen.close_pre(spec), lifecycle="end_of_call")
 
     # ---- closing nodes: hint (outcome, reason, farewell); decide_outcome may override
     name_tok = "NAME"
@@ -214,7 +223,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         "close_paid": (sp.paid.close.outcome, sp.paid.close.reason, f"Thank you for letting me know. {_sentence(sp.paid.say)} {thanks}"),
         "close_dispute": (sp.dispute.close.outcome, sp.dispute.close.reason, f"I understand. {thanks}"),
         "close_refused": (spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason, f"I understand. {thanks}"),
-        "close_hardship": (hs.decline_close.outcome, hs.decline_close.reason, f"I understand. Thank you for your time, {name_tok}, and take care. Goodbye."),
+        "close_hardship": (hs.decline_close.outcome, hs.decline_close.reason, f"Thank you for your time, {name_tok}. Goodbye."),
         f"close_xfer_{hs.offer_queue}": (hs.accept_close.outcome, hs.accept_close.reason, f"I am connecting you with our {hs.offer_queue} team now. Thank you for your time. Goodbye."),
         f"close_xfer_{sp.restructuring.queue}": (sp.restructuring.close.outcome, sp.restructuring.close.reason, "I am connecting you with the team that handles payment plans now. Thank you for your time. Goodbye."),
         f"close_xfer_{sp.human.queue}": (sp.human.close.outcome, sp.human.close.reason, "I am connecting you with a colleague now. Thank you for your time. Goodbye."),
@@ -269,7 +278,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         first_only=True, tools=sec_tools,
         transitions=[
             go("load_account", "All security answers verified", grp(eq("id_state", "verified"),
-               eq("verify_identity_response.data.all_verified", "true"), eq("verify_identity_response.data.all_verified", "True"))),
+               eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "true"), eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "True"))),
             go("close_failed", "The identity check failed", grp(eq("id_state", "failed"))),
         ] + ([go(f"close_xfer_{sp.human.queue}", "Transferred to a human", grp(eq(f"xfer_{sp.human.queue}_state", "done")))] if idn.human_request else []) + [
             tool_tr("close_declined", "The customer declined the security questions twice, or said twice they do not want to talk"),
@@ -288,8 +297,8 @@ def compile_workflow(spec: CallSpec) -> dict:
                              "url": {"type": "string", "default": tb.url("get_account")},
                              "method": {"type": "string", "default": "POST"},
                              "headers": {"type": "object", "properties": {"Content-Type": {"type": "string", "default": "application/json"}}},
-                             "body": {"type": "object", "properties": {"customer_id": {"type": "string", "default": "{{customer_id}}"}}, "required": []}}}}}],
-        "response_mapping": [{"path": "data.products", "variable": "products"}],
+                             "body": {"type": "object", "properties": {tb.rq("get_account", "customer_id"): {"type": "string", "default": "{{customer_id}}"}}, "required": []}}}}}],
+        "response_mapping": [{"path": f"data.{tb.rs('get_account', 'products')}", "variable": "products"}],
         "transitions": [always("account_facts")],
     }
     nodes["account_facts"] = code_node("account_facts", codegen.facts_code(spec), "close_account_error",

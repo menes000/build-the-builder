@@ -293,6 +293,7 @@ class CallSpec(BaseModel):
     multi_product: MultiProduct = MultiProduct()
 
     tools: list[Tool] = Field([], description="Filled by the builder from openapi.json, not by the extractor")
+    field_map: dict = Field({}, description="Filled by the builder from openapi.json: canonical -> actual field names (req/resp/product)")
     global_extra_rules: list[str] = Field([], description="Rules that hold in every node and fit nowhere else")
     source_notes: list[str] = Field([], description="Extractor notes: conflicts resolved, assumptions made")
 

@@ -61,3 +61,17 @@
 - 20:50: veda düzeltmesi + kelime temizliği yayınlandı: ours-a v5, ours-ab v9. Gece ölçüm yok; sabah: A geveze/parça, B 3 tekrar, scan.py ile her koşu.
 - 19:45 tarama (arıza dışı koşular): yeni sınıf yok; kimlik aşamasında aynı soru 3-6x (geçiyor, döngü riski). Kural: tool teknik hatada 1 tekrar sonra kapanışa geç; aynı soru en fazla 2 kez. Yayın: A v6, AB v10.
 - A v6 --reps 3 (19:50–19:56): 10/10, 9/10, 10/10. Düşüş PUB-08 rep2: ilk get_account isteği 12 s timeout sonrası tekrarlandı, gecikmiş ilk istek bankaya close_call'dan SONRA ulaştı ("close_call son tool değil"). Ağ gecikmesi, önlenemez; 60+ aramada 1 kez.
+- AB v10 B rep2 PUB-12: müşterinin "yarın" (15 Ekim, izinli) teklifi reddedildi → v8'deki refusal script modeli katılaştırdı (regresyon). Ayrıca ürün başına "bugün?" tekrar soruldu (B kural 4 ihlali). Düzeltme v11: script "sadece düz ret sonrası", "müşterinin izinli tarihi her zaman kabul", "Yarın: ..." satırı, çok üründe "bugün'ü tekrar sorma". Zincir bitince yayınlanacak.
+- A v6 talkative (20:05): 8/10. PUB-03: tam söylenmiş DOB'u "tamamlayın" diye reddetti (kural fazla geniş) → "cevap tamsa kullan". PUB-05: simülatör bozuk mesaj üretti, ajan teklifi tekrarladı + vedada "I understand/take care" ikinci sempati sayıldı → geri getirme sadece "Is that a yes or a no?", hardship vedası sade.
+- A v6 pieces (20:10): 9/10. PUB-09: müşteri "bu tutarı ödeyemem" / "düşük taksit istiyorum" cümlesini iki parçada söyledi; ajan ilk parçaya teklif yaptı, judge "transferden önce plan anlattı" saydı. Parça stilinin kaçınılmaz yan etkisi, düzeltme yok.
+- Gece zinciri özeti (v6/v10, snekbox temiz): A 10-9-10 (gecikme), B 3-2-2 (PUB-12, v11 düzeltmesi bekliyor), talkative 8/10 (v7 düzeltmesi bekliyor), pieces 9/10.
+- AB v12 B --reps 3 (20:25): 2/3, 3/3, 3/3. PUB-12: "yarın" artık kabul; kalan sorun ürün başına "bugün?" sorusu (judge deneme sayıyor). v13: çok üründe ürün açılış cümlesi doğrudan 1. deneme ("Can you pay X on <att1>?").
+- **A v7 talkative (20:35): 10/10** (önce 8/10). Tam-cevap kuralı ve "yes or no" geri getirme işledi.
+- AB v13 B --reps 3 (20:15–20:22): **3/3, 3/3, 2/3**. PUB-12 rep3: bu kez loan'a 1 deneme yaptı (2 olmalı). Deneme sayısı tek kararsız sınıf; prompt ile %70-80 bandında. Yarın: deterministik sayaç (get_account taşıyıcı hook) denemesi.
+## Gün sonu (10 Eki 20:25), temiz koşular, son sürümler (A v7, AB v13)
+- A: 3 tekrar 10-9-10 (gecikme); stiller corrects 10, in_words 10, asks_back 10, talkative 10, pieces 9.
+- B: 3 tekrar 3-3-2 (PUB-12 deneme sayısı).
+- Extraction: A, A+B, C ilk denemede doğru. Builder tek komut, ~1 dk, trace+export.
+- Yarın: API key testi; deneme sayacı; builder'ın kendi düzeltme döngüsü; kapsama seti (Mehmet); tool API cevap alanlarını openapi'den okuma; öğlen dondurma.
+- 21:00 **Tool API alan eşlemesi**: `tools.field_map()` canonical→gerçek ad (exact → eşanlamlı → gevşek eşleme → uyarı). codegen/compiler tüm banka alanlarını eşlemeden okuyor. Test: briefs_extra/brief-c/openapi-renamed.json (12 alan yeniden adlandırılmış) → derleme, selfcheck, dryRun OK.
+- 21:35 **Fix loop uçtan uca** (ext-a, Brief A, --style pieces, --fix-rounds 1): extraction 59 s → test 8/10 → Claude revizyonu 69 s ($0.42; hardship teklifi bir kez, belirsiz dönemde tek soru) → yeniden derle (v3) → test **10/10**. Toplam 351 s. Trace: traces/20261010-203007-ext-a.txt. Yapısal koruma (tatil/bant/outcome/kimlik soruları değişmez) geçti.

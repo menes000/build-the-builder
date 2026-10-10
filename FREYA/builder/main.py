@@ -31,13 +31,17 @@ from .compile.compiler import compile_workflow  # noqa: E402
 from .compile.lint import lint  # noqa: E402
 from .compile.selfcheck import check_snippets  # noqa: E402
 from .extract.callspec import CallSpec  # noqa: E402
-from .extract.tools import parse_openapi  # noqa: E402
+from .extract.tools import field_map, parse_openapi  # noqa: E402
 from .trace import Trace  # noqa: E402
 
 
-def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trace) -> dict | None:
+def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trace, style: str | None = None, only: list[str] | None = None) -> dict | None:
     """Run the kit's practice customers against the agent. Returns the parsed result or None."""
     cmd = [sys.executable, str(KIT / "tools" / "run_cases.py"), agent_id, "--brief", brief, "--cases", cases, "--out", str(out_json)]
+    if style:
+        cmd += ["--style", style]
+    if only:
+        cmd += ["--only", ",".join(only)]
     t0 = time.time()
     p = subprocess.run(cmd, cwd=KIT, capture_output=True, text=True)
     sys.stdout.write(p.stdout)
@@ -50,7 +54,7 @@ def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trac
         trace.note(f"run_cases {brief}: could not read results: {e}")
         return None
     failed = [f"{row['id']}: {'; '.join(row['failed'])[:200]}" for row in r.get("rows", []) if not row.get("pass")]
-    trace.test(name=f"practice brief {brief}", passed=r["passed"], total=r["total"], seconds=time.time() - t0, failed=failed, simulation_id=r.get("simulation_id", ""))
+    trace.test(name=f"practice brief {brief}" + (f" style={style}" if style else ""), passed=r["passed"], total=r["total"], seconds=time.time() - t0, failed=failed, simulation_id=r.get("simulation_id", ""))
     return r
 
 
@@ -63,6 +67,8 @@ def main(argv=None) -> int:
     ap.add_argument("--test", action="append", default=[])
     ap.add_argument("--cases", default=str(KIT / "public-test-set.json"))
     ap.add_argument("--budget-min", type=float, default=25)
+    ap.add_argument("--fix-rounds", type=int, default=1, help="how many times the builder may revise the CallSpec after failed tests")
+    ap.add_argument("--style", default=None, help="customer speaking style for the tests (pieces, corrects, talkative, asks_back, in_words)")
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     ap.add_argument("--out-dir", default=str(ROOT / "out"))
     a = ap.parse_args(argv)
@@ -84,33 +90,73 @@ def main(argv=None) -> int:
         from .extract.extractor import extract_callspec
         spec = extract_callspec(a.briefs, str(out_dir / f"{slot}.callspec.json"), trace, model=a.model, openapi_path=a.openapi)
     spec.tools = parse_openapi(a.openapi)
+    spec.field_map = field_map(a.openapi)
+    for w in spec.field_map.get('warnings', []):
+        trace.note(f'field map: {w}')
     (out_dir / f"{slot}.callspec.json").write_text(spec.model_dump_json(indent=1))
 
-    # 2. compile + check
-    wf = compile_workflow(spec)
-    problems = lint(wf) + check_snippets(wf)
-    for p in problems:
-        trace.note(f"lint: {p}")
-    if any("syntax error" in p or "runtime error" in p for p in problems):
-        raise SystemExit("generated code does not run; aborting")  # a real builder bug, not a brief problem
-    wf_path = out_dir / f"{slot}.workflow.json"
-    wf_path.write_text(json.dumps(wf, indent=1))
-    trace.note(f"compiled {len(wf['nodes'])} nodes -> {wf_path}")
+    def compile_and_save(spec_now: CallSpec, tag: str) -> tuple[dict, dict]:
+        wf = compile_workflow(spec_now)
+        problems = lint(wf) + check_snippets(wf)
+        for p in problems:
+            trace.note(f"lint{tag}: {p}")
+        if any("syntax error" in p or "runtime error" in p for p in problems):
+            raise SystemExit("generated code does not run; aborting")  # a real builder bug, not a brief problem
+        wf_path = out_dir / f"{slot}{tag}.workflow.json"
+        wf_path.write_text(json.dumps(wf, indent=1))
+        trace.note(f"compiled{tag} {len(wf['nodes'])} nodes -> {wf_path}")
+        freya.validate_workflow(f"{slot} dryrun", wf)
+        trace.note(f"dryRun valid{tag}")
+        ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
+        trace.created("workflow", slot=slot, tag=tag or "v1", **ids)
+        return wf, ids
 
-    # 3. validate + save on Freya
-    freya.validate_workflow(f"{slot} dryrun", wf)
-    trace.note("dryRun valid")
-    ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
-    trace.created("workflow", slot=slot, **ids)
+    # 2+3. compile, check, validate, save
+    wf, ids = compile_and_save(spec, "")
     agent_id = ids["agent_id"]
 
     # 4. tests (budget permitting)
-    results = {}
-    for brief in a.test:
-        if time.time() > deadline - 60:
-            trace.note(f"budget exhausted, skipping test {brief}")
+    def run_tests(tag: str) -> dict:
+        res = {}
+        for brief in a.test:
+            if time.time() > deadline - 60:
+                trace.note(f"budget exhausted, skipping test {brief}")
+                break
+            res[brief] = run_cases(agent_id, brief, a.cases, out_dir / f"{slot}{tag}.test-{brief}.json", trace, style=a.style)
+        return res
+
+    def score(res: dict) -> tuple[int, int]:
+        return (sum(r["passed"] for r in res.values() if r), sum(r["total"] for r in res.values() if r))
+
+    results = run_tests("")
+
+    # 4b. the builder's own fix loop: failed customers -> revised CallSpec -> recompile -> retest; keep the better one
+    cases_by_id = {c["id"]: c for c in json.loads(Path(a.cases).read_text())}
+    for rnd in range(1, a.fix_rounds + 1):
+        passed, total = score(results)
+        failures = [f for r in results.values() if r for f in __import__("builder.test.fixer", fromlist=["collect_failures"]).collect_failures(r, cases_by_id)]
+        if not failures or passed == total:
             break
-        results[brief] = run_cases(agent_id, brief, a.cases, out_dir / f"{slot}.test-{brief}.json", trace)
+        if time.time() > deadline - 8 * 60:
+            trace.note(f"fix round {rnd}: not enough budget left ({int((deadline - time.time()) / 60)} min); keeping v{rnd}")
+            break
+        from .test.fixer import propose_fix
+        new_spec = propose_fix(spec, failures, a.briefs, str(out_dir / f"{slot}.callspec.fix{rnd}.json"), trace, model=a.model)
+        if new_spec is None:
+            break
+        prev_wf = wf
+        wf, ids = compile_and_save(new_spec, f".fix{rnd}")
+        new_results = run_tests(f".fix{rnd}")
+        np, nt = score(new_results)
+        trace.note(f"fix round {rnd}: {passed}/{total} -> {np}/{nt}")
+        if np >= passed:
+            spec, results = new_spec, new_results
+            (out_dir / f"{slot}.callspec.json").write_text(spec.model_dump_json(indent=1))
+        else:
+            ids = freya.save_workflow(slot, prev_wf, state_file=str(ROOT / ".freya-agents.json"))
+            wf = prev_wf
+            trace.created("workflow", slot=slot, tag=f"rollback after fix{rnd}", **ids)
+            break
 
     # 5. export
     export_path = out_dir / f"{slot}.export.workflow.json"

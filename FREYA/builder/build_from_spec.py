@@ -12,12 +12,15 @@ from .compile.compiler import compile_workflow
 from .compile.lint import lint
 from .compile.selfcheck import check_snippets
 from .extract.callspec import CallSpec
-from .extract.tools import parse_openapi
+from .extract.tools import field_map, parse_openapi
 
 
 def build(spec_path: str, openapi_path: str) -> tuple[dict, list[str]]:
     spec = CallSpec.model_validate_json(Path(spec_path).read_text())
     spec.tools = parse_openapi(openapi_path)
+    spec.field_map = field_map(openapi_path)
+    for w in spec.field_map.get('warnings', []):
+        print('FIELD MAP:', w)
     wf = compile_workflow(spec)
     problems = lint(wf) + check_snippets(wf)
     return wf, problems

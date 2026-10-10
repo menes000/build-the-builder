@@ -20,12 +20,16 @@ brief file(s) + tools/openapi.json
    ▼
 4. SAVE      `freya.save_workflow(slot, ...)`: the same slot is updated in place, then published.
    ▼
-5. TEST      Optional: the kit's practice customers (`--test A --test B`), within the time budget.
+5. TEST      Optional: the kit's practice customers (`--test A --test B`, `--style pieces`), within the time budget.
+   ▼
+5b. FIX      If customers failed and budget remains (`--fix-rounds 1`): the failed transcripts, ledger diffs and
+   │         judge reasons go to Claude, which revises the CallSpec texts (never the brief's values), the compiler
+   │         rebuilds, the tests rerun, and the better version is kept (rollback otherwise). All by the builder.
    ▼
 6. EXPORT    `out/<slot>.export.workflow.json` and a trace in `traces/`.
 ```
 
-The builder never edits a phone agent by hand and contains no value from any brief: holidays, bands, floors, queues, outcomes and sentences all come from the CallSpec that Claude extracts at run time.
+The builder never edits a phone agent by hand and contains no value from any brief: holidays, bands, floors, queues, outcomes and sentences all come from the CallSpec that Claude extracts at run time. Tool request and response field names come from the tool API file through `tools.field_map()` (exact name, then synonyms, then a loose match, with warnings in the trace), so a final API that renames `all_verified` or `products` still works.
 
 ## Setup
 
@@ -62,7 +66,7 @@ Outputs per run:
 
 The run prints `{"workflow_id", "agent_id", "export"}` at the end.
 
-Options: `--budget-min 25` (tests are skipped once the budget is spent), `--model claude-opus-5-5`, `--spec file.json` (skip extraction, developer use), `--cases file.json`.
+Options: `--budget-min 25` (tests and fix rounds are skipped once the budget is spent), `--fix-rounds 1`, `--style <pieces|corrects|talkative|asks_back|in_words>`, `--model claude-opus-5-5`, `--spec file.json` (skip extraction, developer use), `--cases file.json`.
 
 ## Layout
 
@@ -79,6 +83,9 @@ builder/
   compile/prompts.py      node prompt templates
   compile/lint.py         kit checklist checks
   compile/selfcheck.py    runs every generated snippet locally
+  test/fixer.py           the fix loop: failures -> revised CallSpec (Claude), with structural guards
+  test/scan.py            scans every call of a run for loops, silence, platform errors, invalid close_call
+  extract/prompts/fix_callspec.md   the revision instructions
   build_from_spec.py      compile a CallSpec file without extraction (developer tool)
 kit/                      the organisers' starter kit, unchanged
 fixtures/                 hand-written CallSpecs, the example builder's output, Claude's extractions

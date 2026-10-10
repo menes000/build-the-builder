@@ -44,6 +44,8 @@ def facts_code(spec: CallSpec) -> str:
         "CB_TODAY": cb.allow_today, "CB_NBD": cb.allow_next_business_day, "CB_LATER": cb.must_be_later_than_now,
         "MULTI": spec.multi_product.enabled,
         "DEBT_RULE": spec.debt_statement_rule,
+        "PF": (spec.field_map or {}).get("product") or {},
+        "PRODUCTS_KEY": ((spec.field_map or {}).get("resp", {}).get("get_account") or {}).get("products", "products"),
         "DEFAULT_OUTCOME": [spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason],
         "VERIFIED_DEFAULT": [spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason],
     }
@@ -97,14 +99,16 @@ def as_list(v):
         except Exception:
             pass
     return None
+def pf(p, name):
+    return p.get(PF.get(name, name), p.get(name))
 def find_products():
-    for k in ['products', 'load_account_response.data.products', 'get_account_response.data.products']:
+    for k in ['products', 'load_account_response.data.' + PRODUCTS_KEY, 'get_account_response.data.' + PRODUCTS_KEY]:
         v = as_list(vars.get(k))
         if v:
             return v
     items = dict()
     for k in list(vars.keys()):
-        m = re.search(r'products\.(\d+)\.(\w+)$', str(k))
+        m = re.search(PRODUCTS_KEY + r'\.(\d+)\.(\w+)$', str(k))
         if m:
             items.setdefault(int(m.group(1)), dict())[m.group(2)] = vars.get(k)
     return [items[i] for i in sorted(items)]
@@ -127,6 +131,7 @@ try:
         vars['outcome'] = DEFAULT_OUTCOME[0]
         vars['reason'] = DEFAULT_OUTCOME[1]
     vars['today_text'] = tag(today) + ', time ' + now_hm
+    vars['tomorrow_text'] = tag(today + ONE) + (' (a business day)' if isbd(today + ONE) else ' (not a business day)')
     # callback window
     cb = []
     cbd = []
@@ -156,12 +161,12 @@ try:
     facts = []
     if prods:
         for i, p in enumerate(prods):
-            typ = str(p.get('type') or '')
+            typ = str(pf(p, 'type') or '')
             pt = PTYPES.get(typ) or dict()
-            past = float(p.get('past_due') or 0)
-            dl = int(float(p.get('days_late') or 0))
-            floor = float(p.get(pt.get('floor') or '') or 0) if pt else 0.0
-            label = (pt.get('label') or typ.replace('_', ' ')).replace('{card_last4}', str(p.get('card_last4') or ''))
+            past = float(pf(p, 'past_due') or 0)
+            dl = int(float(pf(p, 'days_late') or 0))
+            floor = float(pf(p, pt.get('floor') or '') or 0) if pt else 0.0
+            label = (pt.get('label') or typ.replace('_', ' ')).replace('{card_last4}', str(pf(p, 'card_last4') or ''))
             b = band_for(dl) or dict()
             if b.get('bd') is not None:
                 deadline = nth_bd(today, int(b['bd']))
@@ -178,7 +183,7 @@ try:
                 if isbd(d):
                     valid.append(d.isoformat())
                 d = d + ONE
-            facts.append(dict(pid=str(p.get('product_id') or ('p' + str(i + 1))), label=label, past=round(past, 2),
+            facts.append(dict(pid=str(pf(p, 'product_id') or ('p' + str(i + 1))), label=label, past=round(past, 2),
                               days_late=dl, band=str(b.get('name') or ''), attempts=int(b.get('attempts') or 1),
                               deadline=deadline.isoformat(), floor=round(floor, 2), valid=valid, att1=att1.isoformat()))
         vars['n_products'] = len(facts)
@@ -215,8 +220,11 @@ try:
             ol.append('- ' + f['label'] + ' (product_id ' + f['pid'] + '): full past-due amount ' + money(f['past'])
                       + ', ' + str(f['days_late']) + ' days late, band ' + f['band'] + ', floor ' + money(f['floor'])
                       + ', deadline ' + dl_t + '.')
-            plan = '  Refusal script for ' + f['label'] + ' (exactly ' + str(f['attempts']) + ' persuasion attempt' + ('s' if f['attempts'] != 1 else '') + ', then stop):'
-            plan += '\n    attempt 1 -> propose ' + money(f['past']) + ' (or the floor ' + money(f['floor']) + ' if they already said the amount is too much) on ' + a1_t + '.'
+            plan = '  Refusal script for ' + f['label'] + ' (use ONLY after a flat refusal; a date or amount the customer proposes is handled by the DATES list and the amount rules instead; exactly ' + str(f['attempts']) + ' persuasion attempt' + ('s' if f['attempts'] != 1 else '') + ', then stop' + ('; do NOT ask again whether they can pay today, that was asked once for all products' if MULTI else '') + '):'
+            if MULTI:
+                plan += '\n    open this product with exactly this question, which IS attempt 1 (never ask about today for this product): "For your ' + f['label'] + ', the past-due amount is ' + money(f['past']) + '. Can you pay it on ' + a1_t + '?"'
+            else:
+                plan += '\n    attempt 1 -> propose ' + money(f['past']) + ' (or the floor ' + money(f['floor']) + ' if they already said the amount is too much) on ' + a1_t + '.'
             if f['attempts'] >= 2:
                 plan += '\n    attempt 2 -> propose the floor ' + money(f['floor']) + ' on the deadline ' + dl_t + ', and say the rest stays overdue.'
             for k in range(3, f['attempts'] + 1):
@@ -265,7 +273,8 @@ STRIP_HEADER = "        result.pop('header', None)\n"
 def verify_post(spec: CallSpec) -> str:
     hints = {h.hint: (h.instruction, h.counts_as_wrong) for h in spec.identity.retry_hints}
     qs = [q.field for q in spec.identity.questions]
-    return "HINTS = " + _lit(hints) + "\nQS = " + _lit(qs) + r'''
+    F = ((spec.field_map or {}).get("resp", {}).get("verify_identity") or {})
+    return "HINTS = " + _lit(hints) + "\nQS = " + _lit(qs) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error", "verified", "all_verified", "wrong_answers_left", "hint")}) + r'''
 try:
     if isinstance(result, dict):
         result.pop('header', None)
@@ -274,29 +283,29 @@ try:
             d = dict()
             result['data'] = d
         t = lambda x: str(x).lower() == 'true'
-        left = d.get('wrong_answers_left')
+        left = d.get(F['wrong_answers_left'])
         try:
             left = int(left)
         except Exception:
             left = None
-        err = str(d.get('error') or '').lower()
-        hint = str(d.get('hint') or '')
-        if t(d.get('all_verified')):
+        err = str(d.get(F['error']) or '').lower()
+        hint = str(d.get(F['hint']) or '')
+        if t(d.get(F['all_verified'])):
             d['id_state'] = 'verified'
             d['what_to_do_next'] = 'Both security answers are correct.'
         elif hint and hint in HINTS:
             d['id_state'] = 'retry'
             d['what_to_do_next'] = ('This counted as a wrong answer. ' if HINTS[hint][1] else 'This did NOT count as a wrong answer. ') + HINTS[hint][0]
-        elif left is not None and left <= 0 and not t(d.get('verified')):
+        elif left is not None and left <= 0 and not t(d.get(F['verified'])):
             d['id_state'] = 'failed'
             d['what_to_do_next'] = 'The check has failed: no wrong answers left. Say nothing about the account.'
-        elif not t(d.get('ok')) and ('lock' in err or 'attempt' in err or 'fail' in err or 'ended' in err):
+        elif not t(d.get(F['ok'])) and ('lock' in err or 'attempt' in err or 'fail' in err or 'ended' in err):
             d['id_state'] = 'failed'
             d['what_to_do_next'] = 'The check has failed. Say nothing about the account.'
-        elif not t(d.get('ok')):
+        elif not t(d.get(F['ok'])):
             d['id_state'] = 'retry'
             d['what_to_do_next'] = 'The answer could not be read and did NOT count as wrong. Ask the customer for the full answer again.'
-        elif t(d.get('verified')):
+        elif t(d.get(F['verified'])):
             d['id_state'] = 'next'
             d['what_to_do_next'] = 'This answer is correct. Now ask the next security question that has not been passed yet, in this order: ' + ', '.join(QS) + '.'
         else:
@@ -308,7 +317,8 @@ except Exception:
 
 
 def promise_pre(spec: CallSpec) -> str:
-    return r'''
+    R = ((spec.field_map or {}).get("req", {}).get("create_promise") or {})
+    return "R = " + _lit({k: R.get(k, k) for k in ("product_id", "amount", "date")}) + r'''
 import json
 try:
     b = config.get('body')
@@ -318,21 +328,21 @@ try:
             facts = json.loads(str(vars.get('facts_json') or '[]'))
         except Exception:
             facts = []
-        pid = str(b.get('product_id') or '').strip()
+        pid = str(b.get(R['product_id']) or '').strip()
         if len(facts) == 1:
             pid = facts[0]['pid']
         f = None
         for x in facts:
             if x['pid'] == pid:
                 f = x
-        b['product_id'] = pid
+        b[R['product_id']] = pid
         try:
             vars['last_promise_pid'] = pid
         except Exception:
             pass
         good = f is not None
-        dt = str(b.get('date') or '').strip()[:10]
-        b['date'] = dt
+        dt = str(b.get(R['date']) or '').strip()[:10]
+        b[R['date']] = dt
         kind = str(b.get('amount_kind') or '').strip().lower()
         b.pop('amount_kind', None)
         amt = None
@@ -342,12 +352,12 @@ try:
             amt = float(f['floor'])
         else:
             try:
-                amt = round(float(str(b.get('amount')).replace(',', '')), 2)
+                amt = round(float(str(b.get(R['amount'])).replace(',', '')), 2)
             except Exception:
                 amt = None
                 good = False
         if amt is not None:
-            b['amount'] = amt
+            b[R['amount']] = amt
         if f is not None:
             if dt not in f['valid']:
                 good = False
@@ -360,7 +370,7 @@ try:
             except Exception:
                 pass
         if not good:
-            b['date'] = 'REJECTED'
+            b[R['date']] = 'REJECTED'
 except Exception:
     pass
 '''
@@ -368,7 +378,8 @@ except Exception:
 
 def promise_post(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
-    return "MULTI = " + _lit(multi) + r'''
+    F = ((spec.field_map or {}).get("resp", {}).get("create_promise") or {})
+    return "MULTI = " + _lit(multi) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 import json
 try:
     if isinstance(result, dict):
@@ -385,8 +396,8 @@ try:
         pid = str(vars.get('last_promise_pid') or vars.get('create_promise_args.product_id') or '')
         if len(facts) == 1:
             pid = facts[0]['pid']
-        err = str(d.get('error') or '')
-        if str(d.get('ok')).lower() == 'true':
+        err = str(d.get(F['error']) or '')
+        if str(d.get(F['ok'])).lower() == 'true':
             try:
                 done = json.loads(str(vars.get('promises_json') or '[]'))
             except Exception:
@@ -436,7 +447,8 @@ except Exception:
 
 
 def note_pre(spec: CallSpec, reasons: list[str]) -> str:
-    return "REASONS = " + _lit(reasons) + r'''
+    R = ((spec.field_map or {}).get("req", {}).get("add_note") or {})
+    return "REASONS = " + _lit(reasons) + "\nR = " + _lit({k: R.get(k, k) for k in ("product_id", "reason")}) + r'''
 import json
 try:
     b = config.get('body')
@@ -446,16 +458,16 @@ try:
             facts = json.loads(str(vars.get('facts_json') or '[]'))
         except Exception:
             facts = []
-        pid = str(b.get('product_id') or '').strip()
+        pid = str(b.get(R['product_id']) or '').strip()
         if len(facts) == 1:
             pid = facts[0]['pid']
-        b['product_id'] = pid
+        b[R['product_id']] = pid
         try:
             vars['last_note_pid'] = pid
-            vars['last_note_reason'] = str(b.get('reason') or '')
+            vars['last_note_reason'] = str(b.get(R['reason']) or '')
         except Exception:
             pass
-        ok = any(x['pid'] == pid for x in facts) and (not REASONS or str(b.get('reason')) in REASONS)
+        ok = any(x['pid'] == pid for x in facts) and (not REASONS or str(b.get(R['reason'])) in REASONS)
         try:
             done = json.loads(str(vars.get('promises_json') or '[]'))
             if any(str(x.get('pid')) == pid for x in done):
@@ -463,14 +475,15 @@ try:
         except Exception:
             pass
         if not ok:
-            b['product_id'] = 'REJECTED'
+            b[R['product_id']] = 'REJECTED'
 except Exception:
     pass
 '''
 
 
 def note_post(spec: CallSpec) -> str:
-    return r'''
+    F = ((spec.field_map or {}).get("resp", {}).get("add_note") or {})
+    return "F = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 import json
 try:
     if isinstance(result, dict):
@@ -488,7 +501,7 @@ try:
             facts = []
         if len(facts) == 1:
             pid = facts[0]['pid']
-        if str(d.get('ok')).lower() == 'true':
+        if str(d.get(F['ok'])).lower() == 'true':
             try:
                 notes = json.loads(str(vars.get('notes_json') or '[]'))
             except Exception:
@@ -518,14 +531,15 @@ except Exception:
 
 def callback_pre(spec: CallSpec) -> str:
     cb = spec.third_party.callback
-    return "CB_FROM = " + _lit(cb.time_from) + "\nCB_TO = " + _lit(cb.time_to) + "\nCB_LATER = " + _lit(cb.must_be_later_than_now) + r'''
+    R = ((spec.field_map or {}).get("req", {}).get("schedule_callback") or {})
+    return "CB_FROM = " + _lit(cb.time_from) + "\nCB_TO = " + _lit(cb.time_to) + "\nCB_LATER = " + _lit(cb.must_be_later_than_now) + "\nR = " + _lit({k: R.get(k, k) for k in ("date", "time")}) + r'''
 try:
     b = config.get('body')
     if isinstance(b, dict):
         good = True
-        dt = str(b.get('date') or '').strip()[:10]
-        b['date'] = dt
-        tm = str(b.get('time') or '').strip()
+        dt = str(b.get(R['date']) or '').strip()[:10]
+        b[R['date']] = dt
+        tm = str(b.get(R['time']) or '').strip()
         parts = tm.replace('.', ':').split(':')
         try:
             hh = int(parts[0])
@@ -533,7 +547,7 @@ try:
             tm = '%02d:%02d' % (hh, mm)
         except Exception:
             good = False
-        b['time'] = tm
+        b[R['time']] = tm
         dates = [x for x in str(vars.get('cb_dates') or '').split(',') if x]
         if dates and dt not in dates:
             good = False
@@ -542,14 +556,15 @@ try:
         if CB_LATER and dt == str(vars.get('today_iso') or '') and tm <= str(vars.get('now_hm') or ''):
             good = False
         if not good:
-            b['date'] = 'REJECTED'
+            b[R['date']] = 'REJECTED'
 except Exception:
     pass
 '''
 
 
 def callback_post(spec: CallSpec) -> str:
-    return r'''
+    F = ((spec.field_map or {}).get("resp", {}).get("schedule_callback") or {})
+    return "F = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 try:
     if isinstance(result, dict):
         result.pop('header', None)
@@ -557,8 +572,8 @@ try:
         if not isinstance(d, dict):
             d = dict()
             result['data'] = d
-        err = str(d.get('error') or '')
-        if str(d.get('ok')).lower() == 'true':
+        err = str(d.get(F['error']) or '')
+        if str(d.get(F['ok'])).lower() == 'true':
             d['cb_state'] = 'booked'
             d['what_to_do_next'] = 'The callback is booked.'
         elif 'unknown customer' in err or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower():
@@ -586,8 +601,9 @@ except Exception:
 '''
 
 
-def transfer_post(queue: str) -> str:
-    return "Q = " + _lit(queue) + r'''
+def transfer_post(queue: str, spec: CallSpec | None = None) -> str:
+    F = (((spec.field_map if spec else None) or {}).get("resp", {}).get("transfer_to_agent") or {})
+    return "Q = " + _lit(queue) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 try:
     if isinstance(result, dict):
         result.pop('header', None)
@@ -595,7 +611,7 @@ try:
         if not isinstance(d, dict):
             d = dict()
             result['data'] = d
-        if str(d.get('ok')).lower() == 'true':
+        if str(d.get(F['ok'])).lower() == 'true':
             d['xfer_state'] = 'done'
             try:
                 vars['transfer_queue'] = Q
@@ -611,11 +627,12 @@ except Exception:
 
 
 def close_pre(spec: CallSpec) -> str:
-    return "NO_REASON = " + _lit(list(spec.closing.outcomes_without_reason)) + r'''
+    R = ((spec.field_map or {}).get("req", {}).get("close_call") or {})
+    return "NO_REASON = " + _lit(list(spec.closing.outcomes_without_reason)) + "\nR = " + _lit({k: R.get(k, k) for k in ("outcome", "reason")}) + r'''
 try:
     b = config.get('body')
-    if isinstance(b, dict) and (b.get('outcome') in NO_REASON or not b.get('reason')):
-        b.pop('reason', None)
+    if isinstance(b, dict) and (b.get(R['outcome']) in NO_REASON or not b.get(R['reason'])):
+        b.pop(R['reason'], None)
 except Exception:
     pass
 '''

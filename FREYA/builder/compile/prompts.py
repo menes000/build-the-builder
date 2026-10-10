@@ -33,9 +33,9 @@ def system_prompt(spec: CallSpec) -> str:
     if sp.forbidden_offers:
         lines.append("- Never offer " + ", ".join(sp.forbidden_offers) + ".")
     lines += [
-        "- If the customer gives only part of a number, a date or an answer to your question, ask them to finish it before you react. If they stop mid-sentence about something else, do not ask them to finish: ignore it and repeat your own question briefly. Never ask the same thing more than twice in a row. An unfinished sentence is never a refusal, an agreement or an amount objection.",
+        "- If the answer itself is complete (a full date, all four digits, an amount, a day), use it at once even if the sentence around it was cut off or trailed into something else. Ask the customer to finish only when the answer itself is incomplete (a date without a year, two digits of four). If they stop mid-sentence about something unrelated, ignore it and repeat your own question briefly. Never ask the same thing more than twice in a row. An unfinished sentence is never a refusal, an agreement or an amount objection.",
         "- If the customer corrects themselves, the corrected value counts.",
-        "- Say each required sentence, offer or explanation exactly once. If the customer talks about something else instead of answering, bring them back with one short question such as 'Could you answer my question?' without repeating the sympathy, the offer or the explanation.",
+        "- Say each required sentence, offer or explanation exactly once. If the customer talks about something else instead of answering an offer or a yes/no question, bring them back with exactly 'Is that a yes or a no?' and nothing else: do not restate the offer, the sympathy or the explanation. For an open question, repeat only the question itself.",
         "- Call at most one tool per message. After every tool result, speak to the customer or call the next tool. Never end a turn with nothing.",
         "- A tool result may contain what_to_do_next. Follow it.",
         "- If a tool fails with a technical error (connection error, service unavailable, timeout), call it once more with the same values. If it fails again, tell the customer once that there is a technical problem and call the transition_to_close_... tool that fits the situation. Never retry a third time and never repeat the same sentence.",
@@ -140,7 +140,8 @@ def negotiate_task(spec: CallSpec) -> str:
         "",
         "ACCOUNT",
         "{{offers_text}}",
-        "- Today: {{today_text}}.",
+        "- Today: {{today_text}}. Tomorrow: {{tomorrow_text}}.",
+        "- A date the customer names that the DATES list marks as allowed for that product is accepted as it is, even if it is not in the refusal script. The script is only for what YOU propose after a flat refusal.",
         "",
         "SPECIAL SITUATIONS (these come first)",
         f"- {', '.join(hs.triggers)}: {hs.sympathy_rule} Say it once and never repeat it.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_{hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
