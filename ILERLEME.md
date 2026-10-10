@@ -102,6 +102,15 @@ Sonuç: emülatör 28 vakanın 26'sında Freya ile aynı karar (2 farkın biri j
 
 **Not:** OUR-25 (ilk redde kapanış) sonucu Gemini ajanla alındı; Dora'ya iletmeden önce Freya'da (`run_coverage`) doğrula. OUR-21 check'i kural 26+30 okuması; kural 31 "reddedilen teklifi tekrarlama" ile çelişebilir, FAIL gelirse sınıf "kural belirsizliği".
 
+## v12 doğrulaması (10 Eki 21:30, Dora: ours-a v12, tool adı tek `transfer_to_agent`, c_test kaldırıldı)
+| Vaka | Lokal v12 (2 rep) | Resmi v12 | Not |
+|---|---|---|---|
+| OUR-13, OUR-24 | 2/2 PASS | (koşuda) | söz sonrası bir tur açık kalıyor, transfer/uygulama cümlesi çalışıyor |
+| OUR-15 | 2/2 PASS | (koşuda) | belirsiz tarih → deadline |
+| OUR-25 | 0/2 FAIL | (koşuda) | **kök neden routing, prompt değil.** Freya v6 kaydı `route_evaluated`: security node'unda t4 intent "The customer says goodbye, says they are hanging up, or clearly ends the conversation" → "I don't want to talk about anything right now" ile eşleşti → `close_declined`; diyalog modeline sıra gelmedi. v12 prompt'u düzeltti ama t4 açıklaması aynı. Çözüm: t4 intent'ini daraltmak ("explicitly says goodbye / hanging up now. NOT: refusing to answer, not wanting to talk, asking what the call is about") ya da kapanış kararını tamamen diyalog modelinin tool transition'ına bırakmak. Emülatör aynı kararı verdi (routing Gemini). |
+- Emülatöre `routes` eklendi: intent ile alınan her routing kararı `flags`'te "routed by intent: ..." olarak görünüyor; bu sınıf hata artık doğrudan okunuyor.
+- Lokal 4 vaka × 2 rep 550 sn sürdü (judge/müşteri yavaşlamış olabilir; Gemini yoğunluğu). İzlenecek.
+
 ## İkinci ajanın incelemesi (10 Eki 21:00) ve yapılanlar
 | # | Bulgu | Karar / yapılan |
 |---|---|---|
@@ -128,7 +137,8 @@ Sonuç: emülatör 28 vakanın 26'sında Freya ile aynı karar (2 farkın biri j
 - [ ] (onay bekliyor) `ours-a-chattest` kopyasını oluştur, 18 vakayı Freya modunda koş, lokal ile karşılaştır → emülatör kalibrasyonu (`path` alanı bunun için).
 - [ ] Lokal 18 vaka --reps 2 koşusu: `results/coverage-local-v2.json` (10 Eki 20:40 başladı). Yeni 10 vaka: `results/coverage-local-new.json`.
 - [x] Resmi koşu yapıldı (21:05): 24/28, `results/coverage-freya.json`. `--judge-view tools` Freya'ya yakın (tool adları artık API adı).
-- [ ] OUR-15 ve OUR-25 Dora düzeltince resmi yolda `--only OUR-13,OUR-15,OUR-24,OUR-25` tekrar.
+- [x] v12 lokal: 13/15/24 düzeldi, 25 routing yüzünden hâlâ düşüyor. Resmi v12 koşusu kuyruk boşalınca otomatik (`results/coverage-freya-v12.log`).
+- [ ] Dora t4 intent'ini daraltınca OUR-25 (+ OUR-05, 12, 19 regresyon) tekrar.
 - [ ] Coverage tablosu `--reps 2`, sonuç Dora'nın `NOTES.md`'sine "Coverage set" başlığıyla (vaka, rep başına pass/fail, sınıf, tek satır kanıt).
 - [ ] Dora'ya bulgular: `c_test` / test_variables, tool adları (OUR-10/11), OUR-13.
 - [ ] Brief B (`ours-ab`) için çok ürünlü coverage vakaları.

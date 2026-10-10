@@ -91,6 +91,7 @@ class LocalAgent:
         self.warnings = []        # agent behaviour worth a look (silent turn, parallel tool calls, model-filled lifecycle fields)
         self.endpoints = endpoints_of(workflow)
         self.path = []            # nodes entered, in order, like Freya's node_enter events
+        self.routes = []          # routing decisions taken by the routing model (intent), like Freya's route_evaluated events
         self.started_at = datetime.datetime.now()
         self.events = []          # ("user"|"agent", text) | ("call", name, args, by_model, raw_part) | ("result", name, result)
         self.node = None
@@ -207,6 +208,9 @@ class LocalAgent:
                 if v is True or (isinstance(v, list) and matched & set(v)): hit = (kind, t); break
         if hit is None: return None
         kind, t = hit
+        if isinstance(hit_v := next((v for k, tt, v in verdicts if (k, tt) == hit), None), list):
+            desc = next((c.get("description") for c in [(t.get("condition") if kind == "t" else (self.globals.get(t) or {}).get("condition")) or {}] if c), "")
+            self.routes.append(f"{node_key} -> {t['target_node'] if kind == 't' else t}: intent '{(desc or '')[:90]}'")
         if kind == "loop": self.loop_mode = True; return None
         return t if kind == "g" else t["target_node"]
 

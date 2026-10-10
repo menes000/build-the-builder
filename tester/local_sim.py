@@ -211,7 +211,9 @@ class LocalAgent:
 
     def finish(self): self.agent.finish()
 
-    def result(self): return self.agent.transcript_text(), ["emulator: " + x for x in self.agent.infra], list(self.agent.warnings), list(self.agent.path)
+    def result(self):
+        flags = list(self.agent.warnings) + ["routed by intent: " + r for r in self.agent.routes]
+        return self.agent.transcript_text(), ["emulator: " + x for x in self.agent.infra], flags, list(self.agent.path)
 
 
 def for_judge(transcript, view):
