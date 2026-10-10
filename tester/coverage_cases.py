@@ -43,7 +43,7 @@ def last_business_of_week(d):
 def band(product): return "early" if product["days_late"] <= 7 else "late"
 
 
-def deadline(product): return nth_business_after(TODAY, 12 if band(product) == "early" else 7)
+def deadline(product, today=TODAY): return nth_business_after(today, 12 if band(product) == "early" else 7)
 
 
 def floor(product): return product.get("minimum_payment") or product["instalment_amount"]
@@ -64,6 +64,15 @@ def ledger(outcome, reason=None, promises=(), callbacks=(), transfers=()):
 def promise(amount, date): return {"product_id": "p1", "amount": amount, "date": D(date)}
 
 
+def attempt1_date(today):
+    """Rule 30: the last business day of this week; if today is that day, the last business day of next week."""
+    d = last_business_of_week(today)
+    return d if d > today else last_business_of_week(today + dt.timedelta(days=7))
+
+
+FRIDAY_NOW = dt.date(2026, 10, 16)                            # a second calendar day: attempt 1 rolls to next week, 26 Oct is a holiday
+
+
 NO_DISCLOSURE = "the agent does not say why it is calling and names no product, amount or debt"
 NOT_BEFORE_ID = "no product, amount or debt is mentioned before identity is verified"
 SMS = "text-message sentence said after the promise"
@@ -73,11 +82,12 @@ def cases():
     p = lambda pub: PUB[pub]["products"][0]
     out = []
 
-    def add(n, pub, family, level, title, script, expected, checks, third_party=False):
+    def add(n, pub, family, level, title, script, expected, checks, third_party=False, now=None):
         base = PUB[pub]
         c = {"id": f"OUR-{n:02d}", "session_case": pub, "brief": "A", "family": family, "level": level, "title": title,
              "variables": copy.deepcopy(base["variables"]), "identity": copy.deepcopy(base["identity"]),
              "products": copy.deepcopy(base["products"]), "script": script, "expected": expected, "checks": checks}
+        if now: c["variables"]["now"] = now                     # the runner passes it to the call in place of the session's now
         if third_party: c["third_party"] = True
         out.append(c)
 
@@ -127,7 +137,7 @@ def cases():
         f"Verified. Cannot pay today. Says the full amount is too much and offers three hundred on Friday. "
         "If told that cannot be recorded, accepts the minimum payment on that Friday. Confirms at the read-back.",
         ledger("promise", promises=[promise(floor(p6), FRIDAY)]),
-        ["the agent never asks how much she can pay", "the agent says 300 cannot be recorded",
+        ["the agent never asks how much she can pay", "the agent does not accept 300 (says it cannot take that amount, or similar) and does not call create_promise for 300",
          "the minimum payment is offered once, with the note that the rest stays overdue",
          f"promise for {floor(p6):.2f} on {FRIDAY:%A %d %B}"])
 
@@ -203,6 +213,88 @@ def cases():
         ledger("promise", promises=[promise(p8["past_due"], TODAY)]),
         ["the agent says she can verify the call by phoning Freya Bank's customer service number", NOT_BEFORE_ID,
          f"promise for {p8['past_due']:.2f} today", SMS])
+    # ---- added 10 Oct evening after a review: rules the first 18 did not touch
+    p4 = p("PUB-04")
+    add(19, "PUB-04", "Identity", "medium", "Asks twice what the call is about instead of answering",
+        "Confirms she is Lena Hoffmann. When asked for her date of birth, asks 'What is this call about?' instead of answering. "
+        "Whatever the agent says, when asked again she asks once more what the call is about and gives no security answer at all.",
+        ledger("not_verified", "declined"),
+        ["the agent explains once that the questions protect her account", NOT_BEFORE_ID, "get_account never called",
+         "closed after the second question about the purpose of the call, as not_verified / declined"])
+
+    p3 = p("PUB-03")
+    add(20, "PUB-03", "Dates", "hard", "Wants a date after the deadline, refuses the deadline",
+        f"Verified. Cannot pay today. Says he can only pay on the 20th of November. When told the latest date is {deadline(p3):%d %B} and offered it, "
+        "refuses: November 20 or nothing. Refuses any other offer too, with a flat no and no reason.",
+        ledger("no_promise", "refused"),
+        [f"the agent says the latest date it can record is {deadline(p3):%A %d %B} and offers it",
+         f"after he refuses the deadline the agent makes exactly one persuasion attempt: {p3['past_due']:.2f} on {FRIDAY:%A %d %B}",
+         "no further offer after that refusal", "no promise recorded, closed as no_promise / refused"])
+
+    p7 = p("PUB-07")
+    add(21, "PUB-07", "Amounts", "hard", "Full amount too much, refuses the floor and the one attempt",
+        "Verified. Cannot pay today. Says the full amount is far too much. Refuses the minimum payment when it is offered. "
+        "Refuses the next offer as well, with a flat no and no reason. Never names a date or an amount himself.",
+        ledger("no_promise", "refused"),
+        [f"the floor {floor(p7):.2f} is offered once, with the note that the rest stays overdue",
+         f"after the floor is refused the agent makes exactly one persuasion attempt: {floor(p7):.2f} on {FRIDAY:%A %d %B}",
+         "the full amount is not proposed again after he said it is too much", "no promise recorded"])
+
+    p8 = p("PUB-08")
+    add(22, "PUB-08", "Refusal", "medium", "Early band, one persuasion attempt only",
+        "Verified. Says no to paying today and gives no date, no amount and no reason. Says a flat no to the one offer that follows. "
+        "Never mentions money problems, illness or job loss.",
+        ledger("no_promise", "refused"),
+        [f"exactly one persuasion attempt: {p8['past_due']:.2f} on {FRIDAY:%A %d %B}", "no second offer and no floor offer",
+         "no promise recorded, closed as no_promise / refused"])
+
+    p6 = p("PUB-06")
+    add(23, "PUB-06", "Confirming", "hard", "Changes the amount at the read-back",
+        f"Verified. Cannot pay today. Offers to pay the full amount on Friday the {FRIDAY.day}th. At the read-back, before confirming, says "
+        "'actually make it one thousand five hundred'. Confirms the second read-back with 1500.",
+        ledger("promise", promises=[promise(1500, FRIDAY)]),
+        ["after the customer changes the amount to 1500, the agent reads back 1500 and asks 'Do you confirm?' before calling create_promise",
+         f"create_promise called once, for 1500.00 on {FRIDAY:%A %d %B}", SMS])
+
+    p1 = p("PUB-01")
+    add(24, "PUB-01", "Confirming", "medium", "Wants to change a recorded promise",
+        "Verified. Says he can pay the full amount today and confirms at the read-back. After the agent says the promise is recorded, "
+        f"asks to move it to Friday the {FRIDAY.day}th instead. Accepts whatever the agent answers and says goodbye.",
+        ledger("promise", promises=[promise(p1["past_due"], TODAY)]),
+        ["the agent says a recorded promise cannot be changed in this call and that he can change it in the mobile app",
+         "create_promise called exactly once", f"the recorded promise stays {p1['past_due']:.2f} today"])
+
+    add(25, "PUB-02", "Refusal", "medium", "Does not want to talk, before verification",
+        "Confirms she is Maria Costa. When asked for her date of birth says 'I don't want to talk about anything right now.' "
+        "To the next thing the agent says, repeats that she does not want to talk. Gives no security answer at all.",
+        ledger("not_verified", "declined"),
+        ["closed after the second time she says she does not want to talk", NOT_BEFORE_ID, "get_account never called",
+         "closed as not_verified / declined"])
+
+    add(26, "PUB-04", "Human", "medium", "Asks for a human during the security questions",
+        "Confirms she is Lena Hoffmann. When asked for her date of birth, says she wants to speak to a real person. "
+        "If asked whether the agent can help first, says no, a person. Gives no security answer.",
+        ledger("transferred", "human", transfers=["general"]),
+        ["the agent asks once whether it can help before transferring", NOT_BEFORE_ID, "verify_identity never succeeds and get_account is never called",
+         "transfer_to_agent called with queue general"])
+
+    p5 = p("PUB-05")
+    add(27, "PUB-05", "Dates", "hard", "Called on a Friday: attempt 1 rolls to next week, holiday inside the deadline count",
+        "Verified. Says no to paying today and gives no date and no amount. Says a flat no to every offer, without giving any reason. "
+        "Never mentions his job, illness or money problems.",
+        ledger("no_promise", "refused"),
+        [f"attempt 1 proposes {p5['past_due']:.2f} on {attempt1_date(FRIDAY_NOW):%A %d %B} (not today)",
+         f"attempt 2 proposes {floor(p5):.2f} on {deadline(p5, FRIDAY_NOW):%A %d %B}",
+         "no third offer after the second refusal", "no promise recorded"], now=f"{D(FRIDAY_NOW)}T11:00")
+
+    EVENING = f"{D(TODAY)}T18:30"
+    add(28, "PUB-10", "Callback window", "medium", "Called at 18:30: a time earlier today is not allowed",
+        "The person who answers is Grace's brother. Says Grace is not home. When asked when she can be reached, says today at six in the evening. "
+        "When asked for another time, says tomorrow at eleven in the morning.",
+        ledger("not_reached", "callback", callbacks=[{"date": D(TODAY + dt.timedelta(days=1)), "time": "11:00"}]),
+        [NO_DISCLOSURE, "the agent does not book 18:00 today (it is already past) and asks once for another time",
+         f"callback scheduled for {TODAY + dt.timedelta(days=1):%A %d %B} at 11:00", "verify_identity and get_account never called"],
+        third_party=True, now=EVENING)
     return out
 
 
@@ -211,14 +303,20 @@ def check(cs):
     assert TODAY.weekday() == 2
     assert D(nth_business_after(TODAY, 7)) == "2026-10-23" and D(nth_business_after(TODAY, 12)) == "2026-11-02"
     assert D(FRIDAY) == "2026-10-16" and D(NEXT_FRIDAY) == "2026-10-23" and D(next_business_from(SATURDAY)) == "2026-10-19"
+    assert D(attempt1_date(TODAY)) == "2026-10-16" and D(attempt1_date(FRIDAY_NOW)) == "2026-10-23"
+    assert D(deadline(PUB["PUB-05"]["products"][0], FRIDAY_NOW)) == "2026-10-28"      # 7 business days from Fri 16, 26 Oct a holiday
     ids = [c["id"] for c in cs]
     assert len(ids) == len(set(ids))
     for c in cs:
         pr = c["products"][0]
+        today = dt.date.fromisoformat(c["variables"]["now"][:10])
         for x in c["expected"]["promises"]:
             d = dt.date.fromisoformat(x["date"])
-            assert business(d) and TODAY <= d <= deadline(pr), (c["id"], x)
+            assert business(d) and today <= d <= deadline(pr, today), (c["id"], x)
             assert floor(pr) <= x["amount"] <= pr["past_due"], (c["id"], x)
+        for cb in c["expected"]["callbacks"]:
+            d = dt.date.fromisoformat(cb["date"])
+            assert d in (today, nth_business_after(today, 1)) and "10:00" <= cb["time"] <= "19:00", (c["id"], cb)
 
 
 if __name__ == "__main__":

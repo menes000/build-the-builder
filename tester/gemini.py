@@ -39,8 +39,9 @@ def call(system, contents, tools=None, model=MODEL, temperature=None, max_tokens
     raise last
 
 
-def generate(system, history, json_mode=False, model=MODEL, temperature=None):
-    """One model call. `history` is a list of (role, text) with role "user" or "model". Returns the reply text."""
+def generate(system, history, json_mode=False, model=MODEL, temperature=None, thinking=None):
+    """One model call. `history` is a list of (role, text) with role "user" or "model". Returns the reply text.
+    `thinking`: "minimal" | "low" | "high" caps the model's reasoning (Gemini 3 thinkingLevel); None leaves the default."""
     key = os.environ.get("GEMINI_API_KEY")
     if not key: raise RuntimeError("GEMINI_API_KEY is not set")
     body = {"systemInstruction": {"parts": [{"text": system}]},
@@ -48,6 +49,7 @@ def generate(system, history, json_mode=False, model=MODEL, temperature=None):
     cfg = {}
     if json_mode: cfg["responseMimeType"] = "application/json"
     if temperature is not None: cfg["temperature"] = temperature
+    if thinking: cfg["thinkingConfig"] = {"thinkingLevel": thinking}
     if cfg: body["generationConfig"] = cfg
     req = urllib.request.Request(URL.format(model=model), data=json.dumps(body).encode(), method="POST",
                                  headers={"Content-Type": "application/json", "x-goog-api-key": key})

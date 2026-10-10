@@ -15,7 +15,7 @@ Two ways to run the phone agent (--agent):
 
 Needs FREYA_BANK_TEAM_KEY and GEMINI_API_KEY, and FREYA_API_KEY unless --agent local is given a file.
 """
-import argparse, concurrent.futures, json, pathlib, sys, threading, time
+import argparse, concurrent.futures, json, os, pathlib, re, sys, threading, time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 KIT = ROOT / "docs" / "build-the-builder"
@@ -25,7 +25,9 @@ from run_cases import STYLES, persona_for
 from score import http, score_ledger
 
 FIRST_LINE = "Hello?"                        # the customer picks up the phone
-BYE = ("goodbye", "good bye", "bye.")
+BYE_RE = re.compile(r"\b(good-?\s?bye|bye)\b[\s!.]*$|\bbye\b", re.I)   # "Goodbye.", "Bye!", "bye bye"
+BYE = ("goodbye", "good bye", "bye.")                                  # kept for FreyaAgent.hung_up
+JUDGE_THINKING = os.environ.get("JUDGE_THINKING", "low")               # Gemini 3 thinkingLevel for the judge; the 215 s judge was a runaway
 JUDGE = """You read the transcript of a phone call between a bank's phone agent (AGENT) and a customer (CUSTOMER).
 Lines marked TOOL are the calls the agent made to the bank's systems, with their arguments and results.
 
@@ -210,8 +212,19 @@ class LocalAgent:
     def result(self): return self.agent.transcript_text(), ["emulator: " + x for x in self.agent.infra], list(self.agent.warnings), list(self.agent.path)
 
 
+def for_judge(transcript, view):
+    """What the judge reads. 'tools': spoken lines plus the bank tool calls (code_exec, end_call and engine lines dropped,
+    they are noise the organisers' checks never mention). 'spoken': the conversation only, as a judge that sees no tool log."""
+    out = []
+    for line in transcript.splitlines():
+        if line.startswith(("TOOL CALL code_exec", "TOOL RESULT code_exec", "TOOL CALL end_call", "TOOL RESULT end_call", "ENGINE:")): continue
+        if view == "spoken" and line.startswith(("TOOL CALL", "TOOL RESULT")): continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def judge(criteria, transcript):
-    raw = gemini.generate(JUDGE.format(criteria=criteria), [("user", transcript)], json_mode=True, temperature=0)
+    raw = gemini.generate(JUDGE.format(criteria=criteria), [("user", transcript)], json_mode=True, temperature=0, thinking=JUDGE_THINKING or None)
     try:
         v = json.loads(raw)
         return bool(v.get("pass")), str(v.get("reason", ""))
@@ -219,7 +232,7 @@ def judge(criteria, transcript):
         return False, "judge returned no JSON: " + raw[:200]
 
 
-def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
+def run_case(target, case, style, max_turns, out_dir, rep, backend="freya", judge_view="tools"):
     """One customer, one call. Returns a row like run_cases.py, with status PASS, FAIL or ERROR."""
     persona = persona_for(case, {"identity": case["identity"]}, style)
     row = {"id": case["id"], "level": case["level"], "family": case["family"], "rep": rep, "failed": [], "turns": 0}
@@ -227,6 +240,8 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
     stats = {"gemini_s": 0.0, "freya_s": 0.0, "freya_retries": 0, "turns": []}
     try:
         variables = http("/v1/practice/sessions", {"case": case.get("session_case", case["id"])})["variables"]   # our cases borrow a PUB account
+        for k, v in (case.get("variables") or {}).items():                                                     # the case's own calendar day or time wins
+            if k != "customer_id" and v not in (None, ""): variables[k] = v
         record["variables"] = variables; row["customer_id"] = variables["customer_id"]
         agent = (LocalAgent if backend == "local" else FreyaAgent)(target, variables, stats)
         t = time.time()
@@ -239,7 +254,7 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
             history.append(("user", agent_text or "(silence)"))
             t = time.time(); customer = gemini.generate(persona["prompt"], history, temperature=1.0); g = time.time() - t
             history.append(("model", customer)); conv.append(("CUSTOMER", customer)); row["turns"] += 1
-            customer_said_bye = any(b in customer.lower() for b in BYE)
+            customer_said_bye = bool(BYE_RE.search(customer))
             t = time.time(); agent_text, ended = agent.send(customer); f = time.time() - t
             stats["gemini_s"] += g; stats["freya_s"] += f; stats["turns"].append({"gemini_s": round(g, 1), "freya_s": round(f, 1)})
             conv.append(("AGENT", agent_text))
@@ -254,7 +269,7 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
         if flags: row["flags"] = flags                        # agent behaviour worth a look, pass or fail
         row["path"] = path
         record.update(ledger=ledger, transcript=transcript)  # kept even when the judge call fails
-        t = time.time(); ok, reason = judge(persona["successCriteria"], transcript); stats["judge_s"] = round(time.time() - t, 1)
+        t = time.time(); ok, reason = judge(persona["successCriteria"], for_judge(transcript, judge_view)); stats["judge_s"] = round(time.time() - t, 1)
         if not ok: row["failed"].append("conversation: " + reason)
         row["status"] = "PASS" if not row["failed"] else ("ERROR" if row.get("infra") else "FAIL")
         if row["status"] == "ERROR": row["error"] = "Freya platform: " + "; ".join(row["infra"])[:300]
@@ -282,6 +297,7 @@ def main():
     ap.add_argument("--cases", default=str(KIT / "public-test-set.json"))
     ap.add_argument("--reps", type=int, default=1); ap.add_argument("--style", choices=sorted(STYLES))
     ap.add_argument("--parallel", type=int, default=3); ap.add_argument("--max-turns", type=int, default=40)
+    ap.add_argument("--judge-view", choices=["tools", "spoken"], default="tools", help="what the judge reads: conversation plus bank tool calls, or the conversation only")
     a = ap.parse_args()
     cases = [c for c in json.load(open(a.cases)) if (not a.brief or c["brief"] == a.brief) and (not a.only or c["id"] in a.only.split(","))]
     if not cases: sys.exit("no cases selected")
@@ -289,11 +305,11 @@ def main():
     target = emulator.load_workflow(wf) if a.agent == "local" else wf
     out_dir = ROOT / "results" / "local" / time.strftime("%Y%m%d-%H%M%S"); out_dir.mkdir(parents=True, exist_ok=True)
     agent_desc = f"agent emulated locally with {emulator.AGENT_MODEL}" if a.agent == "local" else "agent on Freya"
-    say(f"{len(cases)} cases x {a.reps} reps, {agent_desc}, customer and judge {gemini.MODEL}, {a.parallel} at a time. Transcripts: {out_dir}\n")
+    say(f"{len(cases)} cases x {a.reps} reps, {agent_desc}, customer and judge {gemini.MODEL} (judge sees: {a.judge_view}), {a.parallel} at a time. Transcripts: {out_dir}\n")
     t0 = time.time()
     jobs = [(c, rep) for rep in range(1, a.reps + 1) for c in cases]
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.parallel)) as pool:
-        rows = list(pool.map(lambda j: run_case(target, j[0], a.style, a.max_turns, out_dir, j[1], a.agent), jobs))
+        rows = list(pool.map(lambda j: run_case(target, j[0], a.style, a.max_turns, out_dir, j[1], a.agent, a.judge_view), jobs))
     final = []
     for c in cases:
         mine = [r for r in rows if r["id"] == c["id"]]
