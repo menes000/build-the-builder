@@ -67,6 +67,13 @@ class LocalAgent:
         self.globals = dict(workflow.get("global_nodes") or {})
         self.vars = {**(workflow.get("test_variables") or {}), **variables}     # a value passed with the call wins
         self.vars.update({"call.direction": "web", "call.call_id": call_id})
+        llm = (workflow.get("agent_config") or {}).get("llmConfig") or {}
+        self.agent_tools = [t for t in llm.get("tools") or [] if (t.get("function") or {}).get("name")]   # offered in every node (end_call)
+        self.temperature = float(llm.get("temperature") or 0.7)
+        self.max_tokens = int(llm.get("maxTokens") or 1000)
+        self.warnings = []        # agent behaviour worth a look (silent turn, parallel tool calls, model-filled lifecycle fields)
+        self.path = []            # nodes entered, in order, like Freya's node_enter events
+        self.started_at = datetime.datetime.now()
         self.events = []          # ("user"|"agent", text) | ("call", name, args, by_model, raw_part) | ("result", name, result)
         self.node = None
         self.prev = None
@@ -99,6 +106,7 @@ class LocalAgent:
             node, kind = name.rsplit(".", 1)
             return self.turns.get(node, {}).get(kind.split("_")[0], 0)
         if name == "system.iso_utc_now": return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        if name == "call.duration": return int((datetime.datetime.now() - self.started_at).total_seconds())
         return None
 
     def say(self, text, out):
@@ -195,17 +203,27 @@ class LocalAgent:
         today = str(self.vars.get("now") or datetime.date.today().isoformat())
         prompt = ("Extract variables from the conversation of a phone call. Use the latest user message and its context. "
                   f"Now is {today}. Dates as YYYY-MM-DD, datetimes as YYYY-MM-DDTHH:MM. Leave a variable null when it was not given.\n"
-                  "Variables:\n" + "\n".join(lines) + '\nAnswer with JSON only: {"name": value or null, ...}')
+                  "Variables:\n" + "\n".join(lines) +
+                  '\nAnswer with JSON only: {"values": {"name": value or null, ...}, "confidence": {"name": 0.0 to 1.0, ...}}. '
+                  "Confidence is how sure you are of each value; 1.0 only when the user said it plainly.")
         try:
             got = json.loads(gemini.generate(prompt, [("user", self.lookup("system.conversation.last-10"))], json_mode=True, model=ENGINE_MODEL, temperature=0))
         except Exception as e:
             self.infra.append(f"extraction model: {e}"[:200]); return
+        if not isinstance(got, dict): return
+        values, conf = (got.get("values") if isinstance(got.get("values"), dict) else got), (got.get("confidence") if isinstance(got.get("confidence"), dict) else {})
         for f in schema:
-            v = got.get(f["name"]) if isinstance(got, dict) else None
+            v = values.get(f["name"])
             if v in (None, ""): continue
             if f.get("enum_values") and text_of(v) not in map(text_of, f["enum_values"]): continue
             if f.get("validation_pattern") and not re.search(f["validation_pattern"], text_of(v)): continue
+            c = conf.get(f["name"])
+            try: c = float(c) if c is not None else 1.0
+            except (TypeError, ValueError): c = 1.0
+            if c < float(f.get("min_confidence") or 0.95):     # Freya discards low-confidence values without a trace
+                self.warnings.append(f"extraction: {f['name']}={v!r} dropped, confidence {c:.2f} < {f.get('min_confidence') or 0.95}"); continue
             self.vars[f["name"]] = v
+            self.events.append(("extracted", f["name"], v))
 
     # ---------- tools ----------
     def bake(self, tool):
@@ -250,6 +268,7 @@ class LocalAgent:
     def http_call(self, tool, args, counter_name, by_model, raw=None):
         """One api_call or code_exec as the engine runs it. Returns the result envelope the model sees."""
         f = tool["function"]; name = f["name"]; cfg = tool.get("config") or {}
+        timeout = max(1.0, float(cfg.get("timeoutMs") or 20000) / 1000)
         if f.get("handler") == "__function__:code_exec":
             code = self.sub(dig({"p": (f.get("parameters") or {}).get("properties", {})}, "p.code.default") or args.get("code") or "")
             self.events.append(("call", name, {"code": code[:300]}, by_model, raw))
@@ -271,7 +290,7 @@ class LocalAgent:
             self.events.append(("call", name, req.get("body"), by_model, raw))
             res = None
             for attempt in range(1 + int(cfg.get("maxRetries") or 0)):
-                res = self.send_http(req)
+                res = self.send_http(req, timeout)
                 if res["status"] == "success": break
             if tool.get("post_process_code", "").strip(): self.run_python(tool["post_process_code"], {"vars": self.vars, "result": res})
         good = res.get("status") == "success"
@@ -283,13 +302,13 @@ class LocalAgent:
         self.events.append(("result", name, res))
         return res
 
-    def send_http(self, req):
+    def send_http(self, req, timeout=20):
         body = req.get("body")
         data = body.encode() if isinstance(body, str) else json.dumps(body).encode()
         headers = {**UA, "content-type": "application/json", **{k: str(v) for k, v in (req.get("headers") or {}).items()}}
         r = urllib.request.Request(self.sub(req.get("url")), data=data if req.get("method", "POST") != "GET" else None, headers=headers, method=req.get("method", "POST"))
         try:
-            with urllib.request.urlopen(r, timeout=20) as resp:
+            with urllib.request.urlopen(r, timeout=timeout) as resp:
                 raw, code = resp.read().decode(), resp.status
         except urllib.error.HTTPError as e:
             raw, code = e.read().decode(), e.code
@@ -314,6 +333,7 @@ class LocalAgent:
         if key == "__previous__": key = self.prev or self.w.get("initial_node")
         if key not in self.nodes and key not in self.globals: self.infra.append(f"unknown node {key}"); return
         self.prev, self.node, self.loop_mode = self.node, key, False
+        self.path.append(key)
         n = self.spec(key)
         self.turns.setdefault(key, {"current": 0, "total": 0})["current"] = 0
         first = key not in self.entered; self.entered.add(key)
@@ -325,8 +345,11 @@ class LocalAgent:
         if n.get("node_type") == "end_call":
             p = ((n.get("terminal") or {}).get("function") or {}).get("parameters", {}).get("properties", {})
             mode = (p.get("message_mode") or {}).get("default", "custom")
-            if mode == "custom": self.say(self.sub((p.get("spoken_message") or {}).get("default", "")), out)
+            farewell = self.sub((p.get("spoken_message") or {}).get("default", ""))
+            self.events.append(("call", "end_call", {"message_mode": mode, "spoken_message": farewell} if mode == "custom" else {"message_mode": mode}, False, None))
+            if mode == "custom": self.say(farewell, out)
             elif mode == "llm": self.dialogue(key, out, entry_prompt=(p.get("llm_prompt") or {}).get("default", "Say goodbye."), allow_tools=False)
+            self.events.append(("result", "end_call", {"status": "success", "message": "Call ended"}))
             self.ended = True
             return
         oe = n.get("on_enter") or {"type": "llm"}
@@ -360,7 +383,7 @@ class LocalAgent:
             elif e[0] == "agent": push("model", {"text": e[1]})
             elif e[0] == "call" and e[3] and e[4]: push("model", e[4]); pending[e[1]] = True
             elif e[0] == "result" and pending.pop(e[1], None): push("user", {"functionResponse": {"name": e[1], "response": {"result": e[2]}}})
-            elif e[0] == "result": push("user", {"text": f"[engine ran {e[1]}, result: {json.dumps(e[2], default=str)[:600]}]"})
+            elif e[0] == "result" and e[1] != "engine": push("user", {"text": f"[engine ran {e[1]}, result: {json.dumps(e[2], default=str)[:600]}]"})
         if not out or out[0]["role"] != "user": out.insert(0, {"role": "user", "parts": [{"text": "(call connected)"}]})
         return out
 
@@ -376,17 +399,33 @@ class LocalAgent:
                 if g.get("is_tool_call") and key not in (g.get("excluded_nodes") or []): moves["transition_to_" + gk] = {"target_node": gk, "description": g.get("description", "")}
         decls = [self.declaration(t) for t in tools.values()]
         decls += [{"name": k, "description": self.sub(t.get("description") or (t.get("condition") or {}).get("description", ""))} for k, t in moves.items()]
+        agent_level = {}
+        if allow_tools:
+            for t in self.agent_tools:                      # agent_config.llmConfig.tools: offered in every conversation node
+                f = t["function"]
+                if f["name"] in tools or f["name"] in moves: continue
+                agent_level[f["name"]] = t
+                decls.append({"name": f["name"], "description": f.get("description") or ""})
         for _ in range(MAX_STEPS):
             try:
-                parts = gemini.call(self.system_for(key, entry_prompt), self.contents(), decls or None, model=AGENT_MODEL, temperature=0.3)
+                parts = gemini.call(self.system_for(key, entry_prompt), self.contents(), decls or None, model=AGENT_MODEL, temperature=self.temperature, max_tokens=self.max_tokens)
             except Exception as e:
                 self.infra.append(f"dialogue model: {e}"[:300]); return
             entry_prompt = None
-            self.say("".join(p.get("text", "") for p in parts if "text" in p), out)
+            text = "".join(p.get("text", "") for p in parts if "text" in p).strip()
+            self.say(text, out)
             calls = [p for p in parts if "functionCall" in p]
+            if not calls and not text:
+                self.warnings.append(f"node {key}: the model returned no speakable content (no text, no tool call)")
+                self.events.append(("result", "engine", {"error": "The model returned no speakable content"}))
             if not calls: return
+            if len(calls) > 1: self.warnings.append(f"node {key}: {len(calls)} tool calls in one message ({', '.join(p['functionCall'].get('name', '?') for p in calls)})")
             for p in calls:
                 fc = p["functionCall"]; name, args = fc.get("name"), fc.get("args") or {}
+                if name in agent_level and (agent_level[name]["function"].get("handler") == "__function__:end_call"):
+                    self.events.append(("call", name, args, True, p)); self.events.append(("result", name, {"status": "success", "message": "Call ended"}))
+                    self.warnings.append(f"node {key}: the model hung up with the agent-level end_call tool")
+                    self.ended = True; return
                 if name in moves:
                     self.events.append(("call", name, args, True, p)); self.events.append(("result", name, {"status": "success"}))
                     self.enter(moves[name]["target_node"], out); return
@@ -406,8 +445,19 @@ class LocalAgent:
     def lifecycle(self, when):
         for t in self.w.get("tools") or []:
             if when not in ((t.get("config") or {}).get("alwaysRunsAt") or []): continue
-            self.baked[t["function"]["name"]] = self.bake(t)
-            res = self.http_call(t, {}, t["function"]["name"], by_model=False)
+            name = t["function"]["name"]
+            self.baked[name] = baked, model = self.bake(t)
+            args = {}
+            if model:                                         # docs: an unresolved {{var}} parameter is filled by one model call
+                self.warnings.append(f"lifecycle {name}: {', '.join(model)} unresolved at {when}, filled by the model")
+                try:
+                    parts = gemini.call(self.w.get("system_prompt", "") + f"\n\nThe call has ended. Call the tool {name} with the values that fit this call.",
+                                        self.contents(), [self.declaration(t)], model=AGENT_MODEL, temperature=self.temperature)
+                    for p in parts:
+                        if "functionCall" in p and p["functionCall"].get("name") == name: args = p["functionCall"].get("args") or {}
+                except Exception as e:
+                    self.infra.append(f"lifecycle model: {e}"[:200])
+            res = self.http_call(t, args, name, by_model=False)
             if when == "start_of_call": self.apply_mapping(t.get("response_mapping"), res)
 
     def start(self, first_user_message="Hello?"):
@@ -447,6 +497,7 @@ class LocalAgent:
             if e[0] == "user": out.append("CUSTOMER: " + e[1])
             elif e[0] == "agent": out.append("AGENT: " + e[1])
             elif e[0] == "call" and not e[1].startswith("transition_to_"): out.append(f"TOOL CALL {e[1]}: {json.dumps(e[2], default=str)[:400]}")
+            elif e[0] == "result" and e[1] == "engine": out.append(f"ENGINE: {json.dumps(e[2])[:200]}")
             elif e[0] == "result" and e[1] != "code_exec" and not e[1].startswith("transition_to_"):
                 r = e[2].get("data", e[2]) if isinstance(e[2], dict) else e[2]
                 out.append(f"TOOL RESULT {e[1]}: {json.dumps(r, default=str)[:400]}")

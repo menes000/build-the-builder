@@ -112,6 +112,31 @@ def platform_errors(call):
     return out
 
 
+def node_path(call):
+    """The nodes the engine entered, from the call's node_enter events."""
+    out = []
+    for m in call.get("messages", []):
+        if m.get("role") != "system": continue
+        try: e = json.loads(m.get("message") or "")
+        except ValueError: continue
+        if e.get("event") == "node_enter": out.append(e.get("node"))
+    return out
+
+
+def behaviour_flags(call):
+    """Engine events that point at agent behaviour (not infrastructure): silent turns, a resumed call after it ended."""
+    out, ended = [], False
+    for m in call.get("messages", []):
+        if m.get("role") != "system": continue
+        try: e = json.loads(m.get("message") or "")
+        except ValueError: continue
+        text = json.dumps(e)
+        if "no speakable content" in text: out.append("the model returned no speakable content")
+        if e.get("event") == "call_ended": ended = True
+        elif ended and e.get("event") == "node_enter": out.append(f"engine entered {e.get('node')} after the call ended (runner sent a turn too many)"); ended = False
+    return out
+
+
 def transcript_text(call):
     """User and agent lines plus the tool calls, as plain text for the judge."""
     out = []
@@ -147,16 +172,26 @@ class FreyaAgent:
     def send(self, message):
         r = agent_turn({"callId": self.call_id, "message": message}, self.call_id, self.last, stats=self.stats)
         self.last = r.get("response") or ""
-        return self.last, bool(r.get("endedByAgent"))
+        self.stats.setdefault("chat_replies", []).append({k: v for k, v in r.items() if k != "response"})
+        return self.last, bool(r.get("endedByAgent")) or self.hung_up()
+
+    def hung_up(self):
+        """The chat reply did not say the agent ended the call in the smoke test, although end_call had run. When the agent's
+        line sounds like a farewell, read the call once: a set endedReason means the engine hung up (one GET, not per turn)."""
+        if not self.last or not any(b in self.last.lower() for b in BYE): return False
+        try: ended = bool(freya.get_call(self.call_id).get("endedReason"))
+        except RuntimeError: return False
+        if ended: self.stats["ended_detected_by"] = "endedReason after farewell"
+        return ended
 
     def finish(self):
         try: freya.api("POST", "/api/v2/chat/end", {"callId": self.call_id})
         except RuntimeError: pass
 
     def result(self):
-        """(transcript text for the judge, platform errors), read from Freya after the end-of-call tools ran."""
+        """(transcript text for the judge, platform errors, behaviour flags, node path), read from Freya after the end-of-call tools ran."""
         self.call = freya.get_call(self.call_id)
-        return transcript_text(self.call), platform_errors(self.call)
+        return transcript_text(self.call), platform_errors(self.call), behaviour_flags(self.call), node_path(self.call)
 
 
 class LocalAgent:
@@ -172,7 +207,7 @@ class LocalAgent:
 
     def finish(self): self.agent.finish()
 
-    def result(self): return self.agent.transcript_text(), ["emulator: " + x for x in self.agent.infra]
+    def result(self): return self.agent.transcript_text(), ["emulator: " + x for x in self.agent.infra], list(self.agent.warnings), list(self.agent.path)
 
 
 def judge(criteria, transcript):
@@ -214,8 +249,10 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
         scored = score_ledger(case, ledger)
         row["failed"] += scored["failed"]
         row["tools"] = [c["tool"] for c in ledger.get("calls", [])]
-        transcript, infra = agent.result()
+        transcript, infra, flags, path = agent.result()
         if infra: row["infra"] = infra                        # platform (or emulator) failures, kept apart from the agent's
+        if flags: row["flags"] = flags                        # agent behaviour worth a look, pass or fail
+        row["path"] = path
         record.update(ledger=ledger, transcript=transcript)  # kept even when the judge call fails
         t = time.time(); ok, reason = judge(persona["successCriteria"], transcript); stats["judge_s"] = round(time.time() - t, 1)
         if not ok: row["failed"].append("conversation: " + reason)
@@ -231,7 +268,9 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya"):
     lines = [f"{row['status']:<5} {case['id']} {case['level']:<6} {case['family']:<14} | {chain}"]
     tm = row["timing"]
     lines.append(f"       time: customer (Gemini) {tm['gemini_s']} s, agent ({backend}) {tm['freya_s']} s" + (f", Freya retries {tm['freya_retries']}" if backend == "freya" else ""))
+    if row.get("path"): lines.append("       path: " + " > ".join(row["path"]))
     lines += ["       - " + f[:260] for f in row["failed"]] + (["       - " + row["error"]] if "error" in row else [])
+    lines += ["       ! " + f[:200] for f in row.get("flags", [])]
     say("\n".join(lines))
     return row
 

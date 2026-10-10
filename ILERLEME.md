@@ -11,7 +11,7 @@
 - **Pazar 17–20 platform test limiti:** docs'ta sayı/kapsam yok. Kickoff transcript'i (36:30–36:48): "limit on our platform, but no limit if you test yourself in your local… your system should simulate personas in itself". Chat API'nin sayılıp sayılmadığı bilinmiyor → lokal emülatör bu yüzden yazıldı.
 
 ## Durum: builder Dora'da, bizim görev test
-- Builder'ı takım arkadaşı Dora yazdı (ayrı repo, bu makinede yok): `python3 -m builder.main <brief> --slot X`. Claude CallSpec çıkarır → deterministik compiler workflow üretir → publish + export + trace. Pratik sette A 10/10 (3 koşu), B 3/3.
+- Builder'ı takım arkadaşı Dora yazdı. Kopyası bu repoda `FREYA/` altında (Dora düzenliyor, biz dokunmuyoruz; `FREYA/` dışı bizim): `cd FREYA && python3 -m builder.main <brief> --slot X`. Claude CallSpec çıkarır → deterministik compiler workflow üretir → publish + export + trace. Pratik sette A 10/10 (3 koşu), B 3/3.
 - Bizim görev: `HANDOFF-coverage-tests.md`. PUB setinin test etmediği kurallar için kendi vakalarımız + lokal test altyapısı + sonuç tablosu. `kit/` ve Dora'nın `builder/compile/`'ına dokunma; check yumuşatma yok.
 - Dora'nın ajanları (paylaşımlı workspace):
   - Brief A `ours-a`: workflow `76b6ef99-1679-4369-be3a-4580b853a8a8`, agent `a1230ea7-d704-4c24-8b07-d44e3f1d9b8a`
@@ -34,6 +34,16 @@
   - Kayıtlar `results/local/<zaman>/<vaka>-<rep>.json` (transcript judge'dan önce kaydediliyor). Özet satırı `results/local-log.jsonl`.
 - `coverage_cases.py` → `coverage-cases.json`: 18 vaka OUR-01..18 (wrong number, deceased, unclear, no_callback, declined, gün/ay ters, floor altı, kendi tutarı, dispute, human, support, refused x2, söz+human, iki ikna denemesi, belirsiz tarih, cumartesi, "next Friday", scam). Her biri `session_case` ile bir PUB hesabını ödünç alır (mock sadece PUB id'lerini tanıyor). Tarihler kodla hesaplanır, assert edilir.
 - `dump_call.py`, `gemini.py` (`call()` = function calling, `generate()` = düz metin/JSON).
+- **Emülatör sadakat güncellemesi (10 Eki 20:40, docs ile satır satır karşılaştırıldı):**
+  - `agent_config.llmConfig.tools` içindeki ajan seviyesi `end_call` tool'u artık her konuşma node'unda modele sunuluyor (Freya'da model bununla sessizce kapatabiliyor). Çağrılırsa `flags`'e yazılır.
+  - Diyalog modeli sıcaklığı ve maxTokens `llmConfig`'ten (0.7 / 1000), sabit 0.3 değil.
+  - Extraction: model her değer için güven veriyor, `min_confidence` altı atılıyor (Freya token olasılığından hesaplıyor; bizimki yaklaşık). Atılan değer `flags`'e yazılır.
+  - Lifecycle tool (`close_call`) çözülmemiş `{{var}}` alanı varsa docs'taki gibi tek model çağrısıyla dolduruluyor (eskiden alan düşüyordu) + flag.
+  - Tool `timeoutMs` kullanılıyor; `call.duration` var; terminal `end_call` çağrısı transcript'te görünüyor (Freya ile aynı).
+  - "Model sessiz kaldı" (metin yok, tool yok) ve "tek mesajda N tool çağrısı" `flags`'e yazılıyor; Freya'da ilki "no speakable content" hatası, ikincisi paralel hook sorunu (NOTES PUB-11).
+  - Satırda `path` (girilen node'lar sırayla) var; Freya modunda `node_enter` olaylarından, lokalde emülatörden → ikisi birebir karşılaştırılabilir.
+  - **Freya modu düzeltmesi:** chat API `endedByAgent`'ı `end_call` sonrası da false dönüyordu, runner fazladan tur yolluyor, ajan ikinci `close_call` atıyordu (mock "already closed" diyordu). Şimdi ajan vedalaşınca bir kez `get_call` ile `endedReason` kontrol ediliyor. Doğrulandı: OUR-01 tek `close_call`.
+  - Routing sırası doğrulandı (Freya `route_evaluated` olayı): `opening`'de intent transition listede `always`'ten önceyse önce o değerlendiriliyor; emülatör de öyle.
 
 ## Sonuçlar (ours-a, 1'er rep)
 | Vaka | Lokal (emülatör) | Freya (chat API) |
@@ -59,7 +69,8 @@
 - Ajan modeli `agent_config.llmConfig` = experimental-5 (`freya.save_workflow` ayarlıyor).
 
 ## Sıradaki adımlar
-- [ ] (onay bekliyor) `ours-a-chattest` kopyasını oluştur, 18 vakayı Freya modunda koş, lokal ile karşılaştır → emülatör kalibrasyonu.
+- [ ] (onay bekliyor) `ours-a-chattest` kopyasını oluştur, 18 vakayı Freya modunda koş, lokal ile karşılaştır → emülatör kalibrasyonu (`path` alanı bunun için).
+- [ ] Lokal 18 vaka --reps 2 koşusu: `results/coverage-local-v2.json` (10 Eki 20:40 başladı).
 - [ ] Coverage tablosu `--reps 2`, sonuç Dora'nın `NOTES.md`'sine "Coverage set" başlığıyla (vaka, rep başına pass/fail, sınıf, tek satır kanıt).
 - [ ] Dora'ya bulgular: `c_test` / test_variables, tool adları (OUR-10/11), OUR-13.
 - [ ] Brief B (`ours-ab`) için çok ürünlü coverage vakaları.

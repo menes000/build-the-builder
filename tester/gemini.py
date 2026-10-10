@@ -9,14 +9,17 @@ MODEL = os.environ.get("CUSTOMER_MODEL", "gemini-3-flash-preview")
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
-def call(system, contents, tools=None, model=MODEL, temperature=None):
+def call(system, contents, tools=None, model=MODEL, temperature=None, max_tokens=None):
     """One model call with raw Gemini `contents` and optional function declarations. Returns the reply's parts
     (text parts and functionCall parts, thought signatures kept so they can be sent back unchanged)."""
     key = os.environ.get("GEMINI_API_KEY")
     if not key: raise RuntimeError("GEMINI_API_KEY is not set")
     body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents}
     if tools: body["tools"] = [{"functionDeclarations": tools}]
-    if temperature is not None: body["generationConfig"] = {"temperature": temperature}
+    cfg = {}
+    if temperature is not None: cfg["temperature"] = temperature
+    if max_tokens: cfg["maxOutputTokens"] = int(max_tokens)
+    if cfg: body["generationConfig"] = cfg
     req = urllib.request.Request(URL.format(model=model), data=json.dumps(body).encode(), method="POST",
                                  headers={"Content-Type": "application/json", "x-goog-api-key": key})
     last = None
