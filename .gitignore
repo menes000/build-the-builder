@@ -21,3 +21,6 @@ venv/
 # Editors
 .vscode/
 .idea/
+
+# Test outputs
+results/

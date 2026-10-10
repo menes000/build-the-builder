@@ -1,0 +1,38 @@
+"""Tiny Gemini client. Standard library only.
+
+    export GEMINI_API_KEY=...                    # Google AI Studio key
+    export CUSTOMER_MODEL=gemini-3-flash-preview # optional, the model Freya's simulator uses
+"""
+import json, os, time, urllib.error, urllib.request
+
+MODEL = os.environ.get("CUSTOMER_MODEL", "gemini-3-flash-preview")
+URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
+def generate(system, history, json_mode=False, model=MODEL, temperature=None):
+    """One model call. `history` is a list of (role, text) with role "user" or "model". Returns the reply text."""
+    key = os.environ.get("GEMINI_API_KEY")
+    if not key: raise RuntimeError("GEMINI_API_KEY is not set")
+    body = {"systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": r, "parts": [{"text": t}]} for r, t in history]}
+    cfg = {}
+    if json_mode: cfg["responseMimeType"] = "application/json"
+    if temperature is not None: cfg["temperature"] = temperature
+    if cfg: body["generationConfig"] = cfg
+    req = urllib.request.Request(URL.format(model=model), data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "x-goog-api-key": key})
+    last = None
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as r: out = json.load(r)
+            parts = ((out.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+            text = "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
+            if text: return text
+            last = RuntimeError(f"empty Gemini reply: {json.dumps(out)[:300]}")
+        except urllib.error.HTTPError as e:
+            last = RuntimeError(f"Gemini {e.code}: {e.read().decode()[:300]}")
+            if e.code not in (429, 500, 502, 503, 504): raise last
+        except (urllib.error.URLError, TimeoutError) as e:
+            last = RuntimeError(f"Gemini connection: {e}")
+        time.sleep(2 * (attempt + 1))
+    raise last
