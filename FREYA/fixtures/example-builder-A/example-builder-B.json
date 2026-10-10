@@ -1,0 +1,166 @@
+{
+ "agent_id": "143c5929-5594-4663-8053-ebf02b9489fa",
+ "simulation_id": "f8e247b1-07eb-415c-92ef-52142927454d",
+ "iteration_id": "fad1d4e2-b394-40c6-a1cc-909d8c01bf43",
+ "seconds": 52,
+ "passed": 0,
+ "total": 3,
+ "runs": 1,
+ "final": [
+  {
+   "id": "PUB-11",
+   "family": "Multi-product",
+   "passes": 0,
+   "runs": 1,
+   "pass": false
+  },
+  {
+   "id": "PUB-12",
+   "family": "Multi-product",
+   "passes": 0,
+   "runs": 1,
+   "pass": false
+  },
+  {
+   "id": "PUB-13",
+   "family": "Multi-product",
+   "passes": 0,
+   "runs": 1,
+   "pass": false
+  }
+ ],
+ "rows": [
+  {
+   "id": "PUB-11",
+   "level": "medium",
+   "family": "Multi-product",
+   "pass": false,
+   "failed": [
+    "promises [('p1', 220.0, '2026-10-16')], expected [('p1', 220.0, '2026-10-16'), ('p2', 640.0, '2026-10-16'), ('p3', 75.0, '2026-10-16')]",
+    "conversation: - The agent only stated one product (credit card) in message 6 before asking for payment, failing the requirement to state all three products before any ask. - The agent only performed a read-back and confirmation for one product (the credit card) in message 10, instead of all three products. - Only one 'create_promise' was executed (for product p1) as shown in the system events, failing the requi"
+   ],
+   "call_id": "ac4d4f70-6eb8-4ba9-a73a-90bd3daf99ee",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_1bae3b3d-fd6",
+   "slowest_turn_s": 4.3,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-12",
+   "level": "hard",
+   "family": "Multi-product",
+   "pass": false,
+   "failed": [
+    "notes [], expected [('p2', 'refused'), ('p3', 'refused')]",
+    "conversation: The agent failed to meet several criteria related to the additional products. While it correctly asked the phone question twice and the date of birth once, and recorded exactly one promise for the credit card, it did not mention the personal loan or the car loan at all. Consequently, there were no collection attempts on those products (two required for the personal loan, one for the car loan), and"
+   ],
+   "call_id": "d753d182-52f0-4877-914f-b60c0097efd5",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_9cd6e72d-eee",
+   "slowest_turn_s": 4.1,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-13",
+   "level": "hard",
+   "family": "Multi-product",
+   "pass": false,
+   "failed": [
+    "promises [('p1', 300.0, '2026-10-30')], expected [('p1', 300.0, '2026-10-30'), ('p2', 900.0, '2026-10-23')]",
+    "conversation: The assistant failed to record the loan payment and did not name both dates in the read-back. Specifically: - While the credit card payment was recorded for 30 October (as shown in the system event for product p1), the assistant explicitly stated it could not handle the loan [Message 10, 12] and no promise was created for the loan (product p2). - The success criteria required the loan to be record"
+   ],
+   "call_id": "f6000aac-f6f8-4de2-b1a3-d905c0384b89",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_15a72b64-076",
+   "slowest_turn_s": 4.4,
+   "ended": "assistant-ended-call"
+  }
+ ],
+ "all_rows": [
+  [
+   {
+    "id": "PUB-11",
+    "level": "medium",
+    "family": "Multi-product",
+    "pass": false,
+    "failed": [
+     "promises [('p1', 220.0, '2026-10-16')], expected [('p1', 220.0, '2026-10-16'), ('p2', 640.0, '2026-10-16'), ('p3', 75.0, '2026-10-16')]",
+     "conversation: - The agent only stated one product (credit card) in message 6 before asking for payment, failing the requirement to state all three products before any ask. - The agent only performed a read-back and confirmation for one product (the credit card) in message 10, instead of all three products. - Only one 'create_promise' was executed (for product p1) as shown in the system events, failing the requi"
+    ],
+    "call_id": "ac4d4f70-6eb8-4ba9-a73a-90bd3daf99ee",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_1bae3b3d-fd6",
+    "slowest_turn_s": 4.3,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-12",
+    "level": "hard",
+    "family": "Multi-product",
+    "pass": false,
+    "failed": [
+     "notes [], expected [('p2', 'refused'), ('p3', 'refused')]",
+     "conversation: The agent failed to meet several criteria related to the additional products. While it correctly asked the phone question twice and the date of birth once, and recorded exactly one promise for the credit card, it did not mention the personal loan or the car loan at all. Consequently, there were no collection attempts on those products (two required for the personal loan, one for the car loan), and"
+    ],
+    "call_id": "d753d182-52f0-4877-914f-b60c0097efd5",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_9cd6e72d-eee",
+    "slowest_turn_s": 4.1,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-13",
+    "level": "hard",
+    "family": "Multi-product",
+    "pass": false,
+    "failed": [
+     "promises [('p1', 300.0, '2026-10-30')], expected [('p1', 300.0, '2026-10-30'), ('p2', 900.0, '2026-10-23')]",
+     "conversation: The assistant failed to record the loan payment and did not name both dates in the read-back. Specifically: - While the credit card payment was recorded for 30 October (as shown in the system event for product p1), the assistant explicitly stated it could not handle the loan [Message 10, 12] and no promise was created for the loan (product p2). - The success criteria required the loan to be record"
+    ],
+    "call_id": "f6000aac-f6f8-4de2-b1a3-d905c0384b89",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_15a72b64-076",
+    "slowest_turn_s": 4.4,
+    "ended": "assistant-ended-call"
+   }
+  ]
+ ]
+}

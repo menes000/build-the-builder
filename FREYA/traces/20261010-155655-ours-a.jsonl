@@ -1,0 +1,8 @@
+{"t": 0.0, "kind": "start", "at": "2026-10-10T15:56:55+0300", "label": "ours-a"}
+{"t": 0.0, "kind": "note", "text": "briefs=['kit/briefs/brief-a.md'] openapi=/Users/doraalkan/Desktop/FREYA/kit/tools/openapi.json slot=ours-a model=claude-opus-5-5 budget_min=25"}
+{"t": 0.0, "kind": "note", "text": "using CallSpec from fixtures/callspec_brief_a.json (no extraction)"}
+{"t": 0.0, "kind": "note", "text": "compiled 27 nodes -> /Users/doraalkan/Desktop/FREYA/out/ours-a.workflow.json"}
+{"t": 0.3, "kind": "note", "text": "dryRun valid"}
+{"t": 1.3, "kind": "created_on_freya", "what": "workflow", "slot": "ours-a", "workflow_id": "76b6ef99-1679-4369-be3a-4580b853a8a8", "agent_id": "a1230ea7-d704-4c24-8b07-d44e3f1d9b8a", "version": 1}
+{"t": 1.4, "kind": "note", "text": "exported /Users/doraalkan/Desktop/FREYA/out/ours-a.export.workflow.json"}
+{"t": 1.4, "kind": "end", "at": "2026-10-10T15:56:56+0300", "total_seconds": 1, "workflow_id": "76b6ef99-1679-4369-be3a-4580b853a8a8", "agent_id": "a1230ea7-d704-4c24-8b07-d44e3f1d9b8a", "export": "/Users/doraalkan/Desktop/FREYA/out/ours-a.export.workflow.json", "tests": {}}

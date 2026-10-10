@@ -1,0 +1,8 @@
+[    0.0s] start: label=ours-a
+[    0.0s] note: text=briefs=['kit/briefs/brief-a.md'] openapi=/Users/doraalkan/Desktop/FREYA/kit/tools/openapi.json slot=ours-a model=claude-opus-5-5 budget_min=25
+[    0.0s] note: text=using CallSpec from fixtures/callspec_brief_a.json (no extraction)
+[    0.0s] note: text=compiled 27 nodes -> /Users/doraalkan/Desktop/FREYA/out/ours-a.workflow.json
+[    0.3s] note: text=dryRun valid
+[    1.3s] created_on_freya: what=workflow slot=ours-a workflow_id=76b6ef99-1679-4369-be3a-4580b853a8a8 agent_id=a1230ea7-d704-4c24-8b07-d44e3f1d9b8a version=1
+[    1.4s] note: text=exported /Users/doraalkan/Desktop/FREYA/out/ours-a.export.workflow.json
+[    1.4s] end: total_seconds=1 workflow_id=76b6ef99-1679-4369-be3a-4580b853a8a8 agent_id=a1230ea7-d704-4c24-8b07-d44e3f1d9b8a export=/Users/doraalkan/Desktop/FREYA/out/ours-a.export.workflow.json tests={}

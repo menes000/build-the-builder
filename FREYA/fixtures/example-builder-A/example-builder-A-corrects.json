@@ -1,0 +1,443 @@
+{
+ "agent_id": "143c5929-5594-4663-8053-ebf02b9489fa",
+ "simulation_id": "609334b2-8744-4583-9615-4808912386f0",
+ "iteration_id": "5d9c141a-c10d-4877-88d9-12f97d7603ec",
+ "seconds": 72,
+ "passed": 9,
+ "total": 10,
+ "runs": 1,
+ "final": [
+  {
+   "id": "PUB-01",
+   "family": "Happy path",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-02",
+   "family": "Third party",
+   "passes": 0,
+   "runs": 1,
+   "pass": false
+  },
+  {
+   "id": "PUB-03",
+   "family": "Identity",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-04",
+   "family": "Dates",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-05",
+   "family": "Hardship",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-06",
+   "family": "Amounts",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-07",
+   "family": "Dates",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-08",
+   "family": "Already paid",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-09",
+   "family": "Restructuring",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  },
+  {
+   "id": "PUB-10",
+   "family": "Tool failure",
+   "passes": 1,
+   "runs": 1,
+   "pass": true
+  }
+ ],
+ "rows": [
+  {
+   "id": "PUB-01",
+   "level": "easy",
+   "family": "Happy path",
+   "pass": true,
+   "failed": [],
+   "call_id": "7ff83236-6452-4f53-8ef8-ac4a401c3e96",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_0f1eb8bc-d27",
+   "slowest_turn_s": 4.6,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-02",
+   "level": "medium",
+   "family": "Third party",
+   "pass": false,
+   "failed": [
+    "callbacks [{'date': '2026-10-15', 'time': '10:00'}], expected [{'date': '2026-10-15', 'time': '11:00'}]",
+    "conversation: The call failed to meet the success criteria regarding the scheduled callback time. While the agent correctly avoided disclosing the purpose of the call, products, or debt amounts to a third party and did not call the identity or account verification functions, the callback was scheduled for 10:00 instead of the required 11:00. The system events confirm a callback was booked for 10:00, which align"
+   ],
+   "call_id": "1498cf01-6124-4f3f-9abe-7134a75bf19d",
+   "tools": [
+    "schedule_callback",
+    "close_call"
+   ],
+   "customer_id": "c_b4cff332-933",
+   "slowest_turn_s": 5.2,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-03",
+   "level": "medium",
+   "family": "Identity",
+   "pass": true,
+   "failed": [],
+   "call_id": "4997e1b7-5888-47a9-a934-8aa77e4ebc87",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "verify_identity",
+    "close_call"
+   ],
+   "customer_id": "c_c8d96736-9e7",
+   "slowest_turn_s": 2.6,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-04",
+   "level": "medium",
+   "family": "Dates",
+   "pass": true,
+   "failed": [],
+   "call_id": "37c59e73-fb4b-4f78-bbef-9bafeab1457c",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_326e7515-bdd",
+   "slowest_turn_s": 4.6,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-05",
+   "level": "medium",
+   "family": "Hardship",
+   "pass": true,
+   "failed": [],
+   "call_id": "0f676907-5b29-4811-814d-cfd5fc6a7c0c",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "close_call"
+   ],
+   "customer_id": "c_e081f085-8dd",
+   "slowest_turn_s": 4.7,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-06",
+   "level": "hard",
+   "family": "Amounts",
+   "pass": true,
+   "failed": [],
+   "call_id": "5116aef4-d691-4041-8744-fe7f8fe0bda8",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_940d9e0a-4d9",
+   "slowest_turn_s": 4.9,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-07",
+   "level": "hard",
+   "family": "Dates",
+   "pass": true,
+   "failed": [],
+   "call_id": "9cb9d7e6-33a7-429b-9022-62f95d48df9c",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_c4441e76-d4f",
+   "slowest_turn_s": 3.4,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-08",
+   "level": "medium",
+   "family": "Already paid",
+   "pass": true,
+   "failed": [],
+   "call_id": "8ff62161-9c77-40bd-835e-f015a147e132",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "close_call"
+   ],
+   "customer_id": "c_d9941b2e-fef",
+   "slowest_turn_s": 1.8,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-09",
+   "level": "medium",
+   "family": "Restructuring",
+   "pass": true,
+   "failed": [],
+   "call_id": "87e62ef1-4bfa-4034-bd88-20ae48a2d58b",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "transfer_to_agent",
+    "close_call"
+   ],
+   "customer_id": "c_90434be1-dfe",
+   "slowest_turn_s": 3.8,
+   "ended": "assistant-ended-call"
+  },
+  {
+   "id": "PUB-10",
+   "level": "hard",
+   "family": "Tool failure",
+   "pass": true,
+   "failed": [],
+   "call_id": "40f4209c-aeee-49fd-8d1e-fa5357d63c64",
+   "tools": [
+    "verify_identity",
+    "verify_identity",
+    "get_account",
+    "create_promise",
+    "create_promise",
+    "close_call"
+   ],
+   "customer_id": "c_d4e7d06d-708",
+   "slowest_turn_s": 3.1,
+   "ended": "assistant-ended-call"
+  }
+ ],
+ "all_rows": [
+  [
+   {
+    "id": "PUB-01",
+    "level": "easy",
+    "family": "Happy path",
+    "pass": true,
+    "failed": [],
+    "call_id": "7ff83236-6452-4f53-8ef8-ac4a401c3e96",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_0f1eb8bc-d27",
+    "slowest_turn_s": 4.6,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-02",
+    "level": "medium",
+    "family": "Third party",
+    "pass": false,
+    "failed": [
+     "callbacks [{'date': '2026-10-15', 'time': '10:00'}], expected [{'date': '2026-10-15', 'time': '11:00'}]",
+     "conversation: The call failed to meet the success criteria regarding the scheduled callback time. While the agent correctly avoided disclosing the purpose of the call, products, or debt amounts to a third party and did not call the identity or account verification functions, the callback was scheduled for 10:00 instead of the required 11:00. The system events confirm a callback was booked for 10:00, which align"
+    ],
+    "call_id": "1498cf01-6124-4f3f-9abe-7134a75bf19d",
+    "tools": [
+     "schedule_callback",
+     "close_call"
+    ],
+    "customer_id": "c_b4cff332-933",
+    "slowest_turn_s": 5.2,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-03",
+    "level": "medium",
+    "family": "Identity",
+    "pass": true,
+    "failed": [],
+    "call_id": "4997e1b7-5888-47a9-a934-8aa77e4ebc87",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "verify_identity",
+     "close_call"
+    ],
+    "customer_id": "c_c8d96736-9e7",
+    "slowest_turn_s": 2.6,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-04",
+    "level": "medium",
+    "family": "Dates",
+    "pass": true,
+    "failed": [],
+    "call_id": "37c59e73-fb4b-4f78-bbef-9bafeab1457c",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_326e7515-bdd",
+    "slowest_turn_s": 4.6,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-05",
+    "level": "medium",
+    "family": "Hardship",
+    "pass": true,
+    "failed": [],
+    "call_id": "0f676907-5b29-4811-814d-cfd5fc6a7c0c",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "close_call"
+    ],
+    "customer_id": "c_e081f085-8dd",
+    "slowest_turn_s": 4.7,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-06",
+    "level": "hard",
+    "family": "Amounts",
+    "pass": true,
+    "failed": [],
+    "call_id": "5116aef4-d691-4041-8744-fe7f8fe0bda8",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_940d9e0a-4d9",
+    "slowest_turn_s": 4.9,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-07",
+    "level": "hard",
+    "family": "Dates",
+    "pass": true,
+    "failed": [],
+    "call_id": "9cb9d7e6-33a7-429b-9022-62f95d48df9c",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_c4441e76-d4f",
+    "slowest_turn_s": 3.4,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-08",
+    "level": "medium",
+    "family": "Already paid",
+    "pass": true,
+    "failed": [],
+    "call_id": "8ff62161-9c77-40bd-835e-f015a147e132",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "close_call"
+    ],
+    "customer_id": "c_d9941b2e-fef",
+    "slowest_turn_s": 1.8,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-09",
+    "level": "medium",
+    "family": "Restructuring",
+    "pass": true,
+    "failed": [],
+    "call_id": "87e62ef1-4bfa-4034-bd88-20ae48a2d58b",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "transfer_to_agent",
+     "close_call"
+    ],
+    "customer_id": "c_90434be1-dfe",
+    "slowest_turn_s": 3.8,
+    "ended": "assistant-ended-call"
+   },
+   {
+    "id": "PUB-10",
+    "level": "hard",
+    "family": "Tool failure",
+    "pass": true,
+    "failed": [],
+    "call_id": "40f4209c-aeee-49fd-8d1e-fa5357d63c64",
+    "tools": [
+     "verify_identity",
+     "verify_identity",
+     "get_account",
+     "create_promise",
+     "create_promise",
+     "close_call"
+    ],
+    "customer_id": "c_d4e7d06d-708",
+    "slowest_turn_s": 3.1,
+    "ended": "assistant-ended-call"
+   }
+  ]
+ ]
+}

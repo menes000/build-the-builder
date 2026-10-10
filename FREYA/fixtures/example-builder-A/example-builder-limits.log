@@ -1,0 +1,48 @@
+=== BRIEF B
+FAIL PUB-11 medium Multi-product  | verify > verify > get_account > promise > close_call
+       - promises [('p1', 220.0, '2026-10-16')], expected [('p1', 220.0, '2026-10-16'), ('p2', 640.0, '2026-10-16'), ('p3', 75.0, '2026-10-16')]
+       - conversation: - The agent only stated one product (credit card) in message 6 before asking for payment, failing the requirement to state all three products before any ask. - The agent only performed a read-back and confirmation for one product (the credit card
+FAIL PUB-12 hard   Multi-product  | verify > verify > verify > get_account > promise > close_call
+       - notes [], expected [('p2', 'refused'), ('p3', 'refused')]
+       - conversation: The agent failed to meet several criteria related to the additional products. While it correctly asked the phone question twice and the date of birth once, and recorded exactly one promise for the credit card, it did not mention the personal loan
+FAIL PUB-13 hard   Multi-product  | verify > verify > get_account > promise > close_call
+       - promises [('p1', 300.0, '2026-10-30')], expected [('p1', 300.0, '2026-10-30'), ('p2', 900.0, '2026-10-23')]
+       - conversation: The assistant failed to record the loan payment and did not name both dates in the read-back. Specifically: - While the credit card payment was recorded for 30 October (as shown in the system event for product p1), the assistant explicitly stated
+
+slowest agent turn per call: median 4 s, worst 4 s. Failed calls where the customer hung up: 0.
+
+0 / 3 passed (bank records and conversation checks). Last simulation f8e247b1-07eb-415c-92ef-52142927454d, status completed, 52 s.
+=== STYLE corrects
+PASS PUB-01 easy   Happy path     | verify > verify > get_account > promise > close_call
+FAIL PUB-02 medium Third party    | schedule_callback > close_call
+       - callbacks [{'date': '2026-10-15', 'time': '10:00'}], expected [{'date': '2026-10-15', 'time': '11:00'}]
+       - conversation: The call failed to meet the success criteria regarding the scheduled callback time. While the agent correctly avoided disclosing the purpose of the call, products, or debt amounts to a third party and did not call the identity or account verifica
+PASS PUB-03 medium Identity       | verify > verify > verify > close_call
+PASS PUB-04 medium Dates          | verify > verify > get_account > promise > close_call
+PASS PUB-05 medium Hardship       | verify > verify > get_account > close_call
+PASS PUB-06 hard   Amounts        | verify > verify > get_account > promise > close_call
+PASS PUB-07 hard   Dates          | verify > verify > get_account > promise > close_call
+PASS PUB-08 medium Already paid   | verify > verify > get_account > close_call
+PASS PUB-09 medium Restructuring  | verify > verify > get_account > transfer_to_agent > close_call
+PASS PUB-10 hard   Tool failure   | verify > verify > get_account > promise > promise > close_call
+
+slowest agent turn per call: median 5 s, worst 5 s. Failed calls where the customer hung up: 0.
+
+9 / 10 passed (bank records and conversation checks). Last simulation 609334b2-8744-4583-9615-4808912386f0, status completed, 72 s.
+=== STYLE in_words
+PASS PUB-01 easy   Happy path     | verify > verify > get_account > promise > close_call
+PASS PUB-02 medium Third party    | schedule_callback > close_call
+PASS PUB-03 medium Identity       | verify > verify > verify > close_call
+FAIL PUB-04 medium Dates          | verify > verify > get_account > promise > close_call
+       - promises [('p1', 1200.0, '2026-10-23')], expected [('p1', 1250.0, '2026-10-23')]
+PASS PUB-05 medium Hardship       | verify > verify > get_account > close_call
+PASS PUB-06 hard   Amounts        | verify > verify > get_account > promise > close_call
+PASS PUB-07 hard   Dates          | verify > verify > get_account > promise > close_call
+PASS PUB-08 medium Already paid   | verify > verify > get_account > close_call
+PASS PUB-09 medium Restructuring  | verify > verify > get_account > transfer_to_agent > close_call
+PASS PUB-10 hard   Tool failure   | verify > verify > get_account > promise > promise > close_call
+
+slowest agent turn per call: median 7 s, worst 8 s. Failed calls where the customer hung up: 0.
+
+9 / 10 passed (bank records and conversation checks). Last simulation 0b714165-e0c8-46e2-8ddd-06cce3cd667d, status completed, 94 s.
+=== ALL DONE

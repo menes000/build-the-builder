@@ -1,0 +1,2 @@
+- Claude'un çıkardığı A+B ajanı (ext-ab, 10 Eki 18:30): Brief B **3/3**, Brief A 9/10 (PUB-08 not çakışması). Yani extraction → compile zinciri uçtan uca, insan müdahalesi olmadan çalışıyor.
+- Stil asks_back, A v1.1: 9/10 (PUB-10 judge "recorded").
