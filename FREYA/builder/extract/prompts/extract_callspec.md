@@ -14,7 +14,7 @@ You are given one or more brief files from a bank. Together they specify how an 
 - `multi_product.enabled` is true only when the brief says a customer can be late on more than one product.
 - Texts the agent must say verbatim (first sentence, sympathy sentence, the sentence after a recorded promise) must be quoted exactly.
 - When the brief only describes the opening sentence (who is calling, the call is recorded) rather than quoting it, write it as "... and we record this call." Avoid the word "recorded" in the opening: the transcript judge associates that word with recording a promise.
-- Fields described as "the exact sentence the agent says" (`after_failed_text`, `special.*.say`, `debt_intro_sentence`, `deceased_sentence`, `after_record_sentence`, `first_sentence`) must be the words the agent will speak, first person, no quotes, no "Say that ..." or "Tell the customer ...". If the brief only describes the content, write the sentence yourself from that content.
+- Fields described as "the exact sentence the agent says" (`after_failed_text`, `special.*.say`, `debt_intro_sentence`, `deceased_sentence`, `after_record_sentence`, `first_sentence`, `identity.decline.explain_once_text`) must be the words the agent will speak, first person, no quotes, no "Say that ..." or "Tell the customer ...". If the brief only describes the content, write the sentence yourself from that content.
 - `debt_intro_sentence` names the team and the purpose exactly as the brief words them (e.g. collections team / arrears team, late payment / overdue payment).
 - Do not fill `tools`: the builder reads them from the tool API file.
 

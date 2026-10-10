@@ -30,8 +30,11 @@ def always(target):
 
 
 def bye_tr(target):
-    return {"target_node": target, "description": "The customer says goodbye, hangs up, or clearly ends the conversation",
-            "condition": {"operator": "matches_intent", "description": "The customer says goodbye, says they are hanging up, or clearly ends the conversation (not a refusal to pay, not a question)"}}
+    desc = ("The customer EXPLICITLY says goodbye or that they are hanging up right now (e.g. 'goodbye', 'bye', 'I'm hanging up', 'thank you, bye'). "
+            "NOT when they refuse to answer, say they do not want to talk or discuss something, ask what the call is about, object to paying, "
+            "or ask a question: the dialogue handles those and this must not match.")
+    return {"target_node": target, "description": "The customer explicitly says goodbye or is hanging up",
+            "condition": {"operator": "matches_intent", "description": desc}}
 
 
 def tool_tr(target, desc):
@@ -69,7 +72,8 @@ def conv(name, task, tools=(), transitions=(), on_enter=None, extraction=(), max
 def _sentence(rule: str) -> str:
     """Turn an instruction-shaped text into the spoken sentence: 'Say that X.' -> 'X.'; 'Tell the customer to use Y' -> 'Please use Y.'"""
     s = rule.strip().strip('"').strip("'")
-    s = re.sub(r"^(say|tell the customer|tell them|explain|state)\s+(that\s+|to\s+)?", "", s, flags=re.I)
+    s = re.sub(r"^(say|tell the customer|tell them|explain|state)\s+(once\s+)?(that\s+|to\s+)?", "", s, flags=re.I)
+    s = re.sub(r"\btheir account\b", "your account", s, flags=re.I)
     s = re.sub(r"^(they|he|she) (should|can|may) ", "please ", s, flags=re.I)
     s = re.sub(r"^(the customer|customers) (should|can|may) ", "please ", s, flags=re.I)
     s = s[:1].upper() + s[1:]
@@ -279,16 +283,33 @@ def compile_workflow(spec: CallSpec) -> dict:
         idn.human_request = sp.human  # a human request is handled before verification too unless the brief says otherwise
     sec_tools = [verify_identity] + ([transfer_general] if idn.human_request else [])
     first_q = idn.questions[0]
+    decline_desc = ("The customer refuses to answer the security question, says they do not want to talk" +
+                    (", or asks what the call is about instead of answering" if idn.decline.asking_purpose_counts_as_decline else "") +
+                    ". yes only when their LAST message is such a refusal; leave empty when they answer, ask for a repeat, or say anything else.")
+    def declined_extraction(name):
+        return {"name": name, "type": "string", "min_confidence": 0.6, "enum_values": ["yes"], "description": decline_desc}
+    common_sec_routes = [
+        go("load_account", "All security answers verified", grp(eq("id_state", "verified"),
+           eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "true"), eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "True"))),
+        go("close_failed", "The identity check failed", grp(eq("id_state", "failed"))),
+    ] + ([go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done")))] if idn.human_request else [])
+    # first refusal -> an explanation node (spoken once, deterministically); second refusal there -> declined
     nodes["security"] = conv(
         "security", prompts.security_task(spec),
         on_enter={"type": "tts", "text": f"Thank you, {spec.address_customer_as}. Before I continue, I need to ask you {len(idn.questions)} security questions. {first_q.ask}"},
-        first_only=True, tools=sec_tools,
-        transitions=[
-            go("load_account", "All security answers verified", grp(eq("id_state", "verified"),
-               eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "true"), eq(f"verify_identity_response.data.{tb.rs('verify_identity', 'all_verified')}", "True"))),
-            go("close_failed", "The identity check failed", grp(eq("id_state", "failed"))),
-        ] + ([go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done")))] if idn.human_request else []) + [
-            tool_tr("close_declined", "The customer declined the security questions for the SECOND time after the explanation, or said for the SECOND time that they do not want to talk (never on the first refusal)"),
+        first_only=True, tools=sec_tools, extraction=[declined_extraction("declined_1")],
+        transitions=common_sec_routes + [
+            go("security_explain", "The customer refused the security questions once", grp(eq("declined_1", "yes"))),
+            bye_tr("close_declined"),
+        ],
+        max_turns=30, cap_to="close_declined")
+    nodes["security_explain"] = conv(
+        "security_explain", prompts.security_task(spec, after_explanation=True),
+        on_enter={"type": "tts", "text": f"{_sentence(idn.decline.explain_once_text)} {first_q.ask}"},
+        first_only=True, tools=sec_tools, extraction=[declined_extraction("declined_2")],
+        transitions=common_sec_routes + [
+            go("close_declined", "The customer refused the security questions a second time", grp(eq("declined_2", "yes"))),
+            tool_tr("close_declined", "The customer refused a second time or said again that they do not want to talk"),
             bye_tr("close_declined"),
         ],
         max_turns=30, cap_to="close_declined")
@@ -311,7 +332,14 @@ def compile_workflow(spec: CallSpec) -> dict:
     nodes["account_facts"] = code_node("account_facts", codegen.facts_code(spec), "close_account_error",
                                        transitions=[go("negotiate", "Account facts ready", grp(eq("account_state", "ok")))])
 
-    neg_tools = [create_promise, transfer_to_agent] + ([add_note] if add_note else [])
+    note_refusal = tb.api_tool(
+        "get_account", "note_refusal",
+        "CALL it every time the customer flatly refuses to pay: a no with no date and no amount, or a no to the offer you just made. "
+        "It tells you exactly what to propose next, or that the attempts are used up. Never propose anything after a refusal without calling it.",
+        {"product_id": {"type": "string", "default": "{{refused_product_id}}", "description": "product_id of the product being refused, from ACCOUNT (e.g. p1)."},
+         "amount_too_much": {"type": "boolean", "default": "{{refused_amount_too_much}}", "description": "true if the customer has said the amount is too much for them."}},
+        required=["product_id"], pre=codegen.refusal_pre(spec), post=codegen.refusal_post(spec), mapping=[("data.refusal_state", "refusal_state")])
+    neg_tools = [create_promise, note_refusal, transfer_to_agent] + ([add_note] if add_note else [])
     xfer_routes = [go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done")))]
     if mp.enabled:
         # done when promises + notes >= n_products, enumerated from the engine's own success counters (robust to parallel tool calls)

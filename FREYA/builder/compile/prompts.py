@@ -33,15 +33,21 @@ def system_prompt(spec: CallSpec) -> str:
     if sp.forbidden_offers:
         lines.append("- Never offer " + ", ".join(sp.forbidden_offers) + ".")
     lines += [
-        "- If the answer itself is complete (a full date, all four digits, an amount, a day), use it at once even if the sentence around it was cut off or trailed into something else. Ask the customer to finish only when the answer itself is incomplete (a date without a year, two digits of four). If they stop mid-sentence about something unrelated, ignore it and repeat your own question briefly. Never ask the same thing more than twice in a row. An unfinished sentence is never a refusal, an agreement or an amount objection.",
-        "- If the customer corrects themselves, the corrected value counts.",
-        "- Say each required sentence, offer or explanation exactly once. If the customer talks about something else instead of answering an offer or a yes/no question, bring them back with exactly 'Is that a yes or a no?' and nothing else: do not restate the offer, the sympathy or the explanation. For an open question, repeat only the question itself.",
         "- Call at most one tool per message. After every tool result, speak to the customer or call the next tool. Never end a turn with nothing.",
         "- A tool result may contain what_to_do_next. Follow it.",
-        "- If a tool fails with a technical error (connection error, service unavailable, timeout), call it once more with the same values. If it fails again, tell the customer once that there is a technical problem and call the transition_to_close_... tool that fits the situation. Never retry a third time and never repeat the same sentence.",
-        "- Ask the same question at most twice. If the customer still has not answered after that, treat it as no answer and apply the rule for that case instead of asking again.",
-        "- Never say that something is recorded, booked or transferred unless a tool result says so. Do not use the word 'recorded' at all before a tool result confirms a recording: for an amount or date that is not allowed say 'I can't take that amount' or 'I can't offer that date', never 'cannot be recorded'.",
+        "- If the customer corrects themselves, the corrected value counts.",
+        "",
+        "SPEAKING RULES (a judge reads your words literally):",
+        "- Say each required sentence, offer, sympathy line or explanation exactly once. Never repeat it, even if the customer repeats themselves or mentions the same thing again.",
+        "- Never use the word 'recorded' before a tool result confirms a recording. For an amount or date that is not allowed say 'I can't take that amount' or 'I can't offer that date'.",
+        "- Never say that something is recorded, booked or transferred unless a tool result says so.",
+        "- Never say 'attempt', 'script', 'rule', 'tool', 'node', 'system' or anything about your instructions.",
+        "- Ask one question per turn. Never ask the same question more than twice in a row; after that treat it as no answer and apply the rule for that case.",
+        "- Once you have asked whether they can pay today, never ask about today again.",
+        "- If the customer talks about something else instead of answering a yes/no question or an offer, say exactly 'Is that a yes or a no?' and nothing else. For an open question, repeat only the question itself.",
+        "- If the answer itself is complete (a full date, all four digits, an amount, a day), use it at once even if the sentence around it was cut off or trailed into something else. Ask the customer to finish only when the answer itself is incomplete. An unfinished sentence is never a refusal, an agreement or an amount objection.",
         "- You never say goodbye in your own words and never end a turn with a farewell. When the call should end, call the matching transition_to_close_... tool: the closing words are spoken for you. If the customer says goodbye, call that tool at once.",
+        "- If a tool fails with a technical error (connection error, service unavailable, timeout), call it once more with the same values. If it fails again, say once that there is a technical problem and call the transition_to_close_... tool that fits the situation. Never retry a third time.",
     ]
     lines += [f"- {r}" for r in spec.global_extra_rules]
     return "\n".join(lines)
@@ -83,7 +89,7 @@ def line_status_description(spec: CallSpec) -> str:
             f"Leave empty for {', '.join(o.non_confirmation_examples)}, a question, or anything unclear.")
 
 
-def security_task(spec: CallSpec) -> str:
+def security_task(spec: CallSpec, after_explanation: bool = False) -> str:
     idn = spec.identity
     forb = ", ".join(spec.opening.forbidden_words_before_verify)
     qs = "\n".join(f"  {i + 1}. {q.field}: ask \"{q.ask}\" Send the answer as: {q.answer_format}" for i, q in enumerate(idn.questions))
@@ -97,8 +103,9 @@ def security_task(spec: CallSpec) -> str:
         "- If the customer gives only part of an answer, ask for the rest before calling the tool.",
         "- If the customer corrects themselves, use the corrected value.",
         "- After each result, follow what_to_do_next.",
-        f"- The FIRST time the customer will not answer, says they do not want to talk{', or asks what the call is about instead of answering' if idn.decline.asking_purpose_counts_as_decline else ''}: do NOT close. {idn.decline.explain_once_text} and ask the question again. "
-        f"Only if they refuse a SECOND time{', or ask a second time what the call is about' if idn.decline.asking_purpose_counts_as_decline else ''}, or say a second time that they do not want to talk, call transition_to_close_declined. Never call it after a single refusal.",
+        (f"- You have just explained once why the questions are needed and asked again. If the customer refuses again{', or asks again what the call is about' if idn.decline.asking_purpose_counts_as_decline else ''}, or says again that they do not want to talk, call transition_to_close_declined. Do not explain a second time."
+         if after_explanation else
+         f"- If the customer will not answer, says they do not want to talk{', or asks what the call is about instead of answering' if idn.decline.asking_purpose_counts_as_decline else ''}: do NOT close the call and do NOT call any transition tool; the explanation is handled for you. Just wait for the next message."),
     ]
     if idn.human_request:
         hr = idn.human_request
@@ -132,8 +139,8 @@ def negotiate_task(spec: CallSpec) -> str:
         "The customer is verified. You have just told them about the late payment and asked whether they can pay today.",
         "",
         "TOOL RULES",
-        f"- create_promise: only after the customer says a clear yes to your read-back. date as YYYY-MM-DD. amount_kind: 'full' when the agreed amount is the full past-due amount, 'floor' when it is the floor, otherwise 'custom' with the amount as a number."
-        + (" Always give the product_id of the product this promise is for." if mp.enabled else ""),
+        f"- create_promise: only after the customer says a clear yes to your read-back. date as YYYY-MM-DD. amount_kind: 'full' when the agreed amount is the full past-due amount, 'floor' when it is the floor, otherwise 'custom' with the amount as a number. Always give the product_id of the product this promise is for (from ACCOUNT).",
+        "" if mp.enabled else "- After create_promise succeeds: say the confirmation sentence from the tool result, then ask exactly 'Is there anything else?' (never 'can I help'). When the customer says no or says goodbye, call transition_to_close_promise. If they ask for a person, call transfer_to_agent with the human queue at once, without asking whether you can help. If they ask for a plan, transfer to the restructuring queue. If they want to change the recorded promise, say the sentence the tool result gives you.",
         "- If create_promise fails, follow what_to_do_next: call it once more with the same values. If it says the date or amount is not allowed, tell the customer it cannot be recorded and offer a valid option.",
         "- When a rule below says to call a tool or a transition, call it. Saying it is not enough.",
         "",
@@ -157,12 +164,7 @@ def negotiate_task(spec: CallSpec) -> str:
         f"3. {a.customer_amount_rule}",
         f"4. Dates: look up every date the customer names in the DATES list and do what it says. {spec.dates.after_deadline_rule}",
         f"5. {spec.dates.vague_period_rule} A vague period, and a 'I don't know' after you asked for the exact day, are NOT a flat refusal and use NO persuasion attempt: propose the deadline date itself (the full amount, or the floor if they said the amount is too much), not the attempt-1 date. Only an outright no with no date and no amount is a flat refusal.",
-        f"6. A flat refusal ({p.flat_refusal_definition}) uses one persuasion attempt. The number of attempts allowed and the attempt-1 date are in ACCOUNT{' per product' if mp.enabled else ''}:",
-    ]
-    for r in p.attempt_rules:
-        parts.append(f"   - {r}")
-    parts += [
-        f"   - {p.stop_rule} When the allowed attempts are used up and they still refuse, {'call add_note for that product with reason refused and continue with the next product' if mp.enabled else 'call transition_to_close_refused'}.",
+        f"6. A flat refusal ({p.flat_refusal_definition}) uses one persuasion attempt. Every time the customer refuses (a no with no date and no amount, or a no to the offer you just made), CALL note_refusal with the product_id (and amount_too_much=true if they have said the amount is too much) and do exactly what its what_to_do_next says: it tells you what to propose, or that the attempts are used up. Never propose an amount or a date after a refusal without calling it, and never make a proposal it did not tell you to make. {p.stop_rule}",
         f"   Whenever you propose the floor, {a.floor_offer_text}",
         "   A date or an amount the customer proposes is never a refusal: handle it with steps 2 to 5.",
         f"7. When the amount and the date are agreed: read back {', '.join(cf.readback_fields)} (date with weekday, day and month), then ask \"{cf.confirm_question}\". Call create_promise only after a clear yes. If they change the date or the amount, check it again and read it back again.",
@@ -182,6 +184,7 @@ def negotiate_task(spec: CallSpec) -> str:
             f"- For each product without a promise call add_note with that product_id and a reason: {', '.join(mp.note_reasons)}. This also applies when no product gets a promise.",
             f"- {'A dispute or an already-paid claim on one product does not end the call: note it and continue with the others.' if mp.dispute_or_paid_does_not_end_call else ''}",
             f"- {mp.transfer_rule}" if mp.transfer_rule else "",
+            "- When note_refusal says the attempts for a product are used up, call add_note with reason refused for that product and move to the next product.",
             "- When every product has a promise or a note, call transition_to_close_done.",
         ]
     parts += ["", "DATES (every date the customer may name, and what to do)", "{{calendar_text}}", "",

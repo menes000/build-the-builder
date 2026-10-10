@@ -42,7 +42,7 @@ class RetryHint(BaseModel):
 
 
 class DeclinePolicy(BaseModel):
-    explain_once_text: str = Field(description="What to say the first time the customer will not answer")
+    explain_once_text: str = Field(description="The exact sentence the agent SAYS the first time the customer will not answer, in the agent's voice, e.g. 'These questions protect your account, so I have to ask them before I can continue.'")
     asking_purpose_counts_as_decline: bool = True
     close: Outcome
 

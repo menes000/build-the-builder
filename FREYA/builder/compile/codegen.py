@@ -228,7 +228,7 @@ try:
             ol.append('- ' + f['label'] + ' (product_id ' + f['pid'] + '): full past-due amount ' + money(f['past'])
                       + ', ' + str(f['days_late']) + ' days late, band ' + f['band'] + ', floor ' + money(f['floor'])
                       + ', deadline ' + dl_t + '.')
-            plan = '  Refusal script for ' + f['label'] + ' (use ONLY after a flat refusal; a date or amount the customer proposes is handled by the DATES list and the amount rules instead; exactly ' + str(f['attempts']) + ' persuasion attempt' + ('s' if f['attempts'] != 1 else '') + ', then stop' + ('; do NOT ask again whether they can pay today, that was asked once for all products' if MULTI else '') + '):'
+            plan = '  Refusal plan for ' + f['label'] + ' (the note_refusal tool tells you which attempt you are on; use ONLY after a flat refusal; a date or amount the customer proposes is handled by the DATES list and the amount rules instead; exactly ' + str(f['attempts']) + ' persuasion attempt' + ('s' if f['attempts'] != 1 else '') + ', then stop' + ('; do NOT ask again whether they can pay today, that was asked once for all products' if MULTI else '') + '):'
             if MULTI:
                 plan += '\n    open this product with exactly this question, which IS attempt 1 (never ask about today for this product): "For your ' + f['label'] + ', the past-due amount is ' + money(f['past']) + '. Can you pay it on ' + a1_t + '?"'
             else:
@@ -377,6 +377,9 @@ try:
                 done = json.loads(str(vars.get('promises_json') or '[]'))
                 if any(str(x.get('pid')) == pid for x in done):
                     good = False
+                    vars['promise_duplicate'] = 'yes'
+                else:
+                    vars['promise_duplicate'] = 'no'
             except Exception:
                 pass
         try:
@@ -393,7 +396,8 @@ except Exception:
 def promise_post(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
     F = ((spec.field_map or {}).get("resp", {}).get("create_promise") or {})
-    return "MULTI = " + _lit(multi) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
+    immutable = spec.confirm.promise_immutable_text or "A recorded promise cannot be changed on this call; you can change it in the mobile app."
+    return "MULTI = " + _lit(multi) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nIMMUTABLE = " + _lit(immutable) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 import json
 try:
     if isinstance(result, dict):
@@ -424,7 +428,11 @@ try:
             except Exception:
                 pass
             d['promise_state'] = 'recorded'
-            d['what_to_do_next'] = 'The promise is recorded.' + ('' if MULTI else ' Say exactly: "' + AFTER_RECORD + '" Then ask whether there is anything else. If the customer says no or says goodbye, call transition_to_close_promise. If they ask for a person or a payment plan, use transfer_to_agent.')
+            d['what_to_do_next'] = 'The promise is recorded.' + ('' if MULTI else ' Say exactly: "' + AFTER_RECORD + '" and then ask exactly: "Is there anything else?" If the customer says no or says goodbye, call transition_to_close_promise. If they ask for a person, call transfer_to_agent with the human queue at once (do not ask whether you can help). If they ask for a payment plan, transfer to the restructuring queue.')
+        elif str(vars.get('promise_duplicate') or '') == 'yes':
+            d['promise_state'] = 'duplicate'
+            d['error'] = 'this product already has a recorded promise'
+            d['what_to_do_next'] = 'NOT recorded: this product already has a recorded promise and it cannot be changed or cancelled on this call. Say exactly: "' + IMMUTABLE + '" Then ask exactly: "Is there anything else?"'
         elif str(vars.get('promise_precheck') or '') == 'rejected' or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower() or 'already' in err.lower():
             d['promise_state'] = 'rejected'
             d['error'] = 'not allowed by bank rules'
@@ -791,4 +799,96 @@ except Exception:
         vars['farewell'] = 'Thank you for your time. Goodbye.'
     except Exception:
         pass
+'''
+
+
+
+# ----------------------------------------------------------------------------- persuasion counter (carrier: get_account)
+
+def refusal_pre(spec: CallSpec) -> str:
+    multi = spec.multi_product.enabled
+    floor_text = spec.amounts.floor_offer_text
+    return "MULTI = " + _lit(multi) + "\nFLOOR_TEXT = " + _lit(floor_text) + r'''
+import json, datetime
+WD = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+MO = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+def say(iso):
+    try:
+        d = datetime.date.fromisoformat(str(iso)[:10])
+        return WD[d.weekday()] + ' ' + str(d.day) + ' ' + MO[d.month - 1] + ' ' + str(d.year) + ' (' + d.isoformat() + ')'
+    except Exception:
+        return str(iso)
+def money(x):
+    try:
+        x = round(float(x), 2)
+        return str(int(round(x))) if abs(x - round(x)) < 0.005 else '%.2f' % x
+    except Exception:
+        return str(x)
+try:
+    b = config.get('body')
+    if not isinstance(b, dict):
+        b = dict()
+    facts = []
+    try:
+        facts = json.loads(str(vars.get('facts_json') or '[]'))
+    except Exception:
+        facts = []
+    pid = str(b.pop('product_id', '') or '').strip()
+    if len(facts) == 1:
+        pid = facts[0]['pid']
+    tm = str(b.pop('amount_too_much', '') or '').strip().lower() in ('true', '1', 'yes')
+    f = None
+    for x in facts:
+        if x['pid'] == pid:
+            f = x
+    key = 'attempts_used_' + pid
+    try:
+        n = int(vars.get(key) or 0) + 1
+    except Exception:
+        n = 1
+    vars[key] = n
+    if f is None:
+        instr = 'Unknown product. Use a product_id from ACCOUNT and call note_refusal again.'
+        state = 'unknown'
+    else:
+        allowed = int(f.get('attempts') or 1)
+        if n > allowed:
+            state = 'exhausted'
+            instr = ('Attempts used up for ' + f['label'] + ' (' + str(allowed) + ' allowed). Do NOT propose anything more. '
+                     + ('Call add_note with reason refused for product ' + pid + ' and move to the next product.' if MULTI else 'Call transition_to_close_refused now.'))
+        elif n == 1:
+            state = 'continue'
+            amt = f['floor'] if tm else f['past']
+            instr = ('Attempt ' + str(n) + ' of ' + str(allowed) + ' for ' + f['label'] + ': propose ' + money(amt) + ' on ' + say(f['att1']) + '.'
+                     + (' ' + FLOOR_TEXT if tm else '') + ' Ask whether they can do that.')
+        else:
+            state = 'continue'
+            instr = ('Attempt ' + str(n) + ' of ' + str(allowed) + ' for ' + f['label'] + ': propose the floor ' + money(f['floor']) + ' on the deadline ' + say(f['deadline']) + '. '
+                     + FLOOR_TEXT + ' Ask whether they can do that.')
+    vars['refusal_instruction'] = instr
+    vars['refusal_state'] = state
+    vars['refusal_attempt'] = n
+except Exception as e:
+    try:
+        vars['refusal_instruction'] = 'Continue with your rules.'
+        vars['refusal_state'] = 'error'
+    except Exception:
+        pass
+'''
+
+
+def refusal_post(spec: CallSpec) -> str:
+    return r'''
+try:
+    if isinstance(result, dict):
+        result.pop('header', None)
+        result['data'] = {
+            'ok': True,
+            'attempt': vars.get('refusal_attempt'),
+            'refusal_state': str(vars.get('refusal_state') or 'continue'),
+            'what_to_do_next': str(vars.get('refusal_instruction') or 'Continue with your rules.'),
+        }
+        result['message'] = 'refusal noted'
+except Exception:
+    pass
 '''

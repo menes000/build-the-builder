@@ -122,7 +122,7 @@
    "reason": "failed"
   },
   "decline": {
-   "explain_once_text": "Explain once that the questions protect their account.",
+   "explain_once_text": "These security questions protect your account, so I have to ask them before I can continue.",
    "asking_purpose_counts_as_decline": true,
    "close": {
     "outcome": "not_verified",
