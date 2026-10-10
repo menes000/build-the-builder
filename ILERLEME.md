@@ -126,6 +126,11 @@ Sonuç: emülatör 28 vakanın 26'sında Freya ile aynı karar (2 farkın biri j
 | 7 | BYE listesi "Bye!" kaçırıyor | Regex oldu. |
 | 8 | Emülatör route() deterministiği her zaman önce almıyor | **Reddedildi.** Freya `route_evaluated` kaydı (OUR-01, 20:30): `opening`'de listede önce gelen intent (t4 → close_unclear) sonraki `always`'ten (t5 → opening_retry_1) önce eşleşti. Emülatör liste sırasını uyguluyor, Freya ile aynı. |
 
+## Gemini maliyeti (10 Eki 22:50)
+- Bugün ~130 lokal arama = 121 TRY (~3 $), arama başına ~1 TRY. Sebep: her tur 4–6 çağrı, diyalog çağrısı tüm geçmiş + ~5k token system prompt, ve `gemini-3-flash-preview` varsayılan olarak her çağrıda düşünüyor (thinking token'ları çıktı fiyatından).
+- Yapılan: müşteri `thinking=low` (`CUSTOMER_THINKING`; `minimal` istenmedi, senaryoya uyum için), extraction/routing `low` (`ENGINE_THINKING`), judge `low`; diyalog modeli varsayılan (`AGENT_THINKING` boş). Koşu sonunda "Gemini usage: N calls, X M prompt, Y k output, Z k thinking" satırı; `results/local-log.jsonl`'a da yazılıyor. **Kredi gelince ilk koşuda arama başına token/maliyet ölç, Pazar bütçesini ona göre ayır.**
+- Kredi: 402 "prepayment credits are depleted" 21:33'te. Yükleme https://ai.studio/projects.
+
 ## Öğrenilenler / tuzaklar
 - **Chat API + `test_variables.customer_id` (ÖNEMLİ):** Dora'nın workflow'unda `test_variables` içinde `"customer_id": "c_test"` var. Chat API'de tool'lar (`verify_identity`) gönderdiğimiz `customerVariables.customer_id` yerine `c_test`'i kullanıyor → mock reddediyor → ajan "technical problem" deyip kapatıyor. `close_call` (end_of_call) gerçek id'yi alıyor. Base agent'ın `test_variables`'ında `customer_id` yok, orada sorun yok. Simülasyon (`run_cases`) etkilenmiyor (Dora 10/10 oradan). Docs "call değeri kazanır" diyor, chat API'de öyle değil.
   - Önceki "OUR-06 snekbox yüzünden düştü" teşhisi YANLIŞTI; sebep bu. `code_exec` sonucunun `null` görünmesi normal (docs: `data: null`).

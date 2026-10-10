@@ -28,6 +28,7 @@ FIRST_LINE = "Hello?"                        # the customer picks up the phone
 BYE_RE = re.compile(r"\b(good-?\s?bye|bye)\b[\s!.]*$|\bbye\b", re.I)   # "Goodbye.", "Bye!", "bye bye"
 BYE = ("goodbye", "good bye", "bye.")                                  # kept for FreyaAgent.hung_up
 JUDGE_THINKING = os.environ.get("JUDGE_THINKING", "low")               # Gemini 3 thinkingLevel for the judge; the 215 s judge was a runaway
+CUSTOMER_THINKING = os.environ.get("CUSTOMER_THINKING", "low")         # capped, not off: the persona must still follow its script
 JUDGE = """You read the transcript of a phone call between a bank's phone agent (AGENT) and a customer (CUSTOMER).
 Lines marked TOOL are the calls the agent made to the bank's systems, with their arguments and results.
 
@@ -261,7 +262,7 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya", judg
         history = []
         while not ended and row["turns"] < max_turns and not customer_said_bye:
             history.append(("user", agent_text or "(silence)"))
-            t = time.time(); customer = gemini.generate(persona["prompt"], history, temperature=1.0); g = time.time() - t
+            t = time.time(); customer = gemini.generate(persona["prompt"], history, temperature=1.0, thinking=CUSTOMER_THINKING or None); g = time.time() - t
             history.append(("model", customer)); conv.append(("CUSTOMER", customer)); row["turns"] += 1
             customer_said_bye = bool(BYE_RE.search(customer))
             t = time.time(); agent_text, ended = agent.send(customer); f = time.time() - t
@@ -333,9 +334,10 @@ def main():
     n, errs = sum(f["pass"] for f in final), sum(r["status"] == "ERROR" for r in rows)
     say(f"\n{n} / {len(final)} passed{'' if a.reps == 1 else f', a customer counts with {a.reps} of {a.reps} runs'}. "
         f"{errs} run(s) ended in an infrastructure error. {time.time() - t0:.0f} s.")
+    say(gemini.usage_line() + f" ({len(jobs)} calls)")
     with open(ROOT / "results" / "local-log.jsonl", "a") as f:
         f.write(json.dumps({"at": time.strftime("%Y-%m-%d %H:%M:%S"), "workflow_id": wf, "agent": a.agent, "cases": a.cases, "brief": a.brief, "style": a.style, "runs": a.reps,
-                            "passed": n, "total": len(final), "errors": errs, "failed": [x["id"] for x in final if not x["pass"]], "dir": str(out_dir)}) + "\n")
+                            "passed": n, "total": len(final), "errors": errs, "failed": [x["id"] for x in final if not x["pass"]], "dir": str(out_dir), "gemini": dict(gemini.USAGE)}) + "\n")
     if a.out:
         pathlib.Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         json.dump({"workflow_id": wf, "passed": n, "total": len(final), "final": final, "rows": rows}, open(a.out, "w"), indent=1)

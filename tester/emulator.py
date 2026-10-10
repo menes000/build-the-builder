@@ -21,6 +21,8 @@ import gemini
 
 AGENT_MODEL = os.environ.get("EMU_AGENT_MODEL", gemini.MODEL)        # writes the agent's replies
 ENGINE_MODEL = os.environ.get("EMU_ENGINE_MODEL", gemini.MODEL)      # extraction and routing
+ENGINE_THINKING = os.environ.get("ENGINE_THINKING", "low")           # extraction/routing are classification: capped thinking saves money
+AGENT_THINKING = os.environ.get("AGENT_THINKING") or None             # the dialogue model keeps the default (experimental-5 reasons too)
 UA = {"user-agent": "freya-local-emulator/0.1"}
 PH = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
 MAX_STEPS = 8                                                         # model/tool rounds in one agent turn
@@ -172,7 +174,7 @@ class LocalAgent:
                   '\nAnswer with JSON only: {"matches": [numbers]}. An empty list when none matches.\n\nConditions:\n' +
                   "\n".join(f"{i}. {self.sub(d)}" for i, d in enumerate(descriptions)))
         try:
-            raw = gemini.generate(prompt, [("user", convo or "(no conversation yet)")], json_mode=True, model=ENGINE_MODEL, temperature=0)
+            raw = gemini.generate(prompt, [("user", convo or "(no conversation yet)")], json_mode=True, model=ENGINE_MODEL, temperature=0, thinking=ENGINE_THINKING or None)
             return {int(i) for i in json.loads(raw).get("matches", [])}
         except Exception as e:
             self.infra.append(f"routing model: {e}"[:200]); return set()
@@ -229,7 +231,7 @@ class LocalAgent:
                   '\nAnswer with JSON only: {"values": {"name": value or null, ...}, "confidence": {"name": 0.0 to 1.0, ...}}. '
                   "Confidence is how sure you are of each value; 1.0 only when the user said it plainly.")
         try:
-            got = json.loads(gemini.generate(prompt, [("user", self.lookup("system.conversation.last-10"))], json_mode=True, model=ENGINE_MODEL, temperature=0))
+            got = json.loads(gemini.generate(prompt, [("user", self.lookup("system.conversation.last-10"))], json_mode=True, model=ENGINE_MODEL, temperature=0, thinking=ENGINE_THINKING or None))
         except Exception as e:
             self.infra.append(f"extraction model: {e}"[:200]); return
         if not isinstance(got, dict): return
@@ -434,7 +436,7 @@ class LocalAgent:
                 decls.append({"name": f["name"], "description": f.get("description") or ""})
         for _ in range(MAX_STEPS):
             try:
-                parts = gemini.call(self.system_for(key, entry_prompt), self.contents(), decls or None, model=AGENT_MODEL, temperature=self.temperature, max_tokens=self.max_tokens)
+                parts = gemini.call(self.system_for(key, entry_prompt), self.contents(), decls or None, model=AGENT_MODEL, temperature=self.temperature, max_tokens=self.max_tokens, thinking=AGENT_THINKING)
             except Exception as e:
                 self.infra.append(f"dialogue model: {e}"[:300]); return
             entry_prompt = None
