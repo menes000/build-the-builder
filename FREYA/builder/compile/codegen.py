@@ -47,6 +47,8 @@ def facts_code(spec: CallSpec) -> str:
         "DEBT_INTRO": (spec.debt_intro_sentence or "").strip(),
         "PF": (spec.field_map or {}).get("product") or {},
         "PRODUCTS_KEY": ((spec.field_map or {}).get("resp", {}).get("get_account") or {}).get("products", "products"),
+        "ATT1_KIND": spec.persuasion.attempt1_date_kind,
+        "ATT1_N": int(spec.persuasion.attempt1_business_days or 0),
         "DEFAULT_OUTCOME": [spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason],
         "VERIFIED_DEFAULT": [spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason],
     }
@@ -184,7 +186,17 @@ try:
                     deadline = next_bd(deadline)
             else:
                 deadline = nth_bd(today, 10)
-            att1 = a1 if a1 <= deadline else deadline
+            if ATT1_KIND == 'next_business_day':
+                att1 = next_bd(today + ONE)
+            elif ATT1_KIND == 'deadline':
+                att1 = deadline
+            elif ATT1_KIND == 'today':
+                att1 = today if isbd(today) else next_bd(today)
+            elif ATT1_KIND == 'business_days_after_today' and ATT1_N > 0:
+                att1 = nth_bd(today, ATT1_N)
+            else:
+                att1 = a1
+            att1 = att1 if att1 <= deadline else deadline
             valid = []
             d = today
             while d <= deadline:
@@ -428,7 +440,7 @@ try:
             except Exception:
                 pass
             d['promise_state'] = 'recorded'
-            d['what_to_do_next'] = 'The promise is recorded.' + ('' if MULTI else ' Say exactly: "' + AFTER_RECORD + '" and then ask exactly: "Is there anything else?" If the customer says no or says goodbye, call transition_to_close_promise. If they ask for a person, call transfer_to_agent with the human queue at once (do not ask whether you can help). If they ask for a payment plan, transfer to the restructuring queue.')
+            d['what_to_do_next'] = 'The promise is recorded.' + ('' if MULTI else ' Say nothing more in this turn: the confirmation is spoken for you.')
         elif str(vars.get('promise_duplicate') or '') == 'yes':
             d['promise_state'] = 'duplicate'
             d['error'] = 'this product already has a recorded promise'
@@ -808,7 +820,16 @@ except Exception:
 def refusal_pre(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
     floor_text = spec.amounts.floor_offer_text
-    return "MULTI = " + _lit(multi) + "\nFLOOR_TEXT = " + _lit(floor_text) + r'''
+    ps = spec.persuasion
+    known1 = ps.attempt1_date_kind != "other"
+    params = {
+        "MULTI": multi, "FLOOR_TEXT": floor_text,
+        "OPENING_IS_ATTEMPT1": bool(multi and spec.multi_product.ask_today_for_all_once),
+        "KNOWN1": known1, "ATT1_FULL": bool(ps.attempt1_uses_full_amount),
+        "KNOWN2": bool(ps.attempt2_uses_floor_on_deadline),
+        "RULES_TEXT": " ".join(ps.attempt_rules) + (" " + ps.attempt1_date_rule if ps.attempt1_date_rule else ""),
+    }
+    return "import json\n" + "\n".join(f"{k} = {_lit(v)}" for k, v in params.items()) + r'''
 import json, datetime
 WD = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 MO = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -842,10 +863,13 @@ try:
         if x['pid'] == pid:
             f = x
     key = 'attempts_used_' + pid
+    # with several products the product's opening question already IS attempt 1 (the 'today?' question was asked once
+    # for all); with one product the 'today?' question is not an attempt, so the first refusal starts attempt 1
+    start = 1 if OPENING_IS_ATTEMPT1 else 0
     try:
-        n = int(vars.get(key) or 0) + 1
+        n = int(vars.get(key) or start) + 1
     except Exception:
-        n = 1
+        n = start + 1
     vars[key] = n
     if f is None:
         instr = 'Unknown product. Use a product_id from ACCOUNT and call note_refusal again.'
@@ -856,15 +880,19 @@ try:
             state = 'exhausted'
             instr = ('Attempts used up for ' + f['label'] + ' (' + str(allowed) + ' allowed). Do NOT propose anything more. '
                      + ('Call add_note with reason refused for product ' + pid + ' and move to the next product.' if MULTI else 'Call transition_to_close_refused now.'))
-        elif n == 1:
+        elif n == 1 and KNOWN1:
             state = 'continue'
-            amt = f['floor'] if tm else f['past']
+            amt = f['floor'] if (tm or not ATT1_FULL) else f['past']
             instr = ('Attempt ' + str(n) + ' of ' + str(allowed) + ' for ' + f['label'] + ': propose ' + money(amt) + ' on ' + say(f['att1']) + '.'
-                     + (' ' + FLOOR_TEXT if tm else '') + ' Ask whether they can do that.')
-        else:
+                     + (' ' + FLOOR_TEXT if (tm or not ATT1_FULL) else '') + ' Ask whether they can do that.')
+        elif n >= 2 and KNOWN2:
             state = 'continue'
             instr = ('Attempt ' + str(n) + ' of ' + str(allowed) + ' for ' + f['label'] + ': propose the floor ' + money(f['floor']) + ' on the deadline ' + say(f['deadline']) + '. '
                      + FLOOR_TEXT + ' Ask whether they can do that.')
+        else:
+            state = 'continue'
+            instr = ('Attempt ' + str(n) + ' of ' + str(allowed) + ' for ' + f['label'] + '. The bank rule for this attempt: ' + RULES_TEXT
+                     + ' Facts: full amount ' + money(f['past']) + ', floor ' + money(f['floor']) + ', deadline ' + say(f['deadline']) + ', attempt-1 date ' + say(f['att1']) + '. Make exactly the proposal that rule describes.')
     vars['refusal_instruction'] = instr
     vars['refusal_state'] = state
     vars['refusal_attempt'] = n

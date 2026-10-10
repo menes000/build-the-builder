@@ -150,7 +150,7 @@ def negotiate_task(spec: CallSpec) -> str:
         "- A date the customer names that the DATES list marks as allowed for that product is accepted as it is, even if it is not in the refusal script. The script is only for what YOU propose after a flat refusal.",
         "",
         "SPECIAL SITUATIONS (these come first)",
-        f"- {', '.join(hs.triggers)}: {hs.sympathy_rule} Say it once and never repeat it, even if the customer mentions the hardship again.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_to_agent with queue {hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
+        f"- {', '.join(hs.triggers)} (ONLY these; being busy, tired, stressed, having a bad day or being annoyed is NOT hardship and gets no sympathy sentence and no support offer): {hs.sympathy_rule} Say it once and never repeat it, even if the customer mentions the hardship again.{' Make no persuasion attempt.' if hs.no_persuasion else ''} Offer once to connect them with the {hs.offer_queue} team. If they accept, call transfer_to_agent with queue {hs.offer_queue}. If they decline, call transition_to_close_hardship. If they neither accept nor decline, ask only whether that is a yes or a no."
         + (" Only if they themselves name a date or an amount, record the promise with the steps below." if hs.customer_may_still_promise else ""),
         f"- {', '.join(sp.paid.triggers)} (this past-due amount): {sp.paid.say} Take no promise{'; call add_note for that product with reason paid and continue with the other products' if mp.enabled else ', call transition_to_close_paid'}.",
         f"- {', '.join(sp.dispute.triggers)}: {sp.dispute.say} Take no promise{'; call add_note for that product with reason dispute and continue with the other products' if mp.enabled else ', call transition_to_close_dispute'}.",
@@ -191,3 +191,16 @@ def negotiate_task(spec: CallSpec) -> str:
               f"{spec.dates.next_weekday_rule}", "{{weekday_text}}"]
     extra = a.extra_rules + p.extra_rules + sp.extra_rules + cf.extra_rules + spec.dates.extra_rules + (mp.extra_rules if mp.enabled else [])
     return _speak_safe("\n".join(x for x in parts if x is not None) + ("\n\nOTHER RULES" + _rules(extra) if extra else ""))
+
+
+def after_promise_task(spec: CallSpec) -> str:
+    sp, cf = spec.special, spec.confirm
+    return "\n".join([
+        "The payment promise is recorded and you have just said the confirmation sentence and asked whether there is anything else. No tool can record or change a promise here.",
+        "- If the customer says no, thanks you, or says goodbye: call transition_to_close_promise.",
+        f"- If the customer asks for a person: call transfer_to_agent with queue {sp.human.queue} at once; do not ask whether you can help (you already asked whether there is anything else).",
+        f"- If the customer asks for {' or '.join(sp.restructuring.triggers)}: call transfer_to_agent with queue {sp.restructuring.queue}.",
+        f"- If the customer wants to change or cancel the recorded promise: say exactly \"{cf.promise_immutable_text or 'A recorded promise cannot be changed on this call; you can change it in the mobile app.'}\" and then ask again whether there is anything else.",
+        f"- Any other question: {sp.unknown_answer_text} Then ask again whether there is anything else.",
+        "- Never say goodbye yourself; the closing words are spoken for you.",
+    ])

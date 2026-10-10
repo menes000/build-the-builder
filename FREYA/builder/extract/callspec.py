@@ -146,6 +146,10 @@ class Persuasion(BaseModel):
     flat_refusal_definition: str
     attempt_rules: list[str] = Field(description="Attempt 1, attempt 2... what to propose in each, in order")
     attempt1_date_rule: str = Field(description="e.g. 'last business day of this week; if today is that day, last business day of next week'")
+    attempt1_date_kind: Literal["last_business_day_this_week", "next_business_day", "deadline", "today", "business_days_after_today", "other"] = Field(
+        "other", description="Classification of attempt1_date_rule. last_business_day_this_week = Brief-A style (this week's last business day, next week's if today is it); business_days_after_today needs attempt1_business_days")
+    attempt1_business_days: int = Field(0, description="Only for business_days_after_today: N")
+    attempt1_uses_full_amount: bool = Field(True, description="Attempt 1 proposes the full amount (floor if the customer already said it is too much)")
     attempt2_uses_floor_on_deadline: bool = True
     stop_rule: str = Field(description="What to do when attempts are used up")
     refused_close: Outcome

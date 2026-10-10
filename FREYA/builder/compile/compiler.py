@@ -356,9 +356,9 @@ def compile_workflow(spec: CallSpec) -> dict:
         promise_route = go("close_promise", "Every product has a promise or a note", {"logic": "or", "conditions": [eq("all_products_done", "yes")] + combos})
         service_route = []
     else:
-        # after a recorded promise the agent says the confirmation sentence and stays one turn, so the customer can
-        # still ask for a person or a plan (a transfer after a promise closes as transferred); the model closes with a tool
-        promise_route = tool_tr("close_promise", "The promise is recorded and the customer has nothing else")
+        # after a recorded promise the call moves to a node WITHOUT create_promise: the confirmation sentence is spoken
+        # deterministically, the customer can still ask for a person or a plan (transfer), and nothing can be re-recorded
+        promise_route = go("after_promise", "The promise was recorded", grp(eq("promise_state", "recorded")))
         service_route = [go("close_service_error", "The promise service failed twice", grp(eq("promise_state", "failed_twice"), gt("create_promise_failure_count", 1)))]
     neg_transitions = [promise_route] + service_route + xfer_routes
     if mp.enabled:
@@ -380,7 +380,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         "name": "situation", "type": "string", "min_confidence": 0.6,
         "enum_values": ["hardship", "paid", "dispute", "plan", "human", "refusal", "negotiating"],
         "description": ("The customer's situation from their LAST message, for closing the call correctly if they hang up. "
-                        f"hardship: {', '.join(hs.triggers)}. paid: says they already paid. dispute: says the debt or product is not theirs. "
+                        f"hardship: ONLY {', '.join(hs.triggers)} (not stress, being busy or tired). paid: says they already paid. dispute: says the debt or product is not theirs. "
                         f"plan: asks for {' or '.join(sp.restructuring.triggers)}. human: insists on a person. refusal: refuses to pay with no date or amount. "
                         "negotiating: proposes or discusses a date or an amount. Leave empty when nothing new was said about this."),
     }
@@ -390,6 +390,19 @@ def compile_workflow(spec: CallSpec) -> dict:
         tools=neg_tools, transitions=neg_transitions, extraction=[situation],
         max_turns=60 if mp.enabled else 40, cap_to="close_refused")
     closes["close_on_goodbye"] = None  # placeholder, replaced below
+
+    if not mp.enabled:
+        nodes["after_promise"] = conv(
+            "after_promise", prompts.after_promise_task(spec),
+            on_enter={"type": "tts", "text": f"Your promise is recorded. {cf.after_record_sentence} Is there anything else?"}, first_only=True,
+            tools=[transfer_to_agent], extraction=[situation],
+            transitions=[
+                go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done"))),
+                tool_tr("close_promise", "The customer has nothing else, says no, or says goodbye"),
+                bye_tr("close_promise"),
+            ],
+            max_turns=6, cap_to="close_promise")
+        closes["close_promise"] = (spec.closing.promise_outcome, "", f"Thank you for your time, {name_tok}. Goodbye.")
 
     nodes["third_party"] = conv(
         "third_party", prompts.third_party_task(spec), first_only=True,

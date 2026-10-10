@@ -11,6 +11,7 @@ You are given one or more brief files from a bank. Together they specify how an 
 - Outcome and reason strings must be copied exactly as the brief writes them (they go into an API call).
 - `holidays` are ISO dates. `weekend_days` are Python weekday numbers (Monday=0 ... Sunday=6) that are not business days.
 - For each band, set `deadline_business_days_after_today` when the deadline is "the Nth business day after today"; set `deadline_calendar_days_after_today` when it is "N (calendar) days after today"; set neither when the rule has another form and describe it in `deadline_rule`.
+- `persuasion.attempt1_date_kind`: classify the attempt-1 date rule; use `other` only when none of the kinds fits, and then describe it fully in `attempt1_date_rule` and `attempt_rules`.
 - `multi_product.enabled` is true only when the brief says a customer can be late on more than one product.
 - Texts the agent must say verbatim (first sentence, sympathy sentence, the sentence after a recorded promise) must be quoted exactly.
 - When the brief only describes the opening sentence (who is calling, the call is recorded) rather than quoting it, write it as "... and we record this call." Avoid the word "recorded" in the opening: the transcript judge associates that word with recording a promise.

@@ -229,7 +229,10 @@
   "never_repeat_refused_offer": true,
   "extra_rules": [
    "First ask: 'Can you make this payment today?'"
-  ]
+  ],
+  "attempt1_date_kind": "last_business_day_this_week",
+  "attempt1_business_days": 0,
+  "attempt1_uses_full_amount": true
  },
  "special": {
   "hardship": {
