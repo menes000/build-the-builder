@@ -316,6 +316,10 @@ class LocalAgent:
                 if res["status"] == "success": break
             if tool.get("post_process_code", "").strip(): self.run_python(tool["post_process_code"], {"vars": self.vars, "result": res})
         good = res.get("status") == "success"
+        data = res.get("data") if isinstance(res, dict) else None
+        if by_model and (not good or (isinstance(data, dict) and data.get("ok") is False)):
+            self.rejected = getattr(self, "rejected", {}); self.rejected[name] = self.rejected.get(name, 0) + 1
+            if self.rejected[name] == 2: self.warnings.append(f"{name} rejected/failed {self.rejected[name]}x in one call: the model keeps retrying (seen on Freya: create_promise after a recorded promise)")
         key = counter_name
         self.vars[f"{key}_success_count"] = int(self.vars.get(f"{key}_success_count") or 0) + good
         self.vars[f"{key}_failure_count"] = int(self.vars.get(f"{key}_failure_count") or 0) + (not good)

@@ -126,14 +126,19 @@ def node_path(call):
 
 
 def behaviour_flags(call):
-    """Engine events that point at agent behaviour (not infrastructure): silent turns, a resumed call after it ended."""
-    out, ended = [], False
+    """Engine events that point at agent behaviour (not infrastructure): silent turns, a resumed call after it ended, repeated rejections."""
+    out, ended, rejected = [], False, {}
     for m in call.get("messages", []):
         if m.get("role") != "system": continue
         try: e = json.loads(m.get("message") or "")
         except ValueError: continue
         text = json.dumps(e)
         if "no speakable content" in text: out.append("the model returned no speakable content")
+        if e.get("event") == "function_call_complete":
+            res = e.get("result"); data = res.get("data") if isinstance(res, dict) else None
+            if (isinstance(res, dict) and res.get("status") == "error") or (isinstance(data, dict) and data.get("ok") is False):
+                f = e.get("function"); rejected[f] = rejected.get(f, 0) + 1
+                if rejected[f] == 2: out.append(f"{f} rejected/failed {rejected[f]}x in one call: the model keeps retrying")
         if e.get("event") == "call_ended": ended = True
         elif ended and e.get("event") == "node_enter": out.append(f"engine entered {e.get('node')} after the call ended (runner sent a turn too many)"); ended = False
     return out
