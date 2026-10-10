@@ -47,6 +47,7 @@ def facts_code(spec: CallSpec) -> str:
         "DEBT_INTRO": (spec.debt_intro_sentence or "").strip(),
         "PF": (spec.field_map or {}).get("product") or {},
         "PRODUCTS_KEY": ((spec.field_map or {}).get("resp", {}).get("get_account") or {}).get("products", "products"),
+        "FIRST_QUESTION": spec.identity.questions[0].ask if spec.identity.questions else "",
         "ATT1_KIND": spec.persuasion.attempt1_date_kind,
         "ATT1_N": int(spec.persuasion.attempt1_business_days or 0),
         "DEFAULT_OUTCOME": [spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason],
@@ -134,6 +135,8 @@ try:
         vars['outcome'] = DEFAULT_OUTCOME[0]
         vars['reason'] = DEFAULT_OUTCOME[1]
     vars['today_text'] = tag(today) + ', time ' + now_hm
+    if not vars.get('next_question'):
+        vars['next_question'] = FIRST_QUESTION
     vars['tomorrow_text'] = tag(today + ONE) + (' (a business day)' if isbd(today + ONE) else ' (not a business day)')
     # callback window
     cb = []
@@ -292,11 +295,24 @@ except Exception as e:
 STRIP_HEADER = "        result.pop('header', None)\n"
 
 
+def verify_pre(spec: CallSpec) -> str:
+    R = ((spec.field_map or {}).get("req", {}).get("verify_identity") or {})
+    return "R = " + _lit({k: R.get(k, k) for k in ("field",)}) + r'''
+try:
+    b = config.get('body')
+    if isinstance(b, dict):
+        vars['last_verify_field'] = str(b.get(R['field']) or '')
+except Exception:
+    pass
+'''
+
+
 def verify_post(spec: CallSpec) -> str:
     hints = {h.hint: (h.instruction, h.counts_as_wrong) for h in spec.identity.retry_hints}
     qs = [q.field for q in spec.identity.questions]
+    asks = {q.field: q.ask for q in spec.identity.questions}
     F = ((spec.field_map or {}).get("resp", {}).get("verify_identity") or {})
-    return "HINTS = " + _lit(hints) + "\nQS = " + _lit(qs) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error", "verified", "all_verified", "wrong_answers_left", "hint")}) + r'''
+    return "import json\nHINTS = " + _lit(hints) + "\nQS = " + _lit(qs) + "\nASKS = " + _lit(asks) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error", "verified", "all_verified", "wrong_answers_left", "hint")}) + r'''
 try:
     if isinstance(result, dict):
         result.pop('header', None)
@@ -329,7 +345,21 @@ try:
             d['what_to_do_next'] = 'The answer could not be read and did NOT count as wrong. Ask the customer for the full answer again.'
         elif t(d.get(F['verified'])):
             d['id_state'] = 'next'
-            d['what_to_do_next'] = 'This answer is correct. Now ask the next security question that has not been passed yet, in this order: ' + ', '.join(QS) + '.'
+            try:
+                passed = [str(x) for x in json.loads(str(vars.get('passed_fields') or '[]'))]
+            except Exception:
+                passed = []
+            try:
+                fld = str(vars.get('last_verify_field') or '')
+                if fld and fld not in passed:
+                    passed.append(fld)
+                vars['passed_fields'] = json.dumps(passed)
+                nxt = [q for q in QS if q not in passed]
+                if nxt:
+                    vars['next_question'] = ASKS.get(nxt[0], 'the next security question')
+            except Exception:
+                nxt = []
+            d['what_to_do_next'] = 'This answer is correct. Now ask the next security question: ' + (ASKS.get(nxt[0], '') if nxt else '') + ' (order: ' + ', '.join(QS) + ')'
         else:
             d['id_state'] = 'retry'
             d['what_to_do_next'] = 'This answer is wrong. Tell the customer it does not match our records and ask the same question again.' + ('' if left is None else ' Wrong answers left: ' + str(left) + '.')

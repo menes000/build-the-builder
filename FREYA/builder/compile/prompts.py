@@ -187,6 +187,9 @@ def negotiate_task(spec: CallSpec) -> str:
             "- When note_refusal says the attempts for a product are used up, call add_note with reason refused for that product and move to the next product.",
             "- When every product has a promise or a note, call transition_to_close_done.",
         ]
+    if not mp.enabled:
+        parts += ["", "IF ACCOUNT LISTS MORE THAN ONE PRODUCT (possible even if unusual)",
+                  "- State every late product before asking for anything; ask once whether they can pay all of them today; then go through the products one by one, each with its own deadline and floor; one create_promise per product with its product_id; when every product has a promise or a refusal, call transition_to_close_promise."]
     parts += ["", "DATES (every date the customer may name, and what to do)", "{{calendar_text}}", "",
               f"{spec.dates.next_weekday_rule}", "{{weekday_text}}"]
     extra = a.extra_rules + p.extra_rules + sp.extra_rules + cf.extra_rules + spec.dates.extra_rules + (mp.extra_rules if mp.enabled else [])

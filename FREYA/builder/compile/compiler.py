@@ -168,7 +168,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         {tb.rq("verify_identity", "field"): {"type": "string", "enum": field_enum, "default": "{{field}}",
                    "description": "Which question was answered: " + " or ".join(field_enum) + "."},
          tb.rq("verify_identity", "answer"): tb.model_field("verify_identity", tb.rq("verify_identity", "answer"), desc_override="; ".join(f"{q.field}: {q.answer_format}" for q in idn.questions))},
-        required=[tb.rq("verify_identity", "field"), tb.rq("verify_identity", "answer")], post=codegen.verify_post(spec), mapping=[("data.id_state", "id_state")])
+        required=[tb.rq("verify_identity", "field"), tb.rq("verify_identity", "answer")], pre=codegen.verify_pre(spec), post=codegen.verify_post(spec), mapping=[("data.id_state", "id_state")])
 
     promise_body = {
         "amount_kind": {"type": "string", "enum": ["full", "floor", "custom"], "default": "{{amount_kind}}",
@@ -281,11 +281,17 @@ def compile_workflow(spec: CallSpec) -> dict:
 
     if idn.human_request is None:
         idn.human_request = sp.human  # a human request is handled before verification too unless the brief says otherwise
-    sec_tools = [verify_identity] + ([transfer_general] if idn.human_request else [])
+    transfer_human_only = tb.api_tool(
+        "transfer_to_agent", "transfer_to_agent",
+        "Hand the call to a person. CALL it only when the customer still insists on a human" + (" after you asked once whether you can help." if (idn.human_request or sp.human).ask_once_if_can_help else "."),
+        {tb.rq("transfer_to_agent", "queue"): {"type": "string", "default": (idn.human_request or sp.human).queue}},
+        pre=codegen.transfer_pre(spec, queues), post=codegen.transfer_post(spec), mapping=[("data.xfer_state", "xfer_state")])
+    sec_tools = [verify_identity] + ([transfer_human_only] if idn.human_request else [])
     first_q = idn.questions[0]
-    decline_desc = ("The customer refuses to answer the security question, says they do not want to talk" +
-                    (", or asks what the call is about instead of answering" if idn.decline.asking_purpose_counts_as_decline else "") +
-                    ". yes only when their LAST message is such a refusal; leave empty when they answer, ask for a repeat, or say anything else.")
+    decline_desc = ("The customer EXPLICITLY refuses to answer the security question (e.g. 'I won't give that', 'no'), says they do not want to talk" +
+                    (", or asks what the call is about / why the bank is calling instead of answering" if idn.decline.asking_purpose_counts_as_decline else "") +
+                    ". yes ONLY for such an explicit refusal in their LAST message. Leave empty when they answer, give part of an answer, ask to repeat, "
+                    "ask a short question about the question itself (e.g. 'why do you need that?', 'which account?'), chat about something else, or hesitate.")
     def declined_extraction(name):
         return {"name": name, "type": "string", "min_confidence": 0.6, "enum_values": ["yes"], "description": decline_desc}
     common_sec_routes = [
@@ -305,7 +311,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         max_turns=30, cap_to="close_declined")
     nodes["security_explain"] = conv(
         "security_explain", prompts.security_task(spec, after_explanation=True),
-        on_enter={"type": "tts", "text": f"{_sentence(idn.decline.explain_once_text)} {first_q.ask}"},
+        on_enter={"type": "tts", "text": f"{_sentence(idn.decline.explain_once_text)} {{{{next_question}}}}"},
         first_only=True, tools=sec_tools, extraction=[declined_extraction("declined_2")],
         transitions=common_sec_routes + [
             go("close_declined", "The customer refused the security questions a second time", grp(eq("declined_2", "yes"))),
@@ -358,8 +364,13 @@ def compile_workflow(spec: CallSpec) -> dict:
     else:
         # after a recorded promise the call moves to a node WITHOUT create_promise: the confirmation sentence is spoken
         # deterministically, the customer can still ask for a person or a plan (transfer), and nothing can be re-recorded
-        promise_route = go("after_promise", "The promise was recorded", grp(eq("promise_state", "recorded")))
+        promise_route = go("after_promise", "The promise was recorded (one product)", {"logic": "or", "conditions": [{"logic": "and", "conditions": [eq("promise_state", "recorded"), eq("n_products", "1")]}]})
         service_route = [go("close_service_error", "The promise service failed twice", grp(eq("promise_state", "failed_twice"), gt("create_promise_failure_count", 1)))]
+        # several products although the brief did not say so: close when every product has a promise (counters), else the model closes
+        combos = []
+        for k in range(2, 6):
+            combos.append({"logic": "and", "conditions": [eq("n_products", str(k)), gt("create_promise_success_count", k - 1)]})
+        service_route.append(go("close_promise", "Every product has a promise", {"logic": "or", "conditions": combos}))
     neg_transitions = [promise_route] + service_route + xfer_routes
     if mp.enabled:
         neg_transitions += [
@@ -442,7 +453,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         "xfer_" + sp.restructuring.queue: closes[f"close_xfer_{sp.restructuring.queue}"][2],
         "xfer_" + sp.human.queue: closes[f"close_xfer_{sp.human.queue}"][2],
     }
-    nodes["decide_outcome"] = code_node("decide_outcome", codegen.decide_outcome_code(spec, promise_farewell, farewells), "goodbye")
+    nodes["decide_outcome"] = code_node("decide_outcome", codegen.decide_outcome_code(spec, promise_farewell if mp.enabled else f"Thank you for your time, {name_tok}. Goodbye.", farewells), "goodbye")
     nodes["goodbye"] = {
         "name": "goodbye", "node_type": "end_call", "on_enter": {"type": "silent"},
         "disable_inactivity_monitor": True, "transitions": [],

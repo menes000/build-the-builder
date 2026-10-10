@@ -111,10 +111,12 @@ def _resolve(canon: str, synonyms: list[str], available: list[str], warnings: li
         if _norm(syn) in avail_norm:
             return avail_norm[_norm(syn)]
     tokens = [t for t in canon.split("_") if len(t) > 2]
-    for a in available:
-        if any(t in a.lower() for t in tokens):
-            warnings.append(f"{where}: '{canon}' loosely matched to '{a}'")
-            return a
+    loose = [a for a in available if any(t in a.lower() for t in tokens)]
+    if len(loose) > 1:
+        raise ValueError(f"{where}: '{canon}' is ambiguous in the tool API (candidates: {', '.join(loose)}); add the right name to the synonym list in builder/extract/tools.py")
+    if loose:
+        warnings.append(f"{where}: '{canon}' loosely matched to '{loose[0]}'")
+        return loose[0]
     warnings.append(f"{where}: '{canon}' not found (available: {', '.join(available)}); using '{canon}'")
     return canon
 
@@ -203,7 +205,8 @@ def lint_spec(spec, tools: list[Tool], fm: dict) -> list[str]:
                      ("third_party.deceased_close", spec.third_party.deceased_close), ("persuasion.refused_close", spec.persuasion.refused_close),
                      ("special.hardship.accept_close", sp.hardship.accept_close), ("special.hardship.decline_close", sp.hardship.decline_close),
                      ("special.paid.close", sp.paid.close), ("special.dispute.close", sp.dispute.close), ("special.restructuring.close", sp.restructuring.close),
-                     ("special.human.close", sp.human.close), ("confirm.failed_twice_close", spec.confirm.failed_twice_close)):
+                     ("special.human.close", sp.human.close), ("confirm.failed_twice_close", spec.confirm.failed_twice_close),
+                     ("special.refuses_twice_verified_close", sp.refuses_twice_verified_close), ("special.refuses_twice_unverified_close", sp.refuses_twice_unverified_close)):
         closes.append((name, oc.outcome))
     if outcomes:
         for where, val in closes:

@@ -25,7 +25,15 @@ def _brief_text(brief_paths: list[str]) -> str:
     parts = []
     for p in brief_paths:
         path = Path(p)
-        if path.suffix.lower() == ".pdf":
+        if path.suffix.lower() in (".docx", ".odt", ".rtf", ".xlsx", ".pptx", ".html", ".htm"):
+            try:
+                import subprocess
+                text = subprocess.run(["pandoc", str(path), "-t", "plain", "--wrap=none"], capture_output=True, text=True, timeout=60).stdout
+            except Exception:
+                text = ""
+            if not text.strip():
+                text = f"(file could not be converted to text: {path.name}; read it with the Read tool at {path.resolve()})"
+        elif path.suffix.lower() == ".pdf":
             try:
                 import subprocess
                 text = subprocess.run(["pdftotext", "-layout", str(path), "-"], capture_output=True, text=True, timeout=60).stdout
