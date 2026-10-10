@@ -45,6 +45,11 @@ def workflow_for(given):
         if not f.exists(): continue
         for name, slot in json.loads(f.read_text()).items():
             if given in (name, slot.get("agent_id"), slot.get("workflow_id")): return slot["workflow_id"]
+    try:                                                      # a workflow made elsewhere, e.g. by a teammate's builder
+        listed = freya.api("GET", "/api/v2/workflow", workspaceId=freya.workspace_id())
+        for w in listed.get("workflows", []) if isinstance(listed, dict) else listed:
+            if given in (w.get("id"), w.get("name"), w.get("agentId")): return w["id"]
+    except RuntimeError: pass
     return given
 
 
@@ -137,7 +142,7 @@ def run_case(workflow_id, case, style, max_turns, out_dir, rep):
     conv, record, call_id = [], {"case": case["id"], "style": style, "persona": persona["prompt"]}, None
     stats = {"gemini_s": 0.0, "freya_s": 0.0, "freya_retries": 0, "turns": []}
     try:
-        variables = http("/v1/practice/sessions", {"case": case["id"]})["variables"]
+        variables = http("/v1/practice/sessions", {"case": case.get("session_case", case["id"])})["variables"]   # our cases borrow a PUB account
         record["variables"] = variables; row["customer_id"] = variables["customer_id"]
         t = time.time()
         r = agent_turn({"workflowId": workflow_id, "message": FIRST_LINE, "customerVariables": variables}, None, None, stats=stats)
