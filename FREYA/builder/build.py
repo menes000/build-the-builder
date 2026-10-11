@@ -21,7 +21,10 @@ def entry(argv: list[str]) -> int:
         print(__doc__)
         return 2
     brief, openapi, extra = argv[0], argv[1], argv[2:]
-    name = Path(brief).name if Path(brief).is_dir() else Path(brief).stem
+    bp = Path(brief)
+    name = bp.name if bp.is_dir() else bp.stem
+    if not bp.is_dir() and name.lower() in ("brief", "readme", "spec", "rules", "index"):   # hidden-1/brief.md -> hidden-1
+        name = bp.parent.name
     name = name.removesuffix(".brief")
     if "--no-local-test" in extra:          # the local coverage test (report only) is on by default
         extra = [x for x in extra if x != "--no-local-test"]
