@@ -31,7 +31,7 @@ from .compile.compiler import compile_workflow  # noqa: E402
 from .compile.lint import lint  # noqa: E402
 from .compile.selfcheck import check_snippets  # noqa: E402
 from .extract.callspec import CallSpec  # noqa: E402
-from .extract.tools import field_map, parse_openapi  # noqa: E402
+from .extract.tools import field_map, find_openapi, is_openapi, parse_openapi  # noqa: E402
 from .trace import Trace  # noqa: E402
 
 
@@ -62,7 +62,8 @@ def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trac
     return r
 
 
-BRIEF_EXT = {".md", ".txt", ".pdf", ".docx", ".odt", ".rtf", ".pptx", ".xlsx", ".html", ".htm", ".json", ".csv"}
+BRIEF_EXT = {".md", ".txt", ".pdf", ".docx", ".doc", ".odt", ".rtf", ".pptx", ".xlsx", ".html", ".htm", ".json", ".csv",
+             ".yaml", ".yml", ".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 def freya_retry(fn, what: str, trace: Trace, deadline: float, tries: int = 8, wait_s: float = 15):
@@ -88,7 +89,7 @@ def expand_briefs(paths: list[str]) -> list[str]:
         pp = Path(p)
         if pp.is_dir():
             files = sorted(f for f in pp.rglob("*") if f.is_file() and f.suffix.lower() in BRIEF_EXT and not f.name.startswith("."))
-            files = [f for f in files if "openapi" not in f.name.lower()]      # the tool API file is not brief text
+            files = [f for f in files if "openapi" not in f.name.lower() and not is_openapi(f)]      # the tool API file is not brief text
             if not files:
                 raise SystemExit(f"no brief files in folder {p}")
             out += [str(f) for f in files]
@@ -132,7 +133,8 @@ def local_test(spec_path: Path, export_path: Path, out_path: Path, openapi: str,
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("briefs", nargs="+")
-    ap.add_argument("--openapi", default=str(KIT / "tools" / "openapi.json"))
+    ap.add_argument("--openapi", default=None, help="the bank's tool API file (default: an OpenAPI file inside the case folder, else the kit's)")
+    ap.add_argument("--mock-url", default=None, help="the team's own mock of the bank's services: every tool calls this address")
     ap.add_argument("--slot")
     ap.add_argument("--spec")
     ap.add_argument("--test", action="append", default=[])
@@ -147,12 +149,24 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
 
     slot = a.slot or Path(a.briefs[0]).stem
+    case_inputs = list(a.briefs)
     a.briefs = expand_briefs(a.briefs)
     out_dir = Path(a.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     trace = Trace(str(ROOT / "traces"), label=slot)
-    trace.note(f"briefs={a.briefs} openapi={a.openapi} slot={slot} model={a.model} budget_min={a.budget_min}")
     deadline = time.time() + a.budget_min * 60
+    if not a.openapi:
+        # the tool API: an OpenAPI file in the case folder; else (mock mode) written from the service contract; else the kit's
+        found = find_openapi(case_inputs)
+        if found:
+            a.openapi = str(found)
+            trace.note(f"tool API found in the case material: {found}")
+        elif a.mock_url and not a.spec:
+            from .extract.contract import contract_to_openapi
+            a.openapi = str(contract_to_openapi(a.briefs, str(out_dir / f"{slot}.openapi.json"), trace, model=a.model))
+        else:
+            a.openapi = str(KIT / "tools" / "openapi.json")
+    trace.note(f"briefs={a.briefs} openapi={a.openapi} mock_url={a.mock_url} slot={slot} model={a.model} budget_min={a.budget_min}")
 
     import freya  # the kit's client
 
@@ -163,7 +177,9 @@ def main(argv=None) -> int:
     else:
         from .extract.extractor import extract_callspec
         spec = extract_callspec(a.briefs, str(out_dir / f"{slot}.callspec.json"), trace, model=a.model, openapi_path=a.openapi)
-    spec.tools = parse_openapi(a.openapi)
+    spec.tools = parse_openapi(a.openapi, base_url=a.mock_url)
+    if a.mock_url:
+        trace.note(f"tools call the team's mock: {', '.join(t.name + ' ' + t.url for t in spec.tools)}")
     spec.field_map = field_map(a.openapi)
     for w in spec.field_map.get('warnings', []):
         trace.note(f'field map: {w}')
@@ -239,6 +255,8 @@ def main(argv=None) -> int:
         # the export is the submission file: it gets its own retry window (up to 8 minutes), whatever the test budget left
         freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, time.time() + 480, tries=12)
         trace.note(f"exported {export_path}")
+        if a.mock_url and not a.local_test:
+            trace.note("local test skipped: mock mode (the local fake bank speaks the practice API, not the team's mock)")
         if a.local_test:
             lt = local_test(out_dir / f"{slot}.callspec.json", export_path, out_dir / f"{slot}.localtest.json", a.openapi, slot, trace, deadline - time.time() - 30)
             if lt and "passed" in lt:

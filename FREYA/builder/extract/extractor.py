@@ -21,16 +21,57 @@ def _schema_text() -> str:
     return json.dumps(CallSpec.model_json_schema(), indent=1)
 
 
+def _office_text(path: Path) -> str:
+    """Word / Excel / PowerPoint / ODF / RTF / HTML -> plain text: pandoc, then macOS textutil, then plain Python."""
+    import subprocess
+    suf = path.suffix.lower()
+    if suf == ".xlsx":
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            out = []
+            for ws in wb.worksheets:
+                out.append(f"--- sheet: {ws.title} ---")
+                for row in ws.iter_rows(values_only=True):
+                    if any(c is not None and str(c).strip() for c in row):
+                        out.append(" | ".join("" if c is None else str(c) for c in row))
+            return "\n".join(out)
+        except Exception:
+            pass
+    for cmd in (["pandoc", str(path), "-t", "plain", "--wrap=none"], ["textutil", "-convert", "txt", "-stdout", str(path)]):
+        try:
+            text = subprocess.run(cmd, capture_output=True, text=True, timeout=60).stdout
+            if text.strip():
+                return text
+        except Exception:
+            pass
+    if suf in (".docx", ".pptx", ".odt"):          # zipped XML: keep the text of each paragraph / slide line
+        try:
+            import re
+            import zipfile
+            with zipfile.ZipFile(path) as z:
+                names = [n for n in z.namelist() if re.match(r"(word/document|word/(header|footer)\d*|ppt/slides/slide\d+|content)\.xml$", n)]
+                out = []
+                for n in sorted(names):
+                    xml = z.read(n).decode("utf-8", errors="replace")
+                    xml = re.sub(r"</(w:p|a:p|text:p|text:h)>", "\n", xml)
+                    xml = re.sub(r"<(w:tab|text:tab)/>", "\t", xml)
+                    out.append(re.sub(r"<[^>]+>", "", xml))
+                import html
+                return html.unescape("\n".join(out))
+        except Exception:
+            pass
+    return ""
+
+
 def _brief_text(brief_paths: list[str]) -> str:
     parts = []
     for p in brief_paths:
         path = Path(p)
-        if path.suffix.lower() in (".docx", ".odt", ".rtf", ".xlsx", ".pptx", ".html", ".htm"):
-            try:
-                import subprocess
-                text = subprocess.run(["pandoc", str(path), "-t", "plain", "--wrap=none"], capture_output=True, text=True, timeout=60).stdout
-            except Exception:
-                text = ""
+        if path.suffix.lower() in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+            text = f"(image: {path.name}; look at it with the Read tool at {path.resolve()})"
+        elif path.suffix.lower() in (".docx", ".doc", ".odt", ".rtf", ".xlsx", ".pptx", ".html", ".htm"):
+            text = _office_text(path)
             if not text.strip():
                 text = f"(file could not be converted to text: {path.name}; read it with the Read tool at {path.resolve()})"
         elif path.suffix.lower() == ".pdf":

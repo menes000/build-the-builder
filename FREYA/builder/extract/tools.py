@@ -22,9 +22,40 @@ def tool_name(path: str) -> str:
     return path.strip("/").split("/")[-1]
 
 
-def parse_openapi(path: str | Path) -> list[Tool]:
+def is_openapi(path: str | Path) -> bool:
+    """A JSON or YAML file that describes endpoints (has `paths`): the tool API, not brief text."""
+    p = Path(path)
+    if p.suffix.lower() not in (".json", ".yaml", ".yml"):
+        return False
+    try:
+        d = load_openapi(p)
+    except Exception:
+        return False
+    return isinstance(d, dict) and isinstance(d.get("paths"), dict) and bool(d["paths"])
+
+
+def find_openapi(folders: list[str | Path]) -> Path | None:
+    """The first OpenAPI file inside the case folder(s), shortest path first (a top-level contract beats a copy in a subfolder)."""
+    found = []
+    for f in folders:
+        f = Path(f)
+        if f.is_file() and is_openapi(f):
+            found.append(f)
+        elif f.is_dir():
+            found += [p for p in f.rglob("*") if p.is_file() and not p.name.startswith(".") and is_openapi(p)]
+    return sorted(found, key=lambda p: (len(p.parts), str(p)))[0] if found else None
+
+
+def parse_openapi(path: str | Path, base_url: str | None = None) -> list[Tool]:
+    """The tools of the API. `base_url` (the team's own mock) replaces the file's `servers` address."""
     d = load_openapi(path)
     base = (d.get("servers") or [{}])[0].get("url", "").rstrip("/")
+    if base_url:
+        # the mock serves the contract's full paths: keep the server's path prefix (e.g. /v1) under the mock's address
+        from urllib.parse import urlparse
+        prefix = urlparse(base).path.rstrip("/") if "://" in base else ""
+        mock = base_url.rstrip("/")
+        base = mock if not prefix or urlparse(mock).path.rstrip("/").endswith(prefix) else mock + prefix
     tools: list[Tool] = []
     for p, ops in d.get("paths", {}).items():
         op = ops.get("post") or next(iter(ops.values()))
