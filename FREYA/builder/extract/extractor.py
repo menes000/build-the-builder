@@ -88,24 +88,39 @@ def _brief_text(brief_paths: list[str]) -> str:
     return "".join(parts)
 
 
-async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace, purpose: str, max_turns: int = 12) -> str:
+async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace, purpose: str, max_turns: int = 12,
+                      timeout_s: float | None = None) -> str:
+    """One Claude session that may only read files and write its answer file (no sub-agents, no shell)."""
     from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, query
 
     options = ClaudeAgentOptions(
         cwd=str(cwd), model=model,
-        allowed_tools=["Read", "Write"], permission_mode="dontAsk", max_turns=max_turns,
+        tools=["Read", "Write"], allowed_tools=["Read", "Write"],
+        disallowed_tools=["Agent", "Task", "Bash", "Edit", "WebFetch", "WebSearch"],
+        permission_mode="dontAsk", max_turns=max_turns,
         setting_sources=[],
     )
     t0 = time.time()
     text = []
     cost = None
-    async for m in query(prompt=prompt, options=options):
-        if isinstance(m, AssistantMessage):
-            for b in m.content:
-                if isinstance(b, TextBlock):
-                    text.append(b.text)
-        elif isinstance(m, ResultMessage):
-            cost = m.total_cost_usd
+
+    async def run():
+        nonlocal cost
+        async for m in query(prompt=prompt, options=options):
+            if isinstance(m, AssistantMessage):
+                for b in m.content:
+                    if isinstance(b, TextBlock):
+                        text.append(b.text)
+            elif isinstance(m, ResultMessage):
+                cost = m.total_cost_usd
+
+    try:
+        if timeout_s:
+            await asyncio.wait_for(run(), timeout=timeout_s)
+        else:
+            await run()
+    except asyncio.TimeoutError:
+        trace.note(f"{purpose}: stopped after {int(timeout_s or 0)} s (time limit)")
     trace.model_call(model=model, purpose=purpose, seconds=time.time() - t0, cost_usd=cost)
     return "\n".join(text)
 
