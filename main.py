@@ -155,11 +155,16 @@ def cross_check(spec: CallSpec, brief_args: list[str], openapi: str, trace: Trac
     text, names = rule_diff.read_material(brief_args)
     text += "\n\n===== TOOL API (openapi.json) =====\n" + Path(openapi).read_text()[:12000]
     t0 = time.time()
-    model = os.environ.get("CROSSCHECK_MODEL", "claude-sonnet-5-5")      # strong, and not the extractor's model (independence)
+    model = os.environ.get("CROSSCHECK_MODEL", "gpt-5.5")                # strong, and another vendor than the extractor (independence)
     try:
-        import claude_cli
-        second = claude_cli.ask_json(rule_diff.PROMPT, text, model=model)
-    except Exception as e:                                               # no claude CLI login: the tester's judge model instead
+        if model.startswith("claude"):
+            import claude_cli
+            second = claude_cli.ask_json(rule_diff.PROMPT, text, model=model)
+        else:
+            import openai_client
+            second = json.loads(openai_client.generate(rule_diff.PROMPT, [("user", text)], json_mode=True, model=model,
+                                                       reasoning=os.environ.get("CROSSCHECK_REASONING", "medium")))
+    except Exception as e:                                               # model unavailable: the tester's judge model instead
         trace.note(f"cross-check: {model} unavailable ({str(e)[:120]}); using the judge model")
         model = llm.model_of(llm.provider("judge"))
         second = json.loads(llm.generate("judge", rule_diff.PROMPT, [("user", text)], json_mode=True))

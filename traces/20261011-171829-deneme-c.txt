@@ -1,0 +1,18 @@
+[    0.0s] start: at=2026-10-11T17:18:29+0300 label=deneme-c
+[    0.0s] note: text=main.py brief=FREYA/briefs_extra/brief-c files=3 openapi=FREYA/briefs_extra/brief-c/openapi.json name=deneme-c model=claude-opus-5-5 budget_min=25 fix_rounds=1 reps=3 test_model=gemini work=/Users/enes/Desktop/freya-hecaton/runs/deneme-c/20261011-171829
+[   65.4s] model_call: model=claude-opus-5-5 purpose=extract CallSpec from brief (attempt 1) seconds=64.9 cost_usd=0.46683260000000004 tokens=None
+[   65.4s] note: text=extraction attempt 1: CallSpec valid (15604 bytes)
+[   87.6s] model_call: model=gpt-5.5 purpose=cross-check: second, independent reading of 01-email-thread.md, 02-memo-changes.md, 03-code-list.md seconds=22.2 cost_usd=None tokens=None
+[   87.6s] note: text=cross-check: 2 disagreement(s)
+    attempt2_rule: "Attempt 2 (overdue band only, since the serious band now has one atte | "For the overdue band only, attempt 2 is the floor amount on the lates
+    sentences.opening: "Hello, this is Freya Bank's automated assistant, and we record this c | null
+[  141.6s] model_call: model=claude-opus-5-5 purpose=re-read the brief for 2 field(s) the cross-check disputes seconds=54.0 cost_usd=0.4951876 tokens=None
+[  141.6s] note: text=cross-check: re-read changed 0 field(s)
+[  141.6s] note: text=compiled v1: 31 nodes -> /Users/enes/Desktop/freya-hecaton/runs/deneme-c/20261011-171829/workflow.v1.json
+[  141.7s] note: text=test customers: 34 generated from the CallSpec (no model call; dates and amounts computed); 1 template(s) skipped, rule not in this brief: human during identity: the brief has no human-request rule f
+[  141.7s] note: text=--only 15,19,26: testing 3 of 34 customers: DENEME-15 Promise recorded, then asks for a human; DENEME-19 overdue band: refuses today and all 2 persuasion attempt(s); DENEME-26 Changes the amount at the read-back
+[  212.8s] note: text=local test v1: Gemini usage: 208 calls, 338.3k prompt tokens, 3.2k output, 12.2k thinking (9 calls)
+[  212.8s] note: text=local test v1: OpenAI usage: 69 calls, 37.8k prompt tokens, 10.5k output (7.1k reasoning)
+[  212.8s] note: text=local test v1: LLM cache (extract): 7 hits, 60 misses (extract=openai, route=gemini, judge=openai)
+[  212.8s] test: name=local test v1 (generated customers, emulated agent, 3 rep(s)) passed=3 total=3 seconds=71 failed=[] simulation_id=local
+[  212.8s] end: at=2026-10-11T17:22:01+0300 total_seconds=213 name=deneme-c version=v1 workflow_id=None agent_id=None export=None local_test=3/3 work=/Users/enes/Desktop/freya-hecaton/runs/deneme-c/20261011-171829

@@ -36,6 +36,15 @@ class Rules:
         self.cb = spec["third_party"]["callback"]
         self.attempt1_rule = (spec["persuasion"].get("attempt1_date_rule") or " ".join(spec["persuasion"].get("attempt_rules") or [])).lower()
         self.attempt2_floor_on_deadline = bool(spec["persuasion"].get("attempt2_uses_floor_on_deadline", True))
+        pz = spec["persuasion"]
+        self.a1_kind = pz.get("attempt1_date_kind")                          # structured attempt-1 date (newer CallSpecs); None = parse the text
+        self.a1_n = int(pz.get("attempt1_business_days") or 0)
+        self.a1_full = pz.get("attempt1_uses_full_amount", True) is not False
+        # layer 3: a rule that fits no field is left to the agent's model; the code (and so this generator) cannot compute it
+        self.left_to_model = {}
+        if (spec.get("amounts") or {}).get("floor_mode") == "text": self.left_to_model["floor"] = "amounts.floor_mode=text"
+        if pz.get("attempt1_mode") == "text" or self.a1_kind == "other": self.left_to_model["attempt1"] = "persuasion.attempt1_mode=text" if pz.get("attempt1_mode") == "text" else "persuasion.attempt1_date_kind=other"
+        if (spec["third_party"].get("callback") or {}).get("day_mode") == "text": self.left_to_model["callback_day"] = "third_party.callback.day_mode=text"
         self.multi = spec.get("multi_product") or {}
         self.identity_fields = [q["field"] for q in spec["identity"]["questions"]]
         self.skipped = []
@@ -82,7 +91,17 @@ class Rules:
         b = self.band(product); return int(b["persuasion_attempts"]) if b else None
 
     def attempt1_date(self, today):
-        """Known rule shapes: 'last business day of this week; if today is that day, (the last business day of) next week'."""
+        """The attempt-1 date: from attempt1_date_kind when the CallSpec has it, else from the rule text. None = 'the deadline'
+        (the caller supplies the product), "unknown" = cannot be computed (the template is skipped)."""
+        if "attempt1" in self.left_to_model: return "unknown"
+        k = self.a1_kind
+        if k == "last_business_day_this_week":
+            d = self.last_business_of_week(today)
+            return d if d > today else self.last_business_of_week(today + dt.timedelta(days=7))
+        if k == "next_business_day": return self.next_business(today + ONE)
+        if k == "today": return today
+        if k == "business_days_after_today" and self.a1_n: return self.nth_business_after(today, self.a1_n)
+        if k == "deadline": return None
         r = self.attempt1_rule
         if "last business day" in r and "week" in r:
             d = self.last_business_of_week(today)
@@ -96,7 +115,18 @@ class Rules:
         if "deadline" in r or "latest date" in r: return None            # caller must use the deadline
         return "unknown"
 
+    def attempt1_for(self, product, today):
+        """attempt1_date with the product's own deadline filled in, capped at that deadline."""
+        d = self.attempt1_date(today); dl = self.deadline(product, today)
+        if d is None: return dl
+        return min(d, dl) if isinstance(d, dt.date) and dl else d
+
+    def attempt1_amount(self, product):
+        """Attempt 1 proposes the full amount, or the floor when the brief says so."""
+        return float(product["past_due"]) if self.a1_full or self.floor(product) is None else self.floor(product)
+
     def floor(self, product):
+        if "floor" in self.left_to_model: return None
         pt = self.products.get(product["type"])
         if not pt: return None
         f = pt.get("floor_field") or "past_due"
@@ -290,6 +320,10 @@ def build(rules, pool, tag="OUR", now_override=None):
     sms_check = f"after the recorded promise the agent says: \"{sms}\"" if sms else "the agent confirms the promise is recorded"
     q1 = sp["identity"]["questions"][0]["field"].replace("_", " ")
 
+    for what, why in rules.left_to_model.items():
+        skip({"floor": "floor templates (below floor, own amount, too much, refusal bands)", "attempt1": "attempt-1 templates (refusal bands, vague period, Friday)",
+              "callback_day": "callback booking templates"}[what], f"rule left to the model ({why})")
+
     # ---- third party / opening
     o = need("third_party.wrong_number_close")
     a, _ = pool.pick(lambda a: True, prefer="PUB-03")
@@ -323,7 +357,7 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     cb = rules.cb; o_cb, o_nocb = need("third_party.callback_close"), need("third_party.no_callback_close")
     a, _ = pool.pick(lambda a: True, prefer="PUB-02")
-    if o_nocb and a:
+    if o_nocb and a and "callback_day" not in rules.left_to_model:
         v = a["variables"]; today = today_of(a)
         late_time = (dt.datetime.combine(today, dt.time.fromisoformat(cb["time_to"])) + dt.timedelta(minutes=60)).strftime("%H:%M")
         sunday = today + dt.timedelta(days=6 - today.weekday())
@@ -331,9 +365,9 @@ def build(rules, pool, tag="OUR", now_override=None):
             f"The person who answers is {v['first_name']}'s husband. Says {v['first_name']} is not home. When asked when she can be reached, says {day(sunday)} in the evening. "
             f"When asked for another time, says tomorrow at {late_time}. Gives no other time.",
             ledger(o_nocb), [no_disclosure, "the agent asks once for another time after the first one", "no callback is scheduled", "verify_identity and get_account never called"], third_party=True)
-    else: skip("callback outside window", "no third_party.no_callback_close")
+    elif "callback_day" not in rules.left_to_model: skip("callback outside window", "no third_party.no_callback_close")
 
-    if o_cb and a and cb.get("allow_next_business_day", True):
+    if o_cb and a and cb.get("allow_next_business_day", True) and "callback_day" not in rules.left_to_model:
         today = today_of(a); nbd = rules.next_business(today + ONE)
         t_from = dt.time.fromisoformat(cb["time_from"]); ok_time = (dt.datetime.combine(nbd, t_from) + dt.timedelta(hours=2)).strftime("%H:%M")
         evening_now = (dt.datetime.combine(today, dt.time.fromisoformat(cb["time_to"])) - dt.timedelta(minutes=30))
@@ -346,7 +380,7 @@ def build(rules, pool, tag="OUR", now_override=None):
             ledger(o_cb, callbacks=[{"date": D(nbd), "time": ok_time}]),
             [no_disclosure, f"the agent does not book {earlier} today (it is already past) and asks once for another time", f"callback scheduled for {day(nbd)} at {ok_time}",
              "verify_identity and get_account never called"], third_party=True, now=f"{D(today)}T{evening_now:%H:%M}")
-    else: skip("callback booked", "no callback close or next business day not allowed")
+    elif "callback_day" not in rules.left_to_model: skip("callback booked", "no callback close or next business day not allowed")
 
     # ---- identity
     o = need("identity.decline.close"); explain = rules.text("identity.decline.explain_once_text")
@@ -426,7 +460,7 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     a, _ = pool.pick(lambda a: single(a) and rules.floor(a["products"][0]) and rules.floor(a["products"][0]) < float(a["products"][0]["past_due"]), prefer="PUB-06")
     if a:
-        p, today = a["products"][0], today_of(a); fl = rules.floor(p); d1 = rules.attempt1_date(today)
+        p, today = a["products"][0], today_of(a); fl = rules.floor(p); d1 = rules.attempt1_for(p, today)
         if isinstance(d1, dt.date) and d1 <= rules.deadline(p, today):
             below = money(max(1, round(fl * 0.5)))
             add("Amounts", "hard", "Offers less than the floor, accepts the floor", a,
@@ -494,10 +528,11 @@ def build(rules, pool, tag="OUR", now_override=None):
         a, _ = pool.pick(lambda a, nm=b["name"]: in_band(rules, nm)(a) and rules.floor(a["products"][0]), prefer={"early": "PUB-08", "late": "PUB-05"}.get(b["name"]),
                          synth=lambda x, b=b: (x.__setitem__("products", [dict(x["products"][0], days_late=int(b["days_late_min"]) + 1)]) or x))
         if not a or not o_ref: skip(f"refusal band {b['name']}", "no account in this band" if o_ref else "no refused_close"); continue
-        p, today = a["products"][0], today_of(a); fl, full = rules.floor(p), float(p["past_due"]); d1 = rules.attempt1_date(today); dl = rules.deadline(p, today)
+        p, today = a["products"][0], today_of(a); fl, full = rules.floor(p), float(p["past_due"]); d1 = rules.attempt1_for(p, today); dl = rules.deadline(p, today)
         if not isinstance(d1, dt.date): skip(f"refusal band {b['name']}", "attempt-1 date rule unknown"); continue
         tq = rules.text("amounts.today_question")
-        checks = ([f"the agent first asks: \"{tq}\""] if tq else []) + [f"persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes {money(full)} on {day(min(d1, dl) if dl else d1)}"]
+        if tq: tq = tq.replace("{amount}", money(full)).replace("{tomorrow}", day(rules.next_business(today + ONE))).replace("{today}", day(today))
+        checks = ([f"the agent first asks: \"{tq}\""] if tq else []) + [f"persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes {money(rules.attempt1_amount(p))} on {day(min(d1, dl) if dl else d1)}"]
         if n >= 2 and rules.attempt2_floor_on_deadline: checks.append(f"persuasion attempt 2 proposes {money(fl)} on {day(dl)}")
         checks += [f"exactly {n} offer(s) in total after the refusal to pay today; no offer after attempt {n}", "no promise recorded", f"closed as {o_ref['outcome']} / {o_ref['reason']}"]
         add("Refusal", "hard", f"{b['name']} band: refuses today and all {n} persuasion attempt(s)", a,
@@ -536,7 +571,7 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     a, _ = pool.pick(lambda a: with_attempts(rules, 1)(a) and rules.floor(a["products"][0]), prefer="PUB-03")
     if a and o_ref and "deadline" in rules.text("dates.after_deadline_rule").lower() or (a and o_ref and "latest" in rules.text("dates.after_deadline_rule").lower()):
-        p, today = a["products"][0], today_of(a); dl = rules.deadline(p, today); d1 = rules.attempt1_date(today); far = dl + dt.timedelta(days=18)
+        p, today = a["products"][0], today_of(a); dl = rules.deadline(p, today); d1 = rules.attempt1_for(p, today); far = dl + dt.timedelta(days=18)
         if isinstance(d1, dt.date):
             add("Dates", "hard", "Wants a date after the deadline, refuses the deadline", a,
                 f"Verified. When asked to pay today, answers in one sentence that they cannot pay today and the only day they can pay is {day(far)} (gives that date right away, never a bare 'no'). When told the latest date is {day(dl)} and offered it, refuses: that day or nothing. Refuses any other offer too, with a flat no and no reason.",
@@ -545,7 +580,7 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     a, _ = pool.pick(lambda a: with_attempts(rules, 1)(a) and rules.floor(a["products"][0]) and rules.floor(a["products"][0]) < float(a["products"][0]["past_due"]), prefer="PUB-07")
     if a and o_ref:
-        p, today = a["products"][0], today_of(a); fl = rules.floor(p); d1 = rules.attempt1_date(today)
+        p, today = a["products"][0], today_of(a); fl = rules.floor(p); d1 = rules.attempt1_for(p, today)
         if isinstance(d1, dt.date):
             add("Amounts", "hard", "Full amount too much, refuses the floor and the one attempt", a,
                 "Verified. Cannot pay today. Says the full amount is far too much. Refuses the minimum payment when it is offered. Refuses the next offer as well, with a flat no and no reason. Never names a date or an amount.",
@@ -555,7 +590,7 @@ def build(rules, pool, tag="OUR", now_override=None):
     # confirming
     a, _ = pool.pick(lambda a: single(a) and rules.floor(a["products"][0]) and rules.floor(a["products"][0]) < float(a["products"][0]["past_due"]), prefer="PUB-06")
     if a and sp["confirm"].get("recheck_if_changed", True):
-        p, today = a["products"][0], today_of(a); d1 = rules.attempt1_date(today); fl, full = rules.floor(p), float(p["past_due"]); new = round((fl + full) / 2)
+        p, today = a["products"][0], today_of(a); d1 = rules.attempt1_for(p, today); fl, full = rules.floor(p), float(p["past_due"]); new = round((fl + full) / 2)
         if isinstance(d1, dt.date) and d1 <= rules.deadline(p, today):
             add("Confirming", "hard", "Changes the amount at the read-back", a,
                 f"Verified. Cannot pay today. Offers to pay the full amount on {day(d1)}. At the read-back, before confirming, says 'actually make it {money(new)}'. Confirms the second read-back with {money(new)}.",
@@ -563,7 +598,7 @@ def build(rules, pool, tag="OUR", now_override=None):
                                                           f"create_promise called once, for {money(new)} on {day(d1)}", sms_check])
     a, _ = pool.pick(single, prefer="PUB-01"); imm = rules.text("confirm.promise_immutable_text")
     if a and sp["confirm"].get("one_promise_per_product", True) and imm:
-        p, today = a["products"][0], today_of(a); d1 = rules.attempt1_date(today)
+        p, today = a["products"][0], today_of(a); d1 = rules.attempt1_for(p, today)
         add("Confirming", "medium", "Wants to change a recorded promise", a,
             f"Verified. Says they can pay the full amount today and confirms at the read-back. After the agent says the promise is recorded, asks to move it to {day(d1) if isinstance(d1, dt.date) else 'next week'} instead. Accepts whatever the agent answers and says goodbye.",
             ledger(po, promises=[promise(p["past_due"], today)]), [f"the agent says a recorded promise cannot be changed in this call (the brief's sentence: \"{imm}\")", "create_promise called exactly once", f"the recorded promise stays {money(p['past_due'])} on today's date ({D(today)})"])
@@ -581,7 +616,7 @@ def build(rules, pool, tag="OUR", now_override=None):
     if a and o_ref and rules.attempt2_floor_on_deadline:
         base = today_of(a); fri = base
         while not (rules.business(fri) and rules.last_business_of_week(fri) == fri): fri += ONE
-        p = a["products"][0]; fl, full = rules.floor(p), float(p["past_due"]); d1 = rules.attempt1_date(fri); dl = rules.deadline(p, fri)
+        p = a["products"][0]; fl, full = rules.floor(p), float(p["past_due"]); d1 = rules.attempt1_for(p, fri); dl = rules.deadline(p, fri)
         if isinstance(d1, dt.date):
             add("Dates", "hard", f"Called on {day(fri)}: attempt 1 rolls to next week", a,
                 "Verified. Says no to paying today and gives no date and no amount. Says a flat no to every offer, without giving any reason. Never mentions money problems, illness or job loss.",
@@ -653,7 +688,9 @@ def build_multi(rules, pool, add, ledger, promise, skip, today_of, po, o_ref, sm
         add("Multi", "hard", "Promises the first product, refuses the rest", a,
             f"Verified. Cannot pay all of them today. Will pay the {rules.label(ps[0])} in full on {day(d1)}. Flatly refuses to pay anything on the other products, whatever is offered, without giving a reason.",
             ledger(po, promises=[promise(ps[0]["past_due"], d1, "p1")], notes=[{"product_id": f"p{i+2}", "reason": "refused"} for i in range(len(ps) - 1)]),
-            ["every late product is stated before any ask", f"exactly one promise, on the {rules.label(ps[0])}", "one 'refused' note for each product without a promise", "persuasion attempts are made per product, in get_account order"])
+            ["every late product is stated before any ask", f"exactly one promise, on the {rules.label(ps[0])}", "one 'refused' note for each product without a promise", "persuasion attempts are made per product, in get_account order",
+             ("the first question about each product counts as its persuasion attempt 1" if m.get("per_product_question_is_attempt1", True)
+              else "after a product's first question is refused, the agent still makes that product's persuasion attempt(s) before noting it")])
     a, _ = pool.pick(multi, prefer="PUB-13")
     if a and m.get("one_date_for_all_rule"):
         today = today_of(a); ps = a["products"]

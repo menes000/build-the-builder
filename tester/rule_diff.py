@@ -8,7 +8,7 @@ extraction-error candidates for a human to look at (2 minutes with the brief ope
     source env.sh
     python3 tester/rule_diff.py <callspec.json> <brief file or folder> [more files...] [--out results/<slot>-rulediff.md]
 """
-import argparse, json, pathlib, sys
+import argparse, json, pathlib, re, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import llm
@@ -76,6 +76,28 @@ def field_map_vs_openapi(spec, openapi_path):
     return out
 
 
+def outcome_reasons(rows):
+    """The CallSpec has one row per outcome and reason (or several reasons per row): merge them per outcome."""
+    out = {}
+    for o in rows:
+        out.setdefault(o["outcome"], set()).update(o.get("reasons") or [])
+    return {k: sorted(v) for k, v in out.items()}
+
+
+KEY_WORDS = re.compile(r"\d+|monday|tuesday|wednesday|thursday|friday|saturday|sunday|floor|full|deadline|latest|business|calendar|"
+                       r"tomorrow|today|next|week|month|first|second|third|last|no attempt|none|same", re.I)
+
+
+def same_rule(a, b):
+    """Two paraphrases of one rule are the same when they name the same numbers, weekdays and amount/date words."""
+    def keys(t):
+        t = re.sub(r"\([^)]*\)", " ", t or "")                          # drop parenthesised sources and remarks
+        t = re.sub(r"^\s*attempt\s*\d+\s*[:.-]?", " ", t, flags=re.I)    # drop a leading "Attempt 2:" label
+        return {w.lower() for w in KEY_WORDS.findall(t)}
+    ka, kb = keys(a), keys(b)
+    return ka == kb
+
+
 def from_callspec(c):
     d, tp, ident, sp = c["dates"], c["third_party"], c["identity"], c["special"]
     return {
@@ -85,7 +107,7 @@ def from_callspec(c):
         "identity_questions": [q["field"] for q in ident["questions"]], "max_wrong_answers_total": ident.get("max_wrong_total"),
         "floor_fields": {p["type"]: p["floor_field"] for p in c.get("products") or []},
         "queues": {"human": (sp.get("human") or {}).get("queue"), "hardship": (sp.get("hardship") or {}).get("offer_queue"), "restructuring": (sp.get("restructuring") or {}).get("queue")},
-        "outcomes": {o["outcome"]: sorted(o.get("reasons") or []) for o in c["closing"]["outcomes"]},
+        "outcomes": outcome_reasons(c["closing"]["outcomes"]),
         "sentences": {"after_record": c["confirm"].get("after_record_sentence"), "deceased": tp.get("deceased_sentence"), "opening": c["opening"].get("first_sentence")},
         "attempt1_date_rule": c["persuasion"].get("attempt1_date_rule"),
         "attempt2_rule": next((r for r in c["persuasion"].get("attempt_rules") or [] if "attempt 2" in r.lower() or "second" in r.lower()), None),
@@ -108,10 +130,11 @@ def diff(a, b, path=""):
         for i in range(max(len(a), len(b))): out += diff(a[i] if i < len(a) else None, b[i] if i < len(b) else None, f"{path}[{i}]")
     elif (path.startswith("sentences") or path.startswith("attempt")) and isinstance(a, str) and isinstance(b, str):
         wa, wb = set(norm(a).split()), set(norm(b).split())
-        need = 0.7 if path.startswith("sentences") else 0.5                  # rules are paraphrased; sentences must be near-exact
-        if len(wa & wb) < need * min(len(wa), len(wb), 1e9): out.append((path, a, b))
-    elif isinstance(a, list) and isinstance(b, list) and path.startswith("outcomes"):
-        if sorted(norm(a)) != sorted(norm(b)): out.append((path, a, b))
+        if path.startswith("attempt"):                                      # rules are paraphrased: compare what they name
+            if not same_rule(a, b): out.append((path, a, b))
+        elif len(wa & wb) < 0.7 * min(len(wa), len(wb), 1e9): out.append((path, a, b))   # sentences must be near-exact
+    elif path.startswith("outcomes") and isinstance(a or [], list) and isinstance(b or [], list):
+        if sorted(norm(a or [])) != sorted(norm(b or [])): out.append((path, a, b))    # no reasons = [] = left out
     elif norm(a) != norm(b): out.append((path, a, b))
     return out
 
