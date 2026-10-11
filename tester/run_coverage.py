@@ -9,7 +9,16 @@ Uses the shared workspace's simulation queue (one simulation at a time): check n
 import pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-KIT = ROOT / "docs" / "build-the-builder"
+
+
+def kit_dir(root):
+    """The organisers' kit: FREYA_KIT_DIR, or <root>/kit (Dora's layout), or <root>/docs/build-the-builder (ours)."""
+    import os
+    for p in (os.environ.get("FREYA_KIT_DIR"), root / "kit", root / "docs" / "build-the-builder"):
+        if p and pathlib.Path(p).exists(): return pathlib.Path(p)
+    raise SystemExit("kit not found: set FREYA_KIT_DIR")
+
+KIT = kit_dir(ROOT)
 sys.path.insert(0, str(KIT)); sys.path.insert(0, str(KIT / "tools"))
 
 HELPER = '''

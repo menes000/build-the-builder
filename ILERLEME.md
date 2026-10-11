@@ -164,6 +164,31 @@ Sonuç: v15 `after_promise` node'u model farkını kapattı; experimental-5 art�
 - **Workspace paylaşımlı** (Dora ile): aynı anda 1 simülasyon. Chat API simülasyon kuyruğunu kullanmıyor.
 - Ajan modeli `agent_config.llmConfig` = experimental-5 (`freya.save_workflow` ayarlıyor).
 
+## Pazar düzeneği: ne yapıldı (11 Eki 01:30–11:30)
+Problem tanımındaki 5 maddenin çözümü. Protokol: `docs/PAZAR-PROTOKOLU.md`.
+
+| Parça | Dosya | Ne yapar | Doğrulama |
+|---|---|---|---|
+| Sahte banka | `tester/fakebank.py` | Organizatör mock'unun lokal kopyası: her kimlik alanı, her hesap (vaka dosyasından), aynı ledger şekli, `faults` (fail_first_n), "already has a promise", "identity not verified", day_month_swapped ipucu. `score.py` değişmeden puanlar | gerçek mock probe'larıyla self-test; PUB-10 arıza yolu PASS |
+| `--bank local` | `local_sim.py`, `emulator.py` | tool URL'leri sahte bankaya yönlenir, oturum/ledger oradan | OUR-05/06/28 + PUB-10 PASS |
+| Vaka üretici | `tester/cases_from_callspec.py` | CallSpec → ~30 tek ürün + 6 çok ürün şablonu; tarih/tutar koddan (`Rules`: bant, deadline iş/takvim günü, floor alanı, callback penceresi, deneme-1 kuralı); hesap havuzu + sentez (eksik kimlik alanı, boş bant); `check()` her beklentiyi kurallara göre doğrular; kuralı olmayan şablon atlanır ve listelenir | Brief A: 30 vaka, elle yazılan 28'in tüm imzaları üretildi; Brief C: 30 (postcode, no_slot/not_confirmed/refused_check/plans/hardship_desk, "serious" bandı sentetik, 09:00–17:30); Brief B: 36 |
+| Kural diff'i | `tester/rule_diff.py` | gpt-5.4-mini ham brief'i (klasör: mail+memo+kod listesi) bağımsız okur, CallSpec'in sayısal/enum alt kümesiyle alan alan diff; kaynak belge belirtir | Brief C: 0 gerçek fark (memo'nun 5 değişikliği CallSpec'te var); format farkları prompt'a kelime dağarcığı verilerek giderildi |
+| Tek komut | `tester/final.sh <slot> [reps] [parallel]` | CallSpec → vakalar → lokal koşu → `results/<slot>-report.md` | Brief C 122 sn, Brief A (v15) 135 sn |
+| Sağlık | `tester/health.py` | key'ler, Freya API, kuyruk, mock, Gemini, OpenAI, sahte banka | hepsi OK |
+
+**Prova sonuçları (11 Eki sabah):**
+- Brief C (`ext-c` ajanı, 10 Eki 21:05 derlemesi, v11 öncesi): 24/30. Düşenler: söz sonrası kapanış ×2 ve floor iki kez (eski derleme, A'da v11–v15 ile düzelen sınıf), belirsiz tarih → floor önerdi (OURC-21, A'da v12 ile düzelen sınıf). Check ifadesi kaynaklı 3 FAIL düzeltildi (judge "bugün?" sorusunu ikna, Cuma teklifini plan, 1. denemeyi "deneme sonrası teklif" saydı).
+- Brief A üretilmiş set, v15 ajanı: **29/30**. Tek FAIL **OUR-09 kimlik sırasında insan isteği: v14 regresyonu.** `security` node'unun `declined_1` extraction tanımı "refuses to answer… says no" diyor; "I want to speak to a real person" ret sayılıyor → `security_explain` → `declined_2` → `close_declined`. Diyalog modeline (transfer tool'u orada) hiç sıra gelmiyor. v12'de geçiyordu (OUR-26). Dora'ya: extraction tanımına "insan/temsilci isteğinde boş bırak" ya da `human` enum değeri + transfer yolu.
+- Brief B çok ürün (`ext-ab`, 20:22 derlemesi): 5/6. OURB-35 "söz üzerinde anlaşıldı ama okunmadı, plan istendi" → tek okuma kuralında söz kaydedilmez (önce şablon yanlıştı, düzeltildi). OURB-36 arıza ×2: not doğru, sözler korunuyor.
+- Maliyet: 30 arama ≈ 600k Gemini prompt token + 20k düşünme + 150 OpenAI çağrısı; ~2.5 dk.
+
+**Sınırlar:** (1) şablonlar bilinen kural ailelerini test eder; şemada olmayan kural tipi için LLM senaryo önerisi yazılmadı (zaman). (2) Sahte banka brief'i uygulamaz (mock gibi). (3) `needs_local_bank` vakalar resmi yola gidemez. (4) Judge ve extraction gpt-5.4-mini, Freya'nınkiler farklı; kalibrasyon Gemini judge ile yapıldı (26/28).
+
+### Dora'nın builder self-test isteği (11 Eki 11:16) → cevap
+- `tester/local_test.py`: tek çağrı, CallSpec + export → vakalar → lokal koşu → JSON (`rows`: id, status, failed, flags, judge_reason, transcript, path). exit 0/1/2. Dora'nın `--local-test` bayrağı bunu subprocess ile çağırır, `passed/total`'ı trace'e yazar.
+- Tester kit yolunu otomatik bulur (`kit/` veya `docs/build-the-builder`); Dora düzeninde prova edildi. Paket: `results/handoff-dora-tester-20261011.zip` (tester/ + README + protokol).
+- Öneri: kademe 1 (sadece rapor, trace'e test satırı) bugün; kademe 2 (fix loop) yalnız A'da resmi sonuçla uyum görülürse ve düzeltmeler genel kalıyorsa.
+
 ## Pazar için problem tanımı (11 Eki 01:30)
 Pazar 20:00'de iki görülmemiş brief gelecek; Dora'nın builder'ı ~5 dk'da ajan üretecek; 3 saat içinde o ajanın gizli jüri müşterilerinde nerede düşeceğini bulup Dora'ya genel düzeltme fırsatı vermemiz gerekiyor. Bugünkü düzenek bunu yapamıyor:
 1. **Vakalar elle ve tek brief'e özgü.** 28 vaka Brief A değerleriyle elle yazıldı. Yeni brief için elle yazmaya zaman yok, gizli değerleri elle yazmak gri alan. Brief → vaka dönüşümü otomatik değil.
@@ -178,7 +203,13 @@ Pazar 20:00'de iki görülmemiş brief gelecek; Dora'nın builder'ı ~5 dk'da aj
 - (5) `tester/final.sh` + `health.py`; Brief C ile baştan sona prova, süre ölçümü. Dora'ya teslim formatı iletildi (01:00 mesajı).
 - (4) riskli vaka kuralı: tool tekrar bayrağı, `after_promise`, intent routing geçen vakalar, ret sayacı → resmi yolda öncelik.
 
-## Sıradaki adımlar
+## Sıradaki adımlar (11 Eki, finale kadar)
+- [ ] Dora: OUR-09 regresyonu (declined extraction vs insan isteği), `build.py` sarmalayıcı + `submission/` + trace'e node/tool sayısı ve mutlak saat; `ext-c`/`ext-ab`'yi güncel compiler ile yeniden derleyip bize export.
+- [ ] Biz: Dora'nın yeni derlemeleriyle `final.sh` provası (C ve AB), OUR-09'u resmi yolda 1 koşu.
+- [ ] 19:30 `health.py`, kuyruk koordinasyonu, protokol okuması.
+- [x] Pazar düzeneği (sahte banka, vaka üretici, kural diff'i, final.sh, health.py) — yukarıda.
+
+## Sıradaki adımlar (eski)
 - [ ] (onay bekliyor) `ours-a-chattest` kopyasını oluştur, 18 vakayı Freya modunda koş, lokal ile karşılaştır → emülatör kalibrasyonu (`path` alanı bunun için).
 - [ ] Lokal 18 vaka --reps 2 koşusu: `results/coverage-local-v2.json` (10 Eki 20:40 başladı). Yeni 10 vaka: `results/coverage-local-new.json`.
 - [x] Resmi koşu yapıldı (21:05): 24/28, `results/coverage-freya.json`. `--judge-view tools` Freya'ya yakın (tool adları artık API adı).

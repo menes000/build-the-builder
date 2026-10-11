@@ -18,9 +18,18 @@ Needs FREYA_BANK_TEAM_KEY and GEMINI_API_KEY, and FREYA_API_KEY unless --agent l
 import argparse, concurrent.futures, json, os, pathlib, re, sys, threading, time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-KIT = ROOT / "docs" / "build-the-builder"
+
+
+def kit_dir(root):
+    """The organisers' kit: FREYA_KIT_DIR, or <root>/kit (Dora's layout), or <root>/docs/build-the-builder (ours)."""
+    import os
+    for p in (os.environ.get("FREYA_KIT_DIR"), root / "kit", root / "docs" / "build-the-builder"):
+        if p and pathlib.Path(p).exists(): return pathlib.Path(p)
+    raise SystemExit("kit not found: set FREYA_KIT_DIR")
+
+KIT = kit_dir(ROOT)
 sys.path.insert(0, str(KIT)); sys.path.insert(0, str(KIT / "tools")); sys.path.insert(0, str(ROOT / "tester"))
-import emulator, freya, gemini, llm
+import emulator, fakebank, freya, gemini, llm, score
 from run_cases import STYLES, persona_for
 from score import http, score_ledger
 
@@ -38,6 +47,7 @@ Decide whether ALL of these success criteria are true:
 Judge only these criteria, strictly, from the transcript. Answer with JSON only: {{"pass": true or false, "reason": "one or two sentences, naming the criterion that failed if any"}}"""
 
 print_lock = threading.Lock()
+BANK = "mock"                                                          # or "local": tester/fakebank.py started in-process (see main)
 
 
 def say(*a):
@@ -249,7 +259,8 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya", judg
     conv, record = [], {"case": case["id"], "style": style, "persona": persona["prompt"], "agent": backend}
     stats = {"gemini_s": 0.0, "freya_s": 0.0, "freya_retries": 0, "turns": []}
     try:
-        variables = http("/v1/practice/sessions", {"case": case.get("session_case", case["id"])})["variables"]   # our cases borrow a PUB account
+        session_case = case["id"] if BANK == "local" else case.get("session_case", case["id"])   # the fake bank knows every case; the real mock only PUB accounts
+        variables = http("/v1/practice/sessions", {"case": session_case})["variables"]
         for k, v in (case.get("variables") or {}).items():                                                     # the case's own calendar day or time wins
             if k != "customer_id" and v not in (None, ""): variables[k] = v
         record["variables"] = variables; row["customer_id"] = variables["customer_id"]
@@ -284,11 +295,13 @@ def run_case(target, case, style, max_turns, out_dir, rep, backend="freya", judg
         row["status"] = "PASS" if not row["failed"] else ("ERROR" if row.get("infra") else "FAIL")
         if row["status"] == "ERROR": row["error"] = "Freya platform: " + "; ".join(row["infra"])[:300]
         record.update(ledger=ledger, judge={"pass": ok, "reason": reason}, transcript=transcript)
+        row["transcript"] = for_judge(transcript, judge_view); row["judge_reason"] = reason   # for adapters (Dora's fix loop) that read the --out JSON only
     except Exception as e:                                    # infrastructure, not the agent: counted apart
         row["status"], row["error"] = "ERROR", f"{type(e).__name__}: {e}"[:400]
     row["timing"] = {"gemini_s": round(stats["gemini_s"]), "freya_s": round(stats["freya_s"]), "freya_retries": stats["freya_retries"]}
     record.update(row=row, conversation=conv, timing=stats)
     (out_dir / f"{case['id']}-{rep}.json").write_text(json.dumps(record, indent=1, default=str))
+    row["record"] = str(out_dir / f"{case['id']}-{rep}.json")
     chain = " > ".join(t.replace("verify_identity", "verify").replace("create_promise", "promise") for t in row.get("tools", [])) or "(no tool calls)"
     lines = [f"{row['status']:<5} {case['id']} {case['level']:<6} {case['family']:<14} | {chain}"]
     tm = row["timing"]
@@ -308,9 +321,17 @@ def main():
     ap.add_argument("--reps", type=int, default=1); ap.add_argument("--style", choices=sorted(STYLES))
     ap.add_argument("--parallel", type=int, default=3); ap.add_argument("--max-turns", type=int, default=40)
     ap.add_argument("--judge-view", choices=["tools", "spoken"], default="tools", help="what the judge reads: conversation plus bank tool calls, or the conversation only")
+    ap.add_argument("--bank", choices=["mock", "local"], default="mock", help="mock: the organisers' bank mock (PUB accounts only). local: tester/fakebank.py with the case file's own accounts and identity fields (any brief); --agent local only")
     a = ap.parse_args()
     cases = [c for c in json.load(open(a.cases)) if (not a.brief or c["brief"] == a.brief) and (not a.only or c["id"] in a.only.split(","))]
     if not cases: sys.exit("no cases selected")
+    global BANK
+    if a.bank == "local":
+        if a.agent != "local": sys.exit("--bank local works with --agent local only (the agent on Freya cannot reach a bank on this machine)")
+        BANK = "local"
+        base = fakebank.start(json.load(open(a.cases)))
+        score.HOST = base; os.environ["LOCAL_BANK_HOST"] = base; os.environ.setdefault("FREYA_BANK_TEAM_KEY", "local")
+        say(f"fake bank on {base} with the accounts of {a.cases}")
     wf = workflow_for(a.workflow_id)
     target = emulator.load_workflow(wf) if a.agent == "local" else wf
     if a.agent == "freya":

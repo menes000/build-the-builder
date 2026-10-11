@@ -15,7 +15,7 @@ confirm on Freya before trusting a result.
     text, ended = agent.send("Yes, speaking.")
     agent.finish(); agent.transcript_text()
 """
-import copy, datetime, json, os, re, urllib.error, urllib.request
+import copy, datetime, json, os, re, urllib.error, urllib.parse, urllib.request
 
 import gemini, llm
 
@@ -92,6 +92,7 @@ class LocalAgent:
         self.max_tokens = int(llm.get("maxTokens") or 1000)
         self.warnings = []        # agent behaviour worth a look (silent turn, parallel tool calls, model-filled lifecycle fields)
         self.endpoints = endpoints_of(workflow)
+        self.bank_host = os.environ.get("LOCAL_BANK_HOST") or ""   # set by local_sim --bank local: every bank URL is redirected there
         self.path = []            # nodes entered, in order, like Freya's node_enter events
         self.routes = []          # routing decisions taken by the routing model (intent), like Freya's route_evaluated events
         self.started_at = datetime.datetime.now()
@@ -334,7 +335,11 @@ class LocalAgent:
         body = req.get("body")
         data = body.encode() if isinstance(body, str) else json.dumps(body).encode()
         headers = {**UA, "content-type": "application/json", **{k: str(v) for k, v in (req.get("headers") or {}).items()}}
-        r = urllib.request.Request(self.sub(req.get("url")), data=data if req.get("method", "POST") != "GET" else None, headers=headers, method=req.get("method", "POST"))
+        url = self.sub(req.get("url"))
+        if self.bank_host:                                  # keep the path (/v1/create_promise), swap scheme and host for the local fake bank
+            u = urllib.parse.urlsplit(url); b = urllib.parse.urlsplit(self.bank_host)
+            url = urllib.parse.urlunsplit((b.scheme, b.netloc, u.path, u.query, ""))
+        r = urllib.request.Request(url, data=data if req.get("method", "POST") != "GET" else None, headers=headers, method=req.get("method", "POST"))
         try:
             with urllib.request.urlopen(r, timeout=timeout) as resp:
                 raw, code = resp.read().decode(), resp.status
