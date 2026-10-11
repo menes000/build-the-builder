@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>main.py Akışı</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1b16; --mute:#6b6658; --line:#d9d5c8;
+  --claude:#c96442; --code:#3a6ea5; --freya:#6b4fa0; --gemini:#2f8a5b; --warn:#b5462f; --ok:#2f8a5b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16150f; --card:#211f18; --ink:#ece8dc; --mute:#a39d8c; --line:#3a372d;
+    --claude:#e08a68; --code:#7aa6d6; --freya:#a98bd8; --gemini:#6cc493; --warn:#e2785f; --ok:#6cc493;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16150f; --card:#211f18; --ink:#ece8dc; --mute:#a39d8c; --line:#3a372d;
+  --claude:#e08a68; --code:#7aa6d6; --freya:#a98bd8; --gemini:#6cc493; --warn:#e2785f; --ok:#6cc493;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:18px;margin:36px 0 12px}
+.sub{color:var(--mute);margin:0 0 20px}
+code{font-family:ui-monospace,Menlo,monospace;font-size:13px;background:color-mix(in srgb,var(--line) 45%,transparent);padding:1px 5px;border-radius:4px}
+.cmd{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:ui-monospace,Menlo,monospace;font-size:13px;overflow-x:auto;white-space:pre}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:14px 0 22px;font-size:13px;color:var(--mute)}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+.flow{display:flex;flex-direction:column;align-items:stretch}
+.step{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:10px;padding:12px 14px}
+.step .top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.step b{font-size:15px}
+.step .meta{font-size:12px;color:var(--mute);white-space:nowrap}
+.step p{margin:6px 0 0;font-size:14px}
+.who{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--c)}
+.arrow{align-self:center;color:var(--mute);font-size:18px;line-height:1;padding:4px 0}
+.decision{align-self:center;max-width:520px;width:100%;text-align:center;border:1.5px dashed var(--mute);border-radius:10px;padding:8px 12px;font-size:14px;background:transparent}
+.branch{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.branch .lab{font-size:12px;font-weight:600;margin-bottom:4px}
+.yes{color:var(--ok)} .no{color:var(--warn)}
+.loop{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:0;position:relative}
+.loop .tag{position:absolute;top:-10px;left:12px;background:var(--bg);padding:0 6px;font-size:12px;color:var(--mute)}
+.safe{font-size:12px;color:var(--ok);margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600}
+tr:last-child td{border-bottom:none}
+.ok{color:var(--ok);font-weight:600} .bad{color:var(--warn);font-weight:600}
+@media (max-width:600px){.branch{grid-template-columns:1fr}.step .meta{white-space:normal}}
+</style>
+</head>
+<body>
+<main>
+<h1>main.py: tek komutla builder</h1>
+<p class="sub">Brief + tool API girer, test edilmiş phone agent çıkar. Arada kendi testini yapar ve kendini düzeltir; elle müdahale yoktur.</p>
+
+<div class="cmd">python3 main.py final/hidden-1 final/hidden-1/openapi.json
+  → submission/hidden-1.workflow.json   (teslim dosyası)
+  → traces/&lt;saat&gt;-hidden-1.txt           (trace)
+  → runs/hidden-1/&lt;saat&gt;/                 (ara dosyalar: callspec, workflow, vakalar, test sonuçları)</div>
+
+<div class="legend">
+  <span style="--c:var(--claude)">Claude (builder modeli)</span>
+  <span style="--c:var(--code)">Deterministik kod</span>
+  <span style="--c:var(--freya)">Freya platformu</span>
+  <span style="--c:var(--gemini)">Lokal test (Gemini + sahte banka)</span>
+</div>
+
+<h2>Akış</h2>
+<div class="flow">
+
+  <div class="step" style="--c:var(--code)">
+    <div class="top"><b>Girdi</b><span class="meta">brief dosyası/klasörü + openapi.json</span></div>
+    <p>Klasördeki her dosya (mail, politika, memo, kod listesi) isim sırasıyla okunur.</p>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="step" style="--c:var(--claude)">
+    <div class="who">Claude</div>
+    <div class="top"><b>1 · Extract: brief → CallSpec v0</b><span class="meta">~60–90 sn · ~0,4 $</span></div>
+    <p>Sabit formu doldurur. Şema, API ve tutarlılık hatası olursa hata metni geri verilir, 2 kez daha dener. Son denemede de API uyumsuzluğu kalırsa çökmek yerine geçerli son formla devam edilir; uyumsuzluk trace'e yazılır.</p>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="step" style="--c:var(--gemini)">
+    <div class="who">İkinci model</div>
+    <div class="top"><b>2 · Çapraz kontrol</b><span class="meta">~30 sn</span></div>
+    <p>Başka bir model ve başka bir prompt ham brief'i baştan okur. Tatiller, bantlar, deadline, kimlik soruları, yanlış cevap limiti, callback penceresi, kuyruklar, outcome tablosu ve sabit cümleler CallSpec ile alan alan karşılaştırılır.</p>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="decision">Fark var mı?</div>
+  <div class="branch" style="margin-top:8px">
+    <div>
+      <div class="lab no">Evet</div>
+      <div class="step" style="--c:var(--claude)">
+        <div class="who">Claude</div>
+        <div class="top"><b>Hedefli yeniden okuma → v1</b><span class="meta">~60 sn</span></div>
+        <p>Sadece tartışmalı alanlar için brief'e döner. Sonraki belge öncekini ezer. Brief ne diyorsa o yazılır; her alan için "korundu / değişti + kaynak" notu düşülür.</p>
+      </div>
+    </div>
+    <div>
+      <div class="lab yes">Hayır</div>
+      <div class="step" style="--c:var(--code)"><b>v0 = v1</b><p>Devam.</p></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="step" style="--c:var(--code)">
+    <div class="who">Kod</div>
+    <div class="top"><b>3 · Derle</b><span class="meta">~1 sn</span></div>
+    <p>CallSpec → workflow (FREYA derleyicisi, değiştirilmedi), lint, üretilen her Python parçasının lokal denemesi.</p>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="step" style="--c:var(--freya)">
+    <div class="who">Freya</div>
+    <div class="top"><b>4 · Yayınla v1 + export</b><span class="meta">~10 sn</span></div>
+    <p>dryRun → kaydet ve yayınla (aynı slot yerinde güncellenir) → export.</p>
+    <div class="safe">✓ Buradan sonra her zaman geçerli bir teslim dosyası var. Döngü çökse ya da süre bitse bile.</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="step" style="--c:var(--gemini)">
+    <div class="who">Kod</div>
+    <div class="top"><b>5a · Test müşterilerini üret</b><span class="meta">~2 sn · LLM yok</span></div>
+    <p>CallSpec'ten ~30–40 vaka; tarih ve tutarlar kodla hesaplanır. Set <b>bir kez</b> üretilir ve bütün döngü boyunca aynı kalır.</p>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="loop">
+    <span class="tag">düzeltme döngüsü (varsayılan 1 tur, süre izin verirse)</span>
+    <div class="step" style="--c:var(--gemini)">
+      <div class="who">Lokal test</div>
+      <div class="top"><b>5b · Lokal test</b><span class="meta">~3–4 dk · Freya'ya istek yok</span></div>
+      <p>Emülatör workflow'u yürütür (ajan ve müşteri Gemini), sahte banka kayıt tutar, judge konuşmayı puanlar. Her vaka 2 kez koşulur; 2/2 geçen sayılır.</p>
+    </div>
+    <div class="arrow">↓</div>
+    <div class="decision">Hepsi geçti mi? Süre yeter mi?</div>
+    <div class="branch" style="margin-top:8px">
+      <div>
+        <div class="lab no">Hayır, düşenler var</div>
+        <div class="step" style="--c:var(--claude)">
+          <div class="who">Claude</div>
+          <div class="top"><b>6 · Düzelt</b><span class="meta">~60 sn</span></div>
+          <p>Düşen vakalar (senaryo, beklenen kayıt, judge gerekçesi, transcript) Claude'a gider. Claude sadece CallSpec <b>metinlerini</b> değiştirir. Tatil, bant, outcome, kimlik soruları kilitli. Altyapı hatası olan vakalar gönderilmez.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="step" style="--c:var(--code)"><b>Yeniden derle → aynı vakalarla tekrar test</b></div>
+        <div class="arrow">↓</div>
+        <div class="decision">Daha çok vaka geçiyor <b>ve</b> önceden geçen hiçbiri düşmedi mi?</div>
+        <div class="branch" style="margin-top:8px">
+          <div><div class="lab yes">Evet → kabul</div><div class="step" style="--c:var(--ok)"><b>Yeni en iyi sürüm</b></div></div>
+          <div><div class="lab no">Hayır → reddet</div><div class="step" style="--c:var(--warn)"><b>Eski sürüm kalır</b></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="lab yes">Evet / süre bitti</div>
+        <div class="step" style="--c:var(--code)"><b>Döngüden çık</b><p>En iyi sürümle devam.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="step" style="--c:var(--freya)">
+    <div class="who">Freya</div>
+    <div class="top"><b>7 · En iyiyi yayınla + export</b><span class="meta">~10 sn</span></div>
+    <p>En iyi sürüm v1 değilse yayınlanır ve <code>submission/&lt;ad&gt;.workflow.json</code>'un üstüne yazılır. Trace kapanır: süre, sürüm, workflow ve agent id, lokal test skoru.</p>
+  </div>
+</div>
+
+<h2>Süre ve maliyet (brief başına)</h2>
+<table>
+<tr><th>Durum</th><th>Süre</th><th>Maliyet</th></tr>
+<tr><td>Döngü kapalı (<code>--no-test</code>)</td><td>~2–3 dk</td><td>~0,5 $ Claude</td></tr>
+<tr><td>Varsayılan (test + 1 düzeltme turu)</td><td>~12–15 dk</td><td>~1 $ Claude + ~2–3M Gemini token</td></tr>
+<tr><td>Sert sınır</td><td colspan="2"><code>--budget-min 25</code> (kural 30 dk). Süre biterse eldeki en iyi sürüm teslim edilir.</td></tr>
+</table>
+
+<h2>Döngü neyi değiştirebilir, neyi değiştiremez</h2>
+<table>
+<tr><th>Değişebilir</th><th>Asla</th></tr>
+<tr>
+<td><span class="ok">✓</span> Brief'i yeniden okuyarak CallSpec değeri (adım 2, kaynak notuyla)<br>
+<span class="ok">✓</span> Ajanın söylediği metinler, kural cümleleri, <code>extra_rules</code> (adım 6)<br>
+<span class="ok">✓</span> Hangi sürümün teslim edileceği (kabul kuralıyla)</td>
+<td><span class="bad">✗</span> Test vakaları ve check'ler (set sabit, gevşetme yok)<br>
+<span class="bad">✗</span> Builder'ın kendi kodu<br>
+<span class="bad">✗</span> Ajanın modeli (experimental-5)<br>
+<span class="bad">✗</span> Brief'te olmayan bir değer<br>
+<span class="bad">✗</span> Koşu bittikten sonra ajana dokunmak</td>
+</tr>
+</table>
+
+<h2>Bilinen sınırlar</h2>
+<table>
+<tr><td>Lokal ajan Gemini, gerçek ajan experimental-5</td><td>Kabul kuralı (kayıp yok + kazanç var) kötü bir düzeltmeyi engeller. Model huyu farkları lokalde görünmez.</td></tr>
+<tr><td>Vakalar CallSpec'ten üretiliyor</td><td>Extraction hatasını test göremez; bu yüzden adım 2 var.</td></tr>
+<tr><td>GEMINI_API_KEY yoksa</td><td>Adım 5–6 atlanır, v1 teslim edilir (doğrulama koşusunda da aynısı olur).</td></tr>
+<tr><td>Brief klasörü</td><td>Sadece brief materyali olmalı. Klasördeki her md/txt/json/pdf/docx brief olarak okunur.</td></tr>
+</table>
+</main>
+</body>
+</html>

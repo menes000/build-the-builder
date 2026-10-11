@@ -135,7 +135,13 @@ class Rules:
 
     def label(self, product):
         pt = self.products.get(product["type"])
-        return (pt["spoken_label"] if pt else product["type"]).format(**{k: v for k, v in product.items() if isinstance(v, (str, int, float))})
+        vals = {k: v for k, v in product.items() if isinstance(v, (str, int, float))}
+
+        class Near(dict):            # "{last4}" in the label, "card_last4" on the account: take the field whose name ends with it
+            def __missing__(self, key):
+                hit = next((v for k, v in self.items() if k.endswith(key) or key.endswith(k)), None)
+                return hit if hit is not None else "{" + key + "}"
+        return (pt["spoken_label"] if pt else product["type"]).format_map(Near(vals))
 
     # outcomes and sentences
     def out(self, path):
