@@ -1,7 +1,7 @@
 {
  "bank_name": "Freya Bank",
  "language": "English",
- "call_purpose": "Outbound early-arrears collections call to a retail customer 1 to 50 days past due on one, two or three products (credit card, personal loan, car loan) to obtain a payment promise per product.",
+ "call_purpose": "Outbound early-arrears call (Q4 campaign) to a retail customer 1 to 50 days past due on one or more credit cards, personal loans or car loans, to obtain a payment promise per product.",
  "call_variables": [
   {
    "name": "customer_id",
@@ -9,11 +9,11 @@
   },
   {
    "name": "first_name",
-   "meaning": "Customer's first name"
+   "meaning": "Customer first name"
   },
   {
    "name": "last_name",
-   "meaning": "Customer's last name"
+   "meaning": "Customer last name"
   },
   {
    "name": "title",
@@ -39,8 +39,8 @@
   "non_confirmation_examples": [
    "Hello",
    "Go on",
-   "Who's calling?",
-   "What is this about?"
+   "Who's calling",
+   "What is this about"
   ],
   "max_asks": 3,
   "unclear_close": {
@@ -50,37 +50,37 @@
   "forbidden_words_before_verify": [
    "arrears",
    "overdue",
-   "overdue payment",
    "late payment",
-   "card",
-   "credit card",
-   "loan",
-   "personal loan",
-   "car loan",
-   "collections",
+   "payment",
    "debt",
-   "balance"
+   "collections",
+   "card",
+   "loan",
+   "balance",
+   "amount"
   ],
   "robot_answer": "I am a virtual assistant working for Freya Bank.",
   "scam_answer": "You can hang up and call the number printed on your statement to verify this call.",
   "extra_rules": [
    "Nothing about arrears, an overdue payment, a card or a loan may be said until identity has been verified; this applies to whoever is on the line, including a spouse or relative.",
-   "A question from the person on the line is answered before the question is repeated; after the answer, the next 'Am I speaking with...' counts as the repeat.",
-   "The name question may be asked three times (line quality on mobile routes is poor); after the third unclear answer close not_reached / unclear."
+   "A question from the person on the line is answered before the name question is repeated; after the answer, the next 'Am I speaking with...' counts as the repeat.",
+   "The name question may be put three times (line quality on mobile routes is poor); after the third unclear answer close not_reached / unclear."
   ]
  },
  "third_party": {
   "say_nothing_rule": "Say nothing beyond the opening sentence. A relative or partner may not answer the security questions and may not be told anything about the account, even if they offer to pay on the customer's behalf.",
   "ask_when_reachable": "Ask when the customer can be reached.",
   "callback": {
-   "day_rule": "Never today; the next business day or the business day after that",
+   "day_rule": "the next business day or the business day after that; never today",
    "allow_today": false,
    "allow_next_business_day": true,
    "time_from": "10:30",
    "time_to": "18:30",
    "must_be_later_than_now": true,
    "ask_again_once_if_outside": true,
-   "max_business_days_ahead": 2
+   "max_business_days_ahead": 2,
+   "calendar_days": false,
+   "saturday_allowed": false
   },
   "callback_close": {
    "outcome": "not_reached",
@@ -101,10 +101,11 @@
   },
   "relative_may_not_pay": true,
   "extra_rules": [
-   "Book the callback with schedule_callback (date plus HH:MM). 16 October 2026 is a bank holiday for callbacks too.",
+   "Book the callback with schedule_callback (date plus HH:MM) and close not_reached / callback.",
    "If the slot offered is outside the window, ask for another one once; if the second is also outside it, do not book and close not_reached / no_callback.",
    "'Wrong number' or 'nobody of that name here': close not_reached / wrong_number.",
-   "If told the customer has died: say the deceased sentence, ask nothing further, close not_reached / deceased."
+   "If told the customer has died: say the deceased sentence, ask nothing further, close not_reached / deceased.",
+   "16 October 2026 is a bank holiday for callbacks too."
   ]
  },
  "identity": {
@@ -112,7 +113,7 @@
    {
     "field": "phone_last4",
     "ask": "Could you tell me the last four digits of the phone number we hold for you?",
-    "answer_format": "Four digits"
+    "answer_format": "four digits"
    },
    {
     "field": "date_of_birth",
@@ -120,6 +121,7 @@
     "answer_format": "YYYY-MM-DD however the customer says it; a date given only in numbers is read day, month, year"
    }
   ],
+  "intro_text": "",
   "ask_one_at_a_time": true,
   "max_wrong_total": 2,
   "retry_hints": [
@@ -154,13 +156,13 @@
   },
   "extra_rules": [
    "Order: last four digits of the phone number FIRST, then the date of birth (memo 9 Oct 2026).",
-   "Each answer goes to verify_identity.",
-   "Two wrong answers in total end the check, whichever question they fall on. When the limit is reached do not state any balance.",
-   "Declining the security questions: the first refusal gets the explanation once; a second refusal, or asking what the call is about a second time instead of answering, closes not_verified / declined. A question like 'what is this about?' is not a statement that they do not want to talk.",
-   "Separate from declining the questions: a clear statement that the customer does not want to talk or wants to end the call is respected without further questions, also during the identity questions, and is closed not_verified / declined (see special rules)."
+   "The limit is TWO wrong answers in total; the second wrong answer ends the check, whichever question it falls on.",
+   "When the limit is reached: do not state any balance, tell the customer to use the mobile app or visit a branch, close not_verified / failed.",
+   "A customer who does not want to answer is told once that the questions protect their account. A second refusal, or asking what the call is about a second time instead of answering, closes not_verified / declined.",
+   "A request for a person is honoured at the first request: transfer_to_agent queue general, close transferred / human."
   ]
  },
- "debt_statement_rule": "After both answers pass, call get_account. Say you are calling from the collections team about an overdue payment. With several products, open with the number of overdue products and the total overdue across them (e.g. 'You have two overdue products with a total of 640 pounds overdue'), then one sentence per product with the product in words, its overdue amount and its days late. Never quote minimum_payment or instalment_amount.",
+ "debt_statement_rule": "After both answers pass, call get_account. Say you are calling from the collections team about an overdue payment. With several products, open with the number of overdue products and the total overdue across them (e.g. 'You have two overdue products with a total of 640 pounds overdue'), then one sentence per product with the product in words, its overdue amount and its days late. With one product: the product in words, its overdue amount and the number of days late. Never quote minimum_payment or instalment_amount.",
  "debt_intro_sentence": "I am calling from the collections team about an overdue payment.",
  "products": [
   {
@@ -228,53 +230,53 @@
     "persuasion_attempts": 1
    }
   ],
-  "promise_date_rule": "Today or later, a business day, and not after the latest date for that product (each product checked against its own band).",
-  "weekend_or_holiday_rule": "If the customer names a Saturday, Sunday or bank holiday that is not after the latest date, offer the last business day before it; if that business day would be before today, offer the first business day after the named day instead.",
+  "promise_date_rule": "today or later, a business day, and not after the latest date for that product (each product's band by its own days_late)",
+  "weekend_or_holiday_rule": "If the customer names a Saturday, Sunday or bank holiday that is not after the latest date, offer the LAST business day BEFORE it; if that business day would be before today, offer the first business day after the named day instead.",
   "offer_next_business_day": false,
   "weekend_named_offer": "previous_business_day",
   "vague_period_fallback": "attempt1",
-  "vague_period_rule": "A vague period ('next week', 'after payday', 'end of the month'): ask once for the exact day. If none comes, propose the attempt-1 date (the third business day after today, or the latest date if that is earlier), not the latest date.",
+  "vague_period_rule": "A vague period ('next week', 'after payday', 'end of the month'): ask once for the exact day. If none comes, propose the attempt-1 date (third business day after today, or the latest date if that is earlier), not the latest date.",
   "next_weekday_rule": "'Next <weekday>' means the first such weekday after today; 'this <weekday>' means the same. So 'next Friday' said on a Wednesday is the Friday of the same week.",
-  "after_deadline_rule": "Say the latest date is the latest you can record and offer it. If the customer refuses the latest date, close no_promise / refused there and then (add_note refused for that product); do not spend further attempts.",
+  "after_deadline_rule": "Say the latest date is the latest you can record and offer it. If the customer refuses the latest date, close no_promise / refused there and then (add_note refused for the product); do not spend further attempts.",
   "extra_rules": [
    "Every date rule is worked from now, never the real clock.",
    "16 October 2026 is a bank holiday for every date rule (promise dates, business-day counting, callbacks).",
-   "Band and latest date are per product, by its own days_late."
+   "With several products and one date named for everything, each product's date is checked against its own band separately (weekend rule for one, latest date for another)."
   ]
  },
  "amounts": {
   "ask_full_first": true,
   "never_ask_how_much": true,
-  "floor_rule": "The floor is 50 percent of the overdue amount (past_due), rounded up to the next whole pound, for every product type. minimum_payment and instalment_amount are not used in this campaign: do not quote them and do not use them as a floor.",
+  "floor_rule": "The floor is 50 percent of the overdue amount (past_due), rounded UP to the next whole pound, for every product type. minimum_payment and instalment_amount are NOT used in this campaign: do not quote them and do not use them as a floor.",
   "floor_offer_once": true,
   "floor_offer_text": "the remainder stays overdue",
   "today_question": "Are you able to clear this today?",
-  "customer_amount_rule": "An amount the customer proposes between the floor and the full overdue amount, both inclusive, is accepted. Below the floor: say it cannot be recorded and offer the floor once; refusing it is a flat refusal. If the customer offers more than the overdue amount, record the overdue amount and tell them that is the figure we hold.",
+  "customer_amount_rule": "An amount the customer proposes between the floor and the full overdue amount, both inclusive, is accepted. Below the floor: say it cannot be recorded and offer the floor once; refusing it is a flat refusal. If the customer says the full amount is too much, offer the floor once and say the remainder stays overdue; refusing the floor is a flat refusal.",
   "extra_rules": [
    "Always ask for the full overdue amount first. Never ask 'how much can you pay?'. Every amount is proposed by the caller.",
-   "If the customer says the full amount is too much, offer the floor once and say that the remainder stays overdue. Refusing the floor is a flat refusal."
+   "If a customer offers more than the overdue amount, record the overdue amount and tell them that is the figure we hold."
   ]
  },
  "persuasion": {
-  "flat_refusal_definition": "A flat 'no' with no date and no amount, or no answer at all, uses one attempt. Refusing the floor is a flat refusal. A date or an amount proposed by the customer is never a refusal.",
+  "flat_refusal_definition": "A flat 'no' with no date and no amount, or no answer at all, uses one attempt. A date or an amount proposed by the customer is never a refusal; it is handled under the date and amount rules. Refusing the floor counts as a flat refusal.",
   "attempt_rules": [
-   "Attempt 1: propose the full overdue amount (or the floor, if the customer has already said the full amount is too much) on the third business day after today; if that is after the product's latest date, use the latest date instead (in the final band this is normally the full amount on the latest date).",
-   "Attempt 2 (first and second bands only; the final band has one attempt): propose the floor on the latest date."
+   "Attempt 1: propose the THIRD business day after today, for the full overdue amount (or the floor, if the customer has already said the full amount is too much). If the third business day is after the product's latest date, use the latest date instead (in the final band this normally means the full amount on the latest date).",
+   "Attempt 2 (first and second bands only): propose the floor on the latest date."
   ],
-  "attempt1_date_rule": "The third business day after today; if that is after the product's latest date, the latest date instead.",
+  "attempt1_date_rule": "the third business day after today; if that is after the product's latest date, the latest date instead",
   "attempt1_date_kind": "business_days_after_today",
   "attempt1_business_days": 3,
   "attempt1_uses_full_amount": true,
   "attempt2_uses_floor_on_deadline": true,
-  "stop_rule": "When the attempts for a product are used up, stop; add_note refused for that product; if no promise was recorded on the call, close no_promise / refused (subject to the reason priority).",
+  "stop_rule": "Never repeat an offer the customer has already turned down. When the attempts are used up (first band 2, second band 2, final band 1), stop and close no_promise / refused (add_note refused for the product).",
   "refused_close": {
    "outcome": "no_promise",
    "reason": "refused"
   },
   "never_repeat_refused_offer": true,
   "extra_rules": [
-   "First question after the position is stated: 'Are you able to clear this today?' (asked once for all products together).",
-   "Attempts per band: first 2, second 2, final 1."
+   "First question after the position is stated: 'Are you able to clear this today?' (asked once, for all products together).",
+   "A customer who says clearly ONCE that they do not want to talk or want to end the call: respect it at once, close no_promise / refused (before verification not_verified / declined)."
   ]
  },
  "special": {
@@ -282,7 +284,8 @@
    "triggers": [
     "a hospital stay",
     "a bereavement",
-    "redundancy or the closure of the customer's business",
+    "redundancy",
+    "the closure of the customer's business",
     "fire or flooding at the customer's home"
    ],
    "sympathy_rule": "Say exactly: \"I'm sorry to hear that. I can put you through to our customer care team, who can look at your situation properly. Would you like that?\"",
@@ -301,7 +304,7 @@
   "paid": {
    "triggers": [
     "I've already paid",
-    "customer says the overdue amount is already paid"
+    "the customer claims to have paid this overdue amount"
    ],
    "say": "A payment can take up to three business days to reach the account; if it has not shown by then, please call us.",
    "take_promise": false,
@@ -314,7 +317,7 @@
    "triggers": [
     "That's not my debt",
     "I never had that product",
-    "That was closed years ago"
+    "that was closed years ago"
    ],
    "say": "A colleague from our disputes team will contact you within five business days.",
    "take_promise": false,
@@ -325,8 +328,8 @@
   },
   "restructuring": {
    "triggers": [
-    "payment plan",
-    "payment holiday",
+    "a payment plan",
+    "a payment holiday",
     "lower instalments"
    ],
    "queue": "restructuring",
@@ -360,10 +363,10 @@
    "any other term outside the Standard"
   ],
   "extra_rules": [
-   "A customer who says clearly ONCE that they do not want to talk or want to end the call: respect it at once; after verification close no_promise / refused, before verification not_verified / declined. One clear statement is enough. This is not the same as declining the security questions, which gets the explanation once first.",
+   "Difficult circumstances: no persuasion attempt. If the customer volunteers a date or an amount anyway, record it under the normal rules. With several products the circumstance applies to the whole call, not to one product.",
+   "Dispute: do not argue, take no promise on that product. Only a claim to have paid this overdue amount counts as paid.",
    "A request for a person is honoured at the FIRST request: no 'can I help you first', straight to transfer_to_agent queue general and close transferred / human.",
-   "Difficult circumstances: if they volunteer a date or an amount anyway, record it under the normal rules. With several products the circumstance applies to the whole call, not to one product.",
-   "Dispute: do not argue, no promise on that product. Only a claim to have paid this overdue amount counts as paid.",
+   "A customer who says clearly ONCE that they do not want to talk or want to end the call: respect it at once; after verification close no_promise / refused, before verification not_verified / declined. This also applies during the identity questions (Priya 1 Oct c). (Fields named refuses_twice_* hold these closes; one clear statement is enough.) It is separate from declining the security questions: a refusal to answer them, or asking 'what is this about?', first gets the one explanation (v6 4.5).",
    "Never invent a figure, a date or a reason."
   ]
  },
@@ -387,9 +390,8 @@
   },
   "after_record_sentence": "We will send you a confirmation by text within the hour.",
   "extra_rules": [
-   "If the customer changes the date or the amount at the readback, check the new value under the date and amount rules and read it back again.",
-   "create_promise is retried twice on failure (three tries in all). After the third failure say it could not be recorded, add_note service_error for that product, and if nothing else was recorded close no_promise / service_error.",
-   "Say the promise is recorded only when create_promise returns ok: true."
+   "create_promise is called only after a clear yes. If the customer changes the date or the amount at the read-back, check the new value and read it back again.",
+   "Say the promise is recorded only when create_promise returns ok: true. Retry twice on failure (three tries in all); then say it could not be recorded, add_note service_error for that product, and (if nothing else was recorded) close no_promise / service_error."
   ]
  },
  "closing": {
@@ -397,14 +399,14 @@
    {
     "outcome": "promise",
     "reasons": [],
-    "when": "At least one promise recorded on the call, and no transfer afterwards"
+    "when": "at least one promise recorded on the call, and no transfer afterwards"
    },
    {
     "outcome": "paid",
     "reasons": [
      "paid"
     ],
-    "when": "Customer says the overdue amount is already paid; with several products, every product noted paid"
+    "when": "customer says the overdue amount is already paid; with several products, every product noted paid"
    },
    {
     "outcome": "transferred",
@@ -423,7 +425,7 @@
      "service_error",
      "refused"
     ],
-    "when": "dispute: at least one product disputed, no promise; hardship: difficult circumstances, customer declined customer care, no promise; service_error: create_promise failed three times on a product, no promise, no dispute or hardship; refused: attempts exhausted, latest date refused, or customer said they do not want to talk (after verification)"
+    "when": "dispute: at least one product disputed, no promise; hardship: difficult circumstances, care team declined, no promise; service_error: create_promise failed three times on a product, no promise, no dispute or hardship; refused: attempts exhausted, latest date refused, or the customer said they do not want to talk (after verification)"
    },
    {
     "outcome": "not_verified",
@@ -442,7 +444,7 @@
      "deceased",
      "unclear"
     ],
-    "when": "callback: callback booked; no_callback: no slot inside the callback window; wrong_number: number is not the customer's; deceased: customer has died; unclear: person not confirmed as the customer after three asks"
+    "when": "callback booked; no slot inside the callback window; number is not the customer's; customer has died; person on the line not confirmed as the customer after three asks"
    }
   ],
   "promise_outcome": "promise",
@@ -452,8 +454,8 @@
   "transfer_after_promise_rule": "A transfer after a recorded promise closes as transferred with the transfer's reason, not as promise.",
   "thank_and_goodbye_before_close": true,
   "extra_rules": [
-   "Exactly one close_call per call, as the last tool call.",
-   "promise is the only outcome sent without a reason; every other outcome, including paid, carries the reason shown."
+   "promise is the only outcome sent without a reason. Every other outcome, including paid, carries the reason shown (paid / paid).",
+   "Exactly one close_call per call, as the last tool call."
   ]
  },
  "multi_product": {
@@ -462,15 +464,16 @@
   "per_product_bands": true,
   "ask_today_for_all_once": true,
   "today_question_all": "Are you able to clear this today?",
+  "closing_by_first_product": false,
   "no_promise_reason_priority": [
    "dispute",
    "hardship",
    "service_error",
    "refused"
   ],
-  "product_order_rule": "If the answer is not a yes for everything, take the products one at a time in order of days late, highest first; with the same days late, the larger overdue amount first. NOT the order get_account returns them.",
+  "product_order_rule": "in order of days late, highest first; two products with the same days late: the larger overdue amount first. NOT the order get_account returns them.",
   "attempts_per_product": true,
-  "one_date_for_all_rule": "If the customer names one date for everything, check it separately per product against its own band: a product whose latest date it passes is recorded on its own latest date (say so when reading that product back); a weekend/holiday date is rolled back per the weekend rule for that product; the others keep the named date.",
+  "one_date_for_all_rule": "If the customer names one date for everything and that date is after one product's latest date, that product is recorded on its own latest date; say so when you read that product back. The others keep the named date. Each product's date is checked against its own band separately (e.g. weekend rule for one, latest date for another).",
   "single_readback_single_confirmation": false,
   "one_create_promise_per_product": true,
   "note_reasons": [
@@ -482,15 +485,15 @@
   ],
   "note_for_each_product_without_promise": true,
   "dispute_or_paid_does_not_end_call": true,
-  "transfer_rule": "Before calling transfer_to_agent, write add_note for the products already dealt with that have no promise. Promises already recorded stay; promises agreed but not yet recorded are not recorded.",
+  "transfer_rule": "Where the call is transferred, write the add_note for the products already dealt with BEFORE calling transfer_to_agent. Promises already recorded stay; promises agreed but not yet recorded are not recorded.",
   "failed_promise_note_reason": "service_error",
   "closing_rule": "No promise recorded: if every product is noted paid, close paid / paid; otherwise no_promise with the reason by priority dispute, then hardship, then service_error, then refused, regardless of product order. At least one promise recorded: close promise, unless the call was transferred, in which case transferred with the transfer's reason.",
   "extra_rules": [
-   "Confirm each product SEPARATELY: read back product, amount and date, ask 'Is that correct, and may I record it?' and call create_promise straight after the yes, before moving to the next product.",
-   "Do not ask about today again product by product.",
-   "Each product starts at attempt 1; band and latest date are per product.",
+   "Ask about today once for all products together; do not ask about today again product by product. If the answer is not a yes for everything, take the products one at a time.",
+   "Attempts are counted per product, each product starting at attempt 1. Band and latest date are per product.",
+   "Confirm each product SEPARATELY: read back product, amount and date, ask 'Is that correct, and may I record it?' and call create_promise straight after the yes, before moving to the next product (replaces v6 11.6).",
    "A disputed or already-paid product does not end the call: note it with add_note and carry on with the others.",
-   "add_note for every product that ends without a promise, including when no product gets a promise."
+   "add_note for every product that ends without a promise, including when no product gets a promise. The text field is optional; a short summary is welcome."
   ]
  },
  "tools": [
@@ -793,19 +796,23 @@
   "Every date rule is worked from now; never use the real clock."
  ],
  "source_notes": [
-  "Precedence: memo of 9 Oct 2026 (Owen) > Priya's mails of 30 Sep / 1 Oct 2026 > EATS v6; code list v4 (6 Oct 2026) governs outcome/reason codes.",
+  "Precedence applied: EATS v6 (1 Jun 2026) < Priya's mail 30 Sep + follow-up 1 Oct < code list v4 (6 Oct) < Owen's memo (9 Oct 2026), which takes precedence over all earlier material.",
   "Attempts: v6 1/2/2 -> Priya 2/2/2 -> memo sets final band to 1. Result 2/2/1.",
-  "Floor: v6 and Priya 40% -> memo 50%, rounded up to whole pound, all product types; minimum_payment/instalment_amount unused.",
-  "Holidays: memo adds 2026-10-16 to the v6 list.",
-  "Identity: memo puts phone_last4 first and lowers the wrong-answer limit to 2 (the API summary says three; brief overrides). day_month_swapped retry stays free.",
-  "Callback: memo replaces v6 window: never today, next business day or the one after, 10:30-18:30 inclusive, one further ask.",
-  "Paid sentence and after-record sentence taken from memo (SMS sentence withdrawn). Paid closes paid / paid per code list (paid carries a reason), although the API description says reason is optional for paid.",
-  "Today question and confirm question taken from Priya's mail, replacing v6 8.1 and 11.1 also for single-product calls. Multi-product confirmation is per product (replaces v6 11.6), so single_readback_single_confirmation = false.",
-  "Weekend/holiday roll-back, 'next <weekday>' reading, vague-period fallback to attempt-1 date, latest-date refusal closes there and then, dispute sentence, three name asks, human at first request, one clear 'do not want to talk' statement: all from Priya's mail 30 Sep, replacing v6.",
-  "Identity decline: v6 4.5 still stands (the first refusal of the security questions gets the explanation once, the second refusal closes), so decline.explain_first = true. Priya's point 8 / reply (c) is a different trigger: one clear 'I don't want to talk' statement (also during identity) ends the call as not_verified / declined before verification and no_promise / refused after; that rule is in special.extra_rules and the refuses_twice_* fields hold these closes.",
-  "create_promise: three tries in all (Priya); failed close no_promise / service_error with add_note service_error.",
-  "Hardship triggers replaced by Priya's list; sympathy/offer sentence quoted exactly.",
-  "Opening first sentence is quoted verbatim in v6 2.1, so kept exactly including 'recorded'.",
-  "forbidden_words_before_verify derived from v6 2.1 (arrears, overdue payment, card, loan) plus close synonyms."
+  "Floor: v6 and Priya 40% -> memo 50% of past_due rounded up to whole pound; minimum_payment/instalment_amount unused.",
+  "Holidays: v6 list plus 16 Oct 2026 (memo).",
+  "Identity: memo puts phone_last4 first, then date_of_birth; wrong-answer limit 2 (v6 had 3; the API summary also says 3, brief overrides). day_month_swapped retry stays free.",
+  "Callback: memo replaces v6 3.2: never today, next business day or the one after, 10:30-18:30 inclusive, one further ask.",
+  "Paid sentence and after-promise sentence taken from the memo; the v6 SMS sentence is withdrawn.",
+  "Attempt-1 date: Priya replaced 'next business day' with the third business day after today, clamped to the product's latest date (Priya confirmed final band attempt 1 = full amount on the latest date).",
+  "Weekend/holiday: Priya replaced v6 6.4 with roll back to the last business day before (or the first business day after if that is before today). 'Next <weekday>': Priya replaced v6 6.6.",
+  "Vague period falls back to the attempt-1 date (Priya point 10). Refusing the latest date closes no_promise / refused at once (Priya point 11).",
+  "Name confirmation: 3 asks (Priya point 13), consistent with the code list ('after three asks').",
+  "Human request: honoured at first request (Priya point 8 replaces v6 10.4). Not wanting to talk: one clear statement closes (Priya point 8 / 1 Oct c, replaces v6 10.5).",
+  "Identity decline: explain_first stays true because v6 4.5 (explain once; a second refusal or a second 'what is this about' closes not_verified / declined) is not replaced by any later document. The separate 'does not want to talk, said once' rule is kept in special.extra_rules and persuasion.extra_rules rather than identity.extra_rules, so it is not read as a first-refusal close for the security questions.",
+  "create_promise: 3 tries in all (Priya point 9; code list says 'failed three times').",
+  "Multi-product: per-product separate confirmation and wording 'Is that correct, and may I record it?' (Priya replaces v6 11.1/11.6); today question 'Are you able to clear this today?' also for single-product calls; product order by days late desc then past_due desc.",
+  "Closing: code list v4 says only promise goes without a reason; paid carries reason paid (the API description says reason optional for paid; the code list was followed).",
+  "cases.json contains test expectations that conflict with the written brief in places (e.g. get_account order in D-34, one confirmation for all in D-35, 'second time' refusals in D-09/D-18, an extra attempt after a refused latest date in D-24, attempt 1 on 20 Oct in the final band in D-25). The spec follows the dated written instructions, not those expectations.",
+  "The 'more than the overdue amount' rule (Priya point 3) has no dedicated field; placed in amounts.extra_rules. The 'say it once' refusal rule is stored in the refuses_twice_* fields with a note in special.extra_rules."
  ]
 }

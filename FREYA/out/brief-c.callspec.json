@@ -1,7 +1,7 @@
 {
  "bank_name": "Freya Bank",
  "language": "English",
- "call_purpose": "Outbound early arrears call (1 to 60 days late) to get a recorded payment promise for an overdue product.",
+ "call_purpose": "Outbound early arrears call (1 to 60 days late) to get a payment promise for an overdue product.",
  "call_variables": [
   {
    "name": "customer_id",
@@ -52,19 +52,20 @@
    "loan",
    "overdue",
    "debt",
-   "amount",
-   "days late"
+   "late payment",
+   "amount"
   ],
   "robot_answer": "I am Freya Bank's automated assistant.",
   "scam_answer": "You can check this call by calling the number on the back of your card.",
   "extra_rules": [
    "Nothing about arrears, balances, cards or loans may be said before identity is verified; this also holds for relatives.",
-   "A question from the person is answered first, and the ask that follows counts as the second ask."
+   "A question from the person is answered first, and the ask that follows counts as the second ask.",
+   "The question may be asked twice at most; still no clear confirmation afterwards -> close not_reached / not_confirmed."
   ]
  },
  "third_party": {
   "say_nothing_rule": "If someone else answers, say nothing beyond the opening sentence; nothing about arrears, balances, cards or loans.",
-  "ask_when_reachable": "When can {{title}} {{last_name}} be reached?",
+  "ask_when_reachable": "When would be a good time to reach {{title}} {{last_name}}? I can call back on the next business day between 09:00 and 17:30.",
   "callback": {
    "day_rule": "the next business day only (never today)",
    "allow_today": false,
@@ -72,7 +73,10 @@
    "time_from": "09:00",
    "time_to": "17:30",
    "must_be_later_than_now": true,
-   "ask_again_once_if_outside": true
+   "ask_again_once_if_outside": true,
+   "max_business_days_ahead": 1,
+   "calendar_days": false,
+   "saturday_allowed": false
   },
   "callback_close": {
    "outcome": "not_reached",
@@ -93,9 +97,9 @@
   },
   "relative_may_not_pay": true,
   "extra_rules": [
-   "Booked callback: call schedule_callback, then close not_reached / callback.",
-   "Outside the window: ask once more; if still outside, do not book and close not_reached / no_slot.",
-   "If told the customer passed away: say the condolence sentence, ask nothing else.",
+   "Booked callback -> schedule_callback, then close not_reached / callback.",
+   "Outside the window: ask once more; if still outside, do not book -> not_reached / no_slot.",
+   "If told the customer passed away: say \"Please accept my condolences.\", ask nothing else -> not_reached / deceased.",
    "Relatives may not answer security questions and may not pay."
   ]
  },
@@ -107,34 +111,31 @@
     "answer_format": "YYYY-MM-DD; numeric dates are day-month-year"
    },
    {
-    "field": "postcode",
-    "ask": "What is the postcode of your registered address?",
-    "answer_format": "postcode without spaces, upper case"
-   },
-   {
     "field": "phone_last4",
-    "ask": "What are the last four digits of the phone number we have on file?",
+    "ask": "Could you tell me the last four digits of the phone number on file?",
     "answer_format": "four digits"
    }
   ],
+  "intro_text": "",
   "ask_one_at_a_time": true,
   "max_wrong_total": 3,
   "retry_hints": [
    {
     "hint": "day_month_swapped",
-    "instruction": "Ask for the month of birth as a word, then send the date again; this retry is free.",
+    "instruction": "Ask the customer for the month of birth as a word, then send the date again; this retry is free.",
     "counts_as_wrong": false
    }
   ],
   "wrong_answer_may_be_repeated": true,
-  "after_failed_text": "Please use the Freya Bank app or visit a branch.",
+  "after_failed_text": "Please use the app or visit a branch.",
   "failed_close": {
    "outcome": "not_verified",
    "reason": "failed"
   },
   "decline": {
-   "explain_once_text": "These questions protect your account, so I need to ask them before I can continue.",
+   "explain_once_text": "These questions protect your account, so I have to ask them before I can continue.",
    "asking_purpose_counts_as_decline": true,
+   "explain_first": true,
    "close": {
     "outcome": "not_verified",
     "reason": "refused_check"
@@ -142,10 +143,11 @@
   },
   "human_request": null,
   "extra_rules": [
-   "Ask the three questions in this order: date of birth, postcode of the registered address, last four digits of the phone number on file.",
-   "Each answer goes to verify_identity.",
-   "After the check failed say nothing about the balance.",
-   "A second decline, or asking what the call is about a second time instead of answering, closes not_verified / refused_check."
+   "Two questions only for this campaign, in this order: date of birth, then the last four digits of the phone number on file (postcode dropped).",
+   "Each answer goes to verify_identity (dates as YYYY-MM-DD; numeric dates are day-month-year).",
+   "Three wrong answers in total end the check; say nothing about the balance -> not_verified / failed.",
+   "A second decline, or asking what the call is about a second time instead of answering -> not_verified / refused_check.",
+   "After verification call get_account."
   ]
  },
  "debt_statement_rule": "After verification call get_account, then say you are calling from the arrears team about an overdue payment, name the product in words (\"credit card ending 1234\", \"personal loan\", \"car loan\"), the overdue amount and the days late.",
@@ -153,22 +155,28 @@
  "products": [
   {
    "type": "credit_card",
-   "floor_field": "min_payment",
-   "spoken_label": "credit card ending {last4}"
+   "floor_field": "minimum_payment",
+   "floor_percent": null,
+   "floor_round_up_to_whole": false,
+   "spoken_label": "credit card ending {card_last4}"
   },
   {
    "type": "personal_loan",
-   "floor_field": "installment_amount",
+   "floor_field": "instalment_amount",
+   "floor_percent": null,
+   "floor_round_up_to_whole": false,
    "spoken_label": "personal loan"
   },
   {
    "type": "car_loan",
-   "floor_field": "installment_amount",
+   "floor_field": "instalment_amount",
+   "floor_percent": null,
+   "floor_round_up_to_whole": false,
    "spoken_label": "car loan"
   }
  ],
  "dates": {
-  "business_days_text": "Monday to Friday, except bank holidays",
+  "business_days_text": "Monday to Friday except bank holidays",
   "weekend_days": [
    5,
    6
@@ -213,45 +221,46 @@
   "promise_date_rule": "today or later, a business day, not after the latest promise date of the band",
   "weekend_or_holiday_rule": "offer the next business day",
   "offer_next_business_day": true,
-  "vague_period_rule": "For a vague period (\"next week\", \"payday\") ask once for the exact day, otherwise propose the latest date.",
+  "weekend_named_offer": "next_business_day",
+  "vague_period_fallback": "deadline",
+  "vague_period_rule": "For a vague period (\"next week\", \"payday\"): ask once for the exact day, otherwise propose the latest date.",
   "next_weekday_rule": "\"Next Friday\" = Friday of the following week; \"this Friday\" = this week's Friday.",
-  "after_deadline_rule": "Say the latest date is the latest you can record and offer it; refusing it is a flat refusal.",
+  "after_deadline_rule": "Say the latest date is the latest you can record and offer it; refusing it = flat refusal.",
   "extra_rules": [
-   "Serious band: the 3-calendar-day latest date is rolled forward to the next business day if it is not a business day."
+   "Serious band: if 3 calendar days after today is not a business day, roll forward to the next business day."
   ]
  },
  "amounts": {
   "ask_full_first": true,
   "never_ask_how_much": true,
-  "floor_rule": "Floor is min_payment on a credit card and installment_amount on a loan (personal_loan, car_loan).",
+  "floor_rule": "minimum_payment on a credit card, instalment_amount on a loan (personal_loan, car_loan)",
   "floor_offer_once": true,
   "floor_offer_text": "the remainder stays in arrears",
-  "customer_amount_rule": "Customer-proposed amount between floor and full inclusive: accept. Below floor: say it cannot be recorded, offer the floor once; refusal is a flat refusal.",
+  "today_question": "Can you make this payment today?",
+  "customer_amount_rule": "Customer-proposed amount between floor and full inclusive -> accept. Below floor -> say it cannot be recorded, offer the floor once; refusal = flat refusal.",
   "extra_rules": [
-   "\"Too much\": offer the floor once, adding that the remainder stays in arrears."
+   "\"Too much\" -> offer the floor once, adding that the remainder stays in arrears."
   ]
  },
  "persuasion": {
   "flat_refusal_definition": "A no, with no date and no amount. Each flat refusal uses one attempt.",
   "attempt_rules": [
-   "First ask \"Can you make this payment today?\"",
+   "First ask \"Can you make this payment today?\" (full overdue amount).",
    "Attempt 1: the last business day of this week (if today is that day: of next week), full amount, or the floor if \"too much\" was already said.",
-   "Attempt 2 (overdue band only, since the memo of 24 Sep reduced serious to one attempt): floor amount on the latest date."
+   "Attempt 2 (overdue band only; fresh and serious bands have 1 attempt): floor amount on the latest date."
   ],
   "attempt1_date_rule": "the last business day of this week; if today is that day, the last business day of next week",
   "attempt1_date_kind": "last_business_day_this_week",
   "attempt1_business_days": 0,
   "attempt1_uses_full_amount": true,
   "attempt2_uses_floor_on_deadline": true,
-  "stop_rule": "Attempts exhausted: close no_promise / refused.",
+  "stop_rule": "Attempts exhausted -> no_promise / refused.",
   "refused_close": {
    "outcome": "no_promise",
    "reason": "refused"
   },
   "never_repeat_refused_offer": true,
-  "extra_rules": [
-   "Fresh band: 1 attempt; overdue band: 2 attempts; serious band: 1 attempt."
-  ]
+  "extra_rules": []
  },
  "special": {
   "hardship": {
@@ -327,12 +336,11 @@
   },
   "unknown_answer_text": "I don't have that information.",
   "forbidden_offers": [
-   "payment plan",
+   "describing a payment plan",
    "lower instalments"
   ],
   "extra_rules": [
-   "Dispute: no argument, no promise.",
-   "Hardship accepted: transfer_to_agent team hardship_desk. Plans: transfer_to_agent team plans. Person insisted: transfer_to_agent team general.",
+   "Disputes: no argument, no promise.",
    "Never invent information."
   ]
  },
@@ -349,13 +357,14 @@
   "promise_immutable_text": "A recorded promise cannot be changed on this call; you can change it in the app.",
   "say_recorded_only_after_ok": true,
   "retry_once_on_failure": true,
+  "max_tries_on_failure": 2,
   "failed_twice_close": {
    "outcome": "no_promise",
    "reason": "system_error"
   },
   "after_record_sentence": "You will get a text message confirming this arrangement.",
   "extra_rules": [
-   "On a second create_promise failure say it could not be recorded, then close no_promise / system_error."
+   "A second create_promise failure -> say it could not be recorded -> no_promise / system_error."
   ]
  },
  "closing": {
@@ -414,10 +423,10 @@
    "promise",
    "paid"
   ],
-  "transfer_after_promise_rule": "close as transferred with the transfer's reason",
+  "transfer_after_promise_rule": "Transfer after a recorded promise: close as transferred with the transfer's reason.",
   "thank_and_goodbye_before_close": true,
   "extra_rules": [
-   "Exactly one close_call, as the last tool call.",
+   "Thank the customer and say goodbye, then exactly one close_call as the last tool call.",
    "add_note is not used in this campaign."
   ]
  },
@@ -426,6 +435,9 @@
   "state_all_products_first": true,
   "per_product_bands": true,
   "ask_today_for_all_once": true,
+  "today_question_all": "",
+  "closing_by_first_product": false,
+  "no_promise_reason_priority": [],
   "product_order_rule": "",
   "attempts_per_product": true,
   "one_date_for_all_rule": "",
@@ -506,15 +518,15 @@
      "required": true
     },
     {
-     "name": "promise_date",
-     "type": "string",
+     "name": "amount",
+     "type": "number",
      "enum": [],
      "description": "",
      "required": true
     },
     {
-     "name": "payment_amount",
-     "type": "number",
+     "name": "date",
+     "type": "string",
      "enum": [],
      "description": "",
      "required": true
@@ -541,14 +553,7 @@
      "required": true
     },
     {
-     "name": "text",
-     "type": "string",
-     "enum": [],
-     "description": "",
-     "required": false
-    },
-    {
-     "name": "code",
+     "name": "reason",
      "type": "string",
      "enum": [
       "refused",
@@ -559,6 +564,13 @@
      ],
      "description": "",
      "required": true
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "enum": [],
+     "description": "",
+     "required": false
     }
    ]
   },
@@ -582,7 +594,7 @@
      "required": true
     },
     {
-     "name": "callback_time",
+     "name": "time",
      "type": "string",
      "enum": [],
      "description": "HH:MM",
@@ -603,7 +615,7 @@
      "required": true
     },
     {
-     "name": "team",
+     "name": "queue",
      "type": "string",
      "enum": [
       "plans",
@@ -628,14 +640,7 @@
      "required": true
     },
     {
-     "name": "reason",
-     "type": "string",
-     "enum": [],
-     "description": "Required for every outcome except promise and paid. See the table in the brief.",
-     "required": false
-    },
-    {
-     "name": "result",
+     "name": "outcome",
      "type": "string",
      "enum": [
       "promise",
@@ -647,6 +652,13 @@
      ],
      "description": "",
      "required": true
+    },
+    {
+     "name": "reason",
+     "type": "string",
+     "enum": [],
+     "description": "Required for every outcome except promise and paid. See the table in the brief.",
+     "required": false
     }
    ]
   }
@@ -664,27 +676,27 @@
    "create_promise": {
     "customer_id": "customer_id",
     "product_id": "product_id",
-    "amount": "payment_amount",
-    "date": "promise_date"
+    "amount": "amount",
+    "date": "date"
    },
    "add_note": {
     "customer_id": "customer_id",
     "product_id": "product_id",
-    "reason": "code",
+    "reason": "reason",
     "text": "text"
    },
    "schedule_callback": {
     "customer_id": "customer_id",
     "date": "date",
-    "time": "callback_time"
+    "time": "time"
    },
    "transfer_to_agent": {
     "customer_id": "customer_id",
-    "queue": "team"
+    "queue": "queue"
    },
    "close_call": {
     "customer_id": "customer_id",
-    "outcome": "result",
+    "outcome": "outcome",
     "reason": "reason"
    }
   },
@@ -693,14 +705,14 @@
     "ok": "ok",
     "error": "error",
     "verified": "verified",
-    "all_verified": "fully_verified",
-    "wrong_answers_left": "attempts_left",
+    "all_verified": "all_verified",
+    "wrong_answers_left": "wrong_answers_left",
     "hint": "hint"
    },
    "get_account": {
     "ok": "ok",
     "error": "error",
-    "products": "accounts"
+    "products": "products"
    },
    "create_promise": {
     "ok": "ok",
@@ -727,27 +739,29 @@
   "product": {
    "product_id": "product_id",
    "type": "type",
-   "card_last4": "last4",
-   "past_due": "overdue_amount",
-   "days_late": "days_overdue",
-   "minimum_payment": "min_payment",
-   "instalment_amount": "installment_amount"
+   "card_last4": "card_last4",
+   "past_due": "past_due",
+   "days_late": "days_late",
+   "minimum_payment": "minimum_payment",
+   "instalment_amount": "instalment_amount"
   },
   "warnings": []
  },
  "global_extra_rules": [
   "Send customer_id on every tool call.",
-  "All date rules use the now variable, never the real clock."
+  "All date rules use now, never the real clock."
  ],
  "source_notes": [
-  "Sources: Helena Marsh mail 21 Sep 2026 (CPM rev. 9 extract), Tom Ridley memo 24 Sep 2026 (overrides both where they disagree), Ops code list v3 22 Sep 2026.",
-  "Holidays: memo item 1 list used (replaces appendix C).",
-  "Serious band persuasion attempts: 2 in manual, changed to 1 by memo item 2; latest-date rule unchanged (3 calendar days, rolled forward to next business day).",
-  "Callback window: 09:00-18:00 in manual, changed to 09:00-17:30 by memo item 3; still next business day only.",
-  "Identity wrong-answer limit: 4 in manual, changed to 3 by memo item 4 (matches the API summary).",
-  "After-record sentence: manual's 'A confirmation text will follow shortly.' replaced by memo item 5.",
-  "Floor field names taken from the API: min_payment (credit card), installment_amount (loans); card digits field is last4.",
-  "Opening sentence is only described in the brief; written as '... and we record this call.'",
-  "Brief describes products for one customer only; no multi-product rule, so multi_product disabled. add_note not used per code list."
+  "Sources: Helena Marsh's mail (21 Sep 2026, CPM rev. 9 section 4 extract), Tom Ridley's memo (24 Sep 2026), Ops outcome code list v3 (22 Sep 2026). The memo is later and overrides the extract where they disagree; everything else in section 4 stands.",
+  "Holidays taken from the memo (appendix C replacement): 2026-10-12, 2026-11-02, 2026-11-27, 2026-12-24, 2026-12-25, 2027-01-01.",
+  "Serious band persuasion attempts reduced from 2 to 1 per memo item 2; its deadline rule (3 calendar days, rolled forward to a business day) unchanged. Attempt 2 therefore only applies to the overdue band.",
+  "Callback window changed from 09:00-18:00 to 09:00-17:30 per memo item 3; still next business day only, never today.",
+  "Wrong-answer limit set to 3 per memo item 4 (the manual's 4 was a typo); matches the API summary.",
+  "After-record sentence replaced per memo item 5 by 'You will get a text message confirming this arrangement.'",
+  "Identity questions reduced to date_of_birth then phone_last4 per memo item 6 (postcode dropped for this campaign).",
+  "Opening sentence is only described in the brief (automated assistant, call is recorded), so it was written as '... and we record this call.'",
+  "The brief dictates 'Can you make this payment today?' as the first payment question; put in amounts.today_question.",
+  "The brief gives no rule for a human request during the identity check, so identity.human_request is null.",
+  "add_note is not used in this campaign and the brief never says a customer can be late on more than one product, so multi_product is disabled."
  ]
 }

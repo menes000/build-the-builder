@@ -1,0 +1,9 @@
+[    0.0s] start: at=2026-10-11T15:34:09+0300 label=brief-e
+[    0.0s] note: text=briefs=['../test-briefs/brief-e/brief.md'] openapi=../test-briefs/brief-e/openapi.json slot=brief-e model=claude-opus-5-5 budget_min=25
+[   94.2s] model_call: model=claude-opus-5-5 purpose=extract CallSpec from brief (attempt 1) seconds=94.0 cost_usd=0.5985737 tokens=None
+[   94.2s] note: text=extraction attempt 1: CallSpec valid (24939 bytes)
+[   94.3s] note: text=compiled 30 nodes -> /Users/doraalkan/Desktop/freya-hecaton/FREYA/out/brief-e.workflow.json
+[   95.3s] note: text=dryRun valid
+[   97.4s] created_on_freya: what=workflow steps=30 tools=10 slot=brief-e tag=v1 workflow_id=e4b37dbe-9914-4f44-a6c0-acfea7603b04 agent_id=c184cf70-af64-4c48-95d7-af97dd9502ae
+[   98.4s] note: text=exported /Users/doraalkan/Desktop/freya-hecaton/FREYA/submission/brief-e.workflow.json
+[   98.4s] end: at=2026-10-11T15:35:47+0300 total_seconds=98 workflow_id=e4b37dbe-9914-4f44-a6c0-acfea7603b04 agent_id=c184cf70-af64-4c48-95d7-af97dd9502ae export=/Users/doraalkan/Desktop/freya-hecaton/FREYA/submission/brief-e.workflow.json tests={}
