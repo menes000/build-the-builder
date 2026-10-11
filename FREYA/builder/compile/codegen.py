@@ -894,6 +894,7 @@ try:
             farewell = FAREWELLS.get('paid') or farewell
         else:
             first = ''
+            first_paid = False
             if CLOSE_BY_FIRST:
                 try:
                     facts0 = json.loads(str(vars.get('facts_json') or '[]'))
@@ -903,10 +904,7 @@ try:
                 nn = [n for n in notes if str(n.get('pid')) == pid0] or notes[:1]
                 first = str(nn[0].get('reason')) if nn else ''
                 if first == 'paid':
-                    outcome = PAID_OUTCOME
-                    reason = ''
-                    farewell = FAREWELLS.get('paid') or farewell
-                    first = ''
+                    first_paid = True
             reasons = [str(n.get('reason')) for n in notes if str(n.get('reason')) != 'paid'] if not first else [first]
             for r in REASON_PRIORITY:
                 if r in reasons:
@@ -914,9 +912,14 @@ try:
                     break
             if not first and reasons:
                 first = reasons[0]
-            outcome = NO_PROMISE_OUTCOME
-            reason = first
-            farewell = FAREWELLS.get('no_promise_' + first) or FAREWELLS.get('no_promise') or farewell
+            if first_paid:
+                outcome = PAID_OUTCOME
+                reason = ''
+                farewell = FAREWELLS.get('paid') or farewell
+            else:
+                outcome = NO_PROMISE_OUTCOME
+                reason = first
+                farewell = FAREWELLS.get('no_promise_' + first) or FAREWELLS.get('no_promise') or farewell
     name = (str(vars.get('title') or '') + ' ' + str(vars.get('last_name') or '')).strip()
     vars['outcome'] = outcome
     vars['reason'] = reason

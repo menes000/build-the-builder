@@ -158,3 +158,65 @@ def test_variants_from_brief_e(tmp_path):
     assert '"operand": 0' in json.dumps(svc)                                # no retry: the first failure closes
     assert "do not call it again" in wf["nodes"]["negotiate"]["task_message"]
     assert "CLOSE_BY_FIRST = True" in json.dumps(wf["nodes"]["decide_outcome"])
+
+
+def _decide(wf, notes, facts):
+    from conftest import run_hook
+    node = wf["nodes"]["decide_outcome"]
+    code = node.get("code") or node["pre_actions"][0]["function"]["parameters"]["properties"]["code"]["default"]
+    v = {"notes_json": json.dumps(notes), "facts_json": json.dumps(facts), "promises_json": "[]"}
+    run_hook(code, v)
+    return v["outcome"], v["reason"]
+
+
+def test_closing_by_first_product_behaviour(tmp_path):
+    """Review finding: with closing_by_first_product, a paid first product must close as paid (it was overwritten)."""
+    spec = json.loads((ROOT / "fixtures/callspec_brief_ab.json").read_text())
+    spec["multi_product"]["closing_by_first_product"] = True
+    f = tmp_path / "s.json"; f.write_text(json.dumps(spec))
+    wf, _ = build(str(f), str(ROOT / "kit/tools/openapi.json"))
+    facts = [{"pid": "p1"}, {"pid": "p2"}]
+    assert _decide(wf, [{"pid": "p1", "reason": "paid"}, {"pid": "p2", "reason": "refused"}], facts)[0] == "paid"
+    assert _decide(wf, [{"pid": "p2", "reason": "paid"}, {"pid": "p1", "reason": "dispute"}], facts) == ("no_promise", "dispute")
+
+
+def test_brief_b_closing_unchanged(wf_ab):
+    """Brief B: first non-paid product decides; all paid -> paid."""
+    facts = [{"pid": "p1"}, {"pid": "p2"}]
+    assert _decide(wf_ab, [{"pid": "p1", "reason": "paid"}, {"pid": "p2", "reason": "refused"}], facts) == ("no_promise", "refused")
+    assert _decide(wf_ab, [{"pid": "p1", "reason": "paid"}, {"pid": "p2", "reason": "paid"}], facts)[0] == "paid"
+
+
+def test_consistency_checks_do_not_lock():
+    """Review finding: every weekend value was rejected by one check or another; the A+B rule was a false alarm."""
+    from builder.extract.callspec import CallSpec
+    from builder.extract.tools import consistency_checks
+    ab = CallSpec.model_validate_json((ROOT / "fixtures/callspec_brief_ab.json").read_text())
+    assert consistency_checks(ab) == []
+    spec = json.loads((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    spec["dates"]["weekend_or_holiday_rule"] = "Offer both the last business day before it and the next business day after it; the customer chooses."
+    ok = []
+    for v in ("next_business_day", "previous_business_day", "both"):
+        spec["dates"]["weekend_named_offer"] = v
+        if not [e for e in consistency_checks(CallSpec.model_validate(spec)) if "weekend" in e]:
+            ok.append(v)
+    assert ok == ["both"]
+
+
+def test_extraction_never_crashes_on_lint(tmp_path, monkeypatch):
+    """Review finding: a lint problem on the last attempt crashed the build. Now the spec is kept with a warning."""
+    from builder.extract import extractor
+    from builder.trace import Trace
+    spec = json.loads((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    spec["amounts"]["floor_rule"] = "50 percent of the overdue amount"          # a consistency problem on every attempt
+    out = tmp_path / "cs.json"
+
+    async def fake_ask(prompt, out_path, cwd, model, trace, purpose):
+        out_path.write_text(json.dumps(spec))
+        return ""
+    monkeypatch.setattr(extractor, "_ask_claude", fake_ask)
+    brief = tmp_path / "b.md"; brief.write_text("brief")
+    tr = Trace(str(tmp_path), "t")
+    got = extractor.extract_callspec([str(brief)], str(out), tr, openapi_path=str(ROOT / "kit/tools/openapi.json"))
+    assert got.amounts.floor_rule.startswith("50 percent")
+    assert "WARNING kept as is" in tr.txt.read_text()

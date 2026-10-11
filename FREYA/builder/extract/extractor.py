@@ -84,6 +84,7 @@ def extract_callspec(brief_paths: list[str], out_path: str, trace, model: str | 
     )
     cwd = Path.cwd()
     errors = ""
+    best = None          # last schema-valid CallSpec: a lint problem must never cost the whole build
     for attempt in range(1 + max_retries):
         prompt = base_prompt if not errors else (
             base_prompt + f"\n\n## Your previous JSON was rejected by the schema validator\n{errors}\n"
@@ -100,14 +101,22 @@ def extract_callspec(brief_paths: list[str], out_path: str, trace, model: str | 
             errors = str(e)[:6000]
             trace.note(f"extraction attempt {attempt + 1}: schema errors: {errors[:300]}")
             continue
+        best = spec
         problems = []
         if openapi_path:
             from .tools import field_map, lint_spec, parse_openapi
             problems = lint_spec(spec, parse_openapi(openapi_path), field_map(openapi_path))
+        if problems and attempt == max_retries:
+            for pr in problems:
+                trace.note(f"extraction attempt {attempt + 1}: WARNING kept as is (last attempt): {pr[:200]}")
+            return spec
         if problems:
             errors = "The values below do not match the tool API (copy enum values exactly from the API file):\n- " + "\n- ".join(problems)
             trace.note(f"extraction attempt {attempt + 1}: {len(problems)} API mismatch(es): {problems[0][:200]}")
             continue
         trace.note(f"extraction attempt {attempt + 1}: CallSpec valid ({len(raw)} bytes)")
         return spec
+    if best is not None:
+        trace.note(f"extraction: last attempt was not usable, using the last schema-valid CallSpec ({errors[:200]})")
+        return best
     raise RuntimeError(f"CallSpec extraction failed after {1 + max_retries} attempts: {errors[:500]}")

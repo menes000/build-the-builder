@@ -235,14 +235,17 @@ def main(argv=None) -> int:
     # 5. export
     export_path = Path(a.export) if a.export else out_dir / f"{slot}.export.workflow.json"
     export_path.parent.mkdir(parents=True, exist_ok=True)
-    freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, deadline)
-    trace.note(f"exported {export_path}")
-    if a.local_test:
-        lt = local_test(out_dir / f"{slot}.callspec.json", export_path, out_dir / f"{slot}.localtest.json", a.openapi, slot, trace, deadline - time.time() - 30)
-        if lt and "passed" in lt:
-            results["local"] = {"passed": lt["passed"], "total": lt["total"]}
-    trace.end(workflow_id=ids["workflow_id"], agent_id=agent_id, export=str(export_path),
-              tests={k: (f"{v['passed']}/{v['total']}" if v else "failed") for k, v in results.items()})
+    try:
+        # the export is the submission file: it gets its own retry window (up to 8 minutes), whatever the test budget left
+        freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, time.time() + 480, tries=12)
+        trace.note(f"exported {export_path}")
+        if a.local_test:
+            lt = local_test(out_dir / f"{slot}.callspec.json", export_path, out_dir / f"{slot}.localtest.json", a.openapi, slot, trace, deadline - time.time() - 30)
+            if lt and "passed" in lt:
+                results["local"] = {"passed": lt["passed"], "total": lt["total"]}
+    finally:
+        trace.end(workflow_id=ids["workflow_id"], agent_id=agent_id, export=str(export_path) if export_path.exists() else "NOT WRITTEN",
+                  tests={k: (f"{v['passed']}/{v['total']}" if v else "failed") for k, v in results.items()})
     print(json.dumps({"workflow_id": ids["workflow_id"], "agent_id": agent_id, "export": str(export_path)}))
     return 0
 

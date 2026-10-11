@@ -192,7 +192,7 @@ def consistency_checks(spec) -> list[str]:
     if re.search(r"(immediately|right) after the name is confirmed.*say", it) and not spec.identity.intro_text:
         errs.append("a text rule dictates a sentence right after the name is confirmed but identity.intro_text is empty")
     mc = low(spec.multi_product.closing_rule)
-    if "first product" in mc and not spec.multi_product.closing_by_first_product:
+    if "first product" in mc and not re.search(r"not paid|non-paid|other than paid|isn't paid|is not noted paid", mc) and not spec.multi_product.closing_by_first_product:
         errs.append("multi_product.closing_rule follows the first product but closing_by_first_product is false")
     w2 = low(spec.dates.weekend_or_holiday_rule)
     if re.search(r"(both|before and after|before it and|choose)", w2) and spec.dates.weekend_named_offer != "both" and re.search(r"(after|next)", w2) and re.search(r"(before|previous)", w2):
@@ -204,7 +204,7 @@ def consistency_checks(spec) -> list[str]:
         if "business" in r and "calendar" not in r and b.deadline_business_days_after_today is None:
             errs.append(f"dates.bands[{b.name}].deadline_rule says business days but deadline_business_days_after_today is empty")
     w = low(spec.dates.weekend_or_holiday_rule)
-    if re.search(r"\b(before|previous|preceding|prior|earlier|back)\b", w) and "next" not in w.split("before")[0] and spec.dates.weekend_named_offer != "previous_business_day":
+    if re.search(r"\b(before|previous|preceding|prior|earlier|back)\b", w) and "next" not in w.split("before")[0] and spec.dates.weekend_named_offer == "next_business_day":
         errs.append("dates.weekend_or_holiday_rule moves the date backwards but weekend_named_offer is next_business_day")
     v = low(spec.dates.vague_period_rule)
     if re.search(r"attempt|first proposal|first offer|third business|next business day", v) and "deadline" not in v.replace("not the latest", "").replace("not the deadline", "") and spec.dates.vague_period_fallback != "attempt1":
