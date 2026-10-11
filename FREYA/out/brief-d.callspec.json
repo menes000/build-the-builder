@@ -28,6 +28,7 @@
  "turn_style": "one or two short sentences per turn",
  "opening": {
   "first_sentence": "This is Freya Bank's virtual assistant. This call is recorded for quality and training.",
+  "greetings": {},
   "ask_person_question": "Am I speaking with {{title}} {{last_name}}?",
   "confirmation_examples": [
    "Yes",
@@ -79,6 +80,7 @@
    "must_be_later_than_now": true,
    "ask_again_once_if_outside": true,
    "max_business_days_ahead": 2,
+   "day_mode": "computed",
    "calendar_days": false,
    "saturday_allowed": false
   },
@@ -124,6 +126,7 @@
   "intro_text": "",
   "ask_one_at_a_time": true,
   "max_wrong_total": 2,
+  "max_wrong_per_question": null,
   "retry_hints": [
    {
     "hint": "day_month_swapped",
@@ -250,6 +253,7 @@
   "floor_rule": "The floor is 50 percent of the overdue amount (past_due), rounded UP to the next whole pound, for every product type. minimum_payment and instalment_amount are NOT used in this campaign: do not quote them and do not use them as a floor.",
   "floor_offer_once": true,
   "floor_offer_text": "the remainder stays overdue",
+  "floor_mode": "computed",
   "today_question": "Are you able to clear this today?",
   "customer_amount_rule": "An amount the customer proposes between the floor and the full overdue amount, both inclusive, is accepted. Below the floor: say it cannot be recorded and offer the floor once; refusing it is a flat refusal. If the customer says the full amount is too much, offer the floor once and say the remainder stays overdue; refusing the floor is a flat refusal.",
   "extra_rules": [
@@ -266,6 +270,7 @@
   "attempt1_date_rule": "the third business day after today; if that is after the product's latest date, the latest date instead",
   "attempt1_date_kind": "business_days_after_today",
   "attempt1_business_days": 3,
+  "attempt1_mode": "computed",
   "attempt1_uses_full_amount": true,
   "attempt2_uses_floor_on_deadline": true,
   "stop_rule": "Never repeat an offer the customer has already turned down. When the attempts are used up (first band 2, second band 2, final band 1), stop and close no_promise / refused (add_note refused for the product).",
@@ -464,6 +469,7 @@
   "per_product_bands": true,
   "ask_today_for_all_once": true,
   "today_question_all": "Are you able to clear this today?",
+  "per_product_question_is_attempt1": true,
   "closing_by_first_product": false,
   "no_promise_reason_priority": [
    "dispute",
