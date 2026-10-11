@@ -148,7 +148,7 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
         t0 = time.time()
         asyncio.run(_ask_claude(prompt, out, out_dir.resolve(), model, trace,
                                 purpose=f"free-form: design the workflow from the case documents (round {rnd})", max_turns=40,
-                                timeout_s=15 * 60))
+                                timeout_s=25 * 60))
         if not out.exists():
             feedback = ["No workflow file was written to the output path."]
             trace.note(f"free-form round {rnd}: no file written ({time.time() - t0:.0f} s)")
