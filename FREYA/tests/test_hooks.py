@@ -91,3 +91,29 @@ def test_identity_hint_and_failure(wf_a):
     res = {"data": {"ok": True, "verified": False, "wrong_answers_left": 0}}
     run_hook(t["post_process_code"], v, result=res)
     assert res["data"]["id_state"] == "failed"
+
+
+def _close_call(wf):
+    return next(t for t in wf["tools"] if t["function"]["name"] == "close_call")
+
+
+def test_hangup_after_hardship_closes_as_hardship(wf_a):
+    """Customer hangs up before any closing node ran: the last known situation decides, not the baked default."""
+    t = _close_call(wf_a)
+    v = {"outcome": "no_promise", "reason": "refused", "situation": "hardship", "promises_json": "[]"}
+    e = run_hook(t["pre_process_code"], v, body={"outcome": "no_promise", "reason": "refused"})
+    assert e["config"]["body"] == {"outcome": "no_promise", "reason": "hardship"} and v["reason"] == "hardship"
+    v = {"outcome": "no_promise", "reason": "refused", "situation": "paid", "promises_json": "[]"}
+    e = run_hook(t["pre_process_code"], v, body={"outcome": "no_promise", "reason": "refused"})
+    assert e["config"]["body"] == {"outcome": "paid"}                      # Brief A: paid has no reason
+
+
+def test_hangup_keeps_decided_or_promised_outcome(wf_a):
+    t = _close_call(wf_a)
+    v = {"outcome": "no_promise", "reason": "refused", "situation": "hardship", "outcome_decided": "true"}
+    e = run_hook(t["pre_process_code"], v, body={"outcome": "no_promise", "reason": "refused"})
+    assert e["config"]["body"]["reason"] == "refused"                     # a closing node already decided
+    v = {"outcome": "promise", "reason": "", "situation": "hardship", "promises_json": '[{"pid": "p1"}]'}
+    e = run_hook(t["pre_process_code"], v, body={"outcome": "promise", "reason": ""})
+    assert e["config"]["body"] == {"outcome": "promise"}                   # promise wins; empty reason dropped
+    assert "outcome_decided" in json.dumps(wf_a["nodes"]["decide_outcome"])

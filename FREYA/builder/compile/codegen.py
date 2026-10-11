@@ -724,16 +724,34 @@ except Exception:
 '''
 
 
-def close_pre(spec: CallSpec) -> str:
+def close_pre(spec: CallSpec, hangup_map: dict | None = None) -> str:
+    """Runs when the call ends. If the customer hung up before a closing node ran (no decision, no promise,
+    no transfer), the last known situation (hardship/paid/dispute) picks outcome and reason from the goodbye table."""
     R = ((spec.field_map or {}).get("req", {}).get("close_call") or {})
-    return "NO_REASON = " + _lit(list(spec.closing.outcomes_without_reason)) + "\nR = " + _lit({k: R.get(k, k) for k in ("outcome", "reason")}) + r'''
+    return ("NO_REASON = " + _lit(list(spec.closing.outcomes_without_reason)) + "\nR = " + _lit({k: R.get(k, k) for k in ("outcome", "reason")})
+            + "\nHANGUP = " + _lit({k: list(v)[:2] for k, v in (hangup_map or {}).items() if k != 'default'}) + r'''
 try:
     b = config.get('body')
-    if isinstance(b, dict) and (b.get(R['outcome']) in NO_REASON or not b.get(R['reason'])):
-        b.pop(R['reason'], None)
+    if isinstance(b, dict):
+        decided = str(vars.get('outcome_decided') or '') == 'true'
+        promised = str(vars.get('promises_json') or '[]').strip() not in ('', '[]') or int(vars.get('create_promise_success_count') or 0) > 0
+        if not decided and not promised and not vars.get('transfer_queue'):
+            sit = str(vars.get('situation') or '').strip().lower()
+            if sit in HANGUP:
+                b[R['outcome']] = HANGUP[sit][0]
+                b[R['reason']] = HANGUP[sit][1]
+                vars['outcome'] = HANGUP[sit][0]
+                vars['reason'] = HANGUP[sit][1]
+        if b.get(R['outcome']) in NO_REASON or not b.get(R['reason']):
+            b.pop(R['reason'], None)
 except Exception:
-    pass
-'''
+    try:
+        b = config.get('body')
+        if isinstance(b, dict) and (b.get(R['outcome']) in NO_REASON or not b.get(R['reason'])):
+            b.pop(R['reason'], None)
+    except Exception:
+        pass
+''')
 
 
 # ----------------------------------------------------------------------------- closing
@@ -833,6 +851,7 @@ try:
     name = (str(vars.get('title') or '') + ' ' + str(vars.get('last_name') or '')).strip()
     vars['outcome'] = outcome
     vars['reason'] = reason
+    vars['outcome_decided'] = 'true'
     vars['farewell'] = farewell.replace(NAME_TOKEN, name) if name else farewell.replace(', ' + NAME_TOKEN, '').replace(NAME_TOKEN, '')
 except Exception:
     try:

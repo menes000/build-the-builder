@@ -217,11 +217,6 @@ def compile_workflow(spec: CallSpec) -> dict:
             required=[tb.rq("add_note", "product_id"), tb.rq("add_note", "reason")], pre=codegen.note_pre(spec, reasons), post=codegen.note_post(spec),
             mapping=[("data.note_state", "note_state"), ("data.all_products_done", "all_products_done")])
 
-    close_call = tb.api_tool(
-        "close_call", "close_call", "Record how the call ended.",
-        {tb.rq("close_call", "outcome"): {"type": "string", "default": "{{outcome}}"}, tb.rq("close_call", "reason"): {"type": "string", "default": "{{reason}}"}},
-        required=[tb.rq("close_call", "outcome")], pre=codegen.close_pre(spec), lifecycle="end_of_call")
-
     # ---- closing nodes: hint (outcome, reason, farewell); decide_outcome may override
     name_tok = "NAME"
     thanks = f"Thank you for your time, {name_tok}. Goodbye."
@@ -436,6 +431,10 @@ def compile_workflow(spec: CallSpec) -> dict:
         "default": list(closes["close_refused"]),
     }
     nodes["close_on_goodbye"] = code_node("close_on_goodbye", codegen.close_on_goodbye_code(goodbye_map), "decide_outcome")
+    close_call = tb.api_tool(       # lifecycle tool: runs at the end of every call, also after a hang-up
+        "close_call", "close_call", "Record how the call ended.",
+        {tb.rq("close_call", "outcome"): {"type": "string", "default": "{{outcome}}"}, tb.rq("close_call", "reason"): {"type": "string", "default": "{{reason}}"}},
+        required=[tb.rq("close_call", "outcome")], pre=codegen.close_pre(spec, goodbye_map), lifecycle="end_of_call")
     transfer_map = {
         hs.offer_queue: list(closes[f"close_xfer_{hs.offer_queue}"]),
         sp.restructuring.queue: list(closes[f"close_xfer_{sp.restructuring.queue}"]),
