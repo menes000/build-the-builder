@@ -1,0 +1,3 @@
+[    0.0s] start: at=2026-10-11T14:59:18+0300 label=brief-e-reextract
+[   99.6s] model_call: model=claude-opus-5-5 purpose=extract CallSpec from brief (attempt 1) seconds=99.4 cost_usd=0.6236590000000001 tokens=None
+[   99.6s] note: text=extraction attempt 1: 1 API mismatch(es): dates.weekend_or_holiday_rule moves the date backwards but weekend_named_offer is next_business_day
