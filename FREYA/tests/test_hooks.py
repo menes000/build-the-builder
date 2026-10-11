@@ -231,9 +231,11 @@ def test_one_product_call_never_writes_a_note(wf_ab):
     """Multi-agent check 17:20, PUB-08: a one-product customer said 'already paid' and the model called add_note."""
     t = tool(wf_ab, "negotiate", "add_note")
     v = {"facts_json": json.dumps(FACTS_1), "promises_json": "[]"}
-    e = run_hook(t["pre_process_code"], v, body={"product_id": "p1", "reason": "paid"})
-    assert e["config"]["body"]["product_id"] == "REJECTED"                  # the bank refuses it: nothing in the ledger
-    res = {"data": {"ok": False, "error": "unknown product"}, "header": {}}
+    cfg = {"url": "https://bank/v1/add_note", "method": "POST", "body": {"customer_id": "c1", "product_id": "p1", "reason": "paid"}}
+    env = {"vars": v, "config": cfg}
+    exec(compile(t["pre_process_code"], "<pre>", "exec"), env)
+    assert cfg["url"].endswith("/get_account") and cfg["body"] == {"customer_id": "c1"}   # never reaches add_note
+    res = {"data": {"ok": True, "products": []}, "header": {}}
     run_hook(t["post_process_code"], v, result=res)
     assert res["data"]["note_state"] == "not_needed" and "transition_to_close_paid" in res["data"]["what_to_do_next"]
     assert "notes_json" not in v

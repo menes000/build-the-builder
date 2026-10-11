@@ -598,9 +598,9 @@ except Exception:
 '''
 
 
-def note_pre(spec: CallSpec, reasons: list[str]) -> str:
+def note_pre(spec: CallSpec, reasons: list[str], carrier_url: str = "") -> str:
     R = ((spec.field_map or {}).get("req", {}).get("add_note") or {})
-    return "REASONS = " + _lit(reasons) + "\nR = " + _lit({k: R.get(k, k) for k in ("product_id", "reason")}) + r'''
+    return "REASONS = " + _lit(reasons) + "\nCARRIER_URL = " + _lit(carrier_url) + "\nR = " + _lit({k: R.get(k, k) for k in ("product_id", "reason")}) + r'''
 import json
 try:
     b = config.get('body')
@@ -637,7 +637,13 @@ try:
             vars['note_precheck'] = 'ok' if ok else 'rejected'
         except Exception:
             pass
-        if not ok:
+        if single and CARRIER_URL:
+            # one product: the bank must not record a note at all (it records even an unknown product id), so the
+            # request is sent to the read-only account endpoint instead; the post-hook answers with what to do
+            config['url'] = CARRIER_URL
+            cid = b.get('customer_id')
+            config['body'] = {'customer_id': cid} if cid else {}
+        elif not ok:
             b[R['product_id']] = 'REJECTED'
 except Exception:
     pass
@@ -664,7 +670,14 @@ try:
             facts = []
         if len(facts) == 1:
             pid = facts[0]['pid']
-        if str(d.get(F['ok'])).lower() == 'true':
+        if str(vars.get('note_single') or '') == 'yes':
+            result['data'] = d = {'ok': True, 'note_state': 'not_needed',
+                 'what_to_do_next': ('No note is written on a call with only one product. Do not call add_note again. '
+                                     'Call the transition_to_close_... tool that matches the situation now: '
+                                     + (('transition_to_close_' + reason) if reason else 'the matching one') + ' if it exists'
+                                     + ' (already paid -> close_paid, not my debt -> close_dispute, attempts used up -> close_refused, '
+                                     'difficult circumstances -> close_hardship, the promise service failed -> close_service_error).')}
+        elif str(d.get(F['ok'])).lower() == 'true':
             try:
                 notes = json.loads(str(vars.get('notes_json') or '[]'))
             except Exception:

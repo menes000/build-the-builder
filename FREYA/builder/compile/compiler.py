@@ -242,7 +242,7 @@ def compile_workflow(spec: CallSpec) -> dict:
             "Record why ONE product ends without a promise. CALL it once for each product that gets no promise, with that product_id and the reason.",
             {tb.rq("add_note", "product_id"): tb.model_field("add_note", tb.rq("add_note", "product_id"), desc_override="product_id from ACCOUNT, e.g. p2. Copy it exactly."),
              tb.rq("add_note", "reason"): {"type": "string", "enum": reasons, "default": "{{note_reason}}", "description": "One of: " + ", ".join(reasons)}},
-            required=[tb.rq("add_note", "product_id"), tb.rq("add_note", "reason")], pre=codegen.note_pre(spec, reasons), post=codegen.note_post(spec),
+            required=[tb.rq("add_note", "product_id"), tb.rq("add_note", "reason")], pre=codegen.note_pre(spec, reasons, tb.url("get_account")), post=codegen.note_post(spec),
             mapping=[("data.note_state", "note_state"), ("data.all_products_done", "all_products_done")])
 
     # ---- closing nodes: hint (outcome, reason, farewell); decide_outcome may override
