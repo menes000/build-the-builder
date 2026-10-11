@@ -88,12 +88,12 @@ def _brief_text(brief_paths: list[str]) -> str:
     return "".join(parts)
 
 
-async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace, purpose: str) -> str:
+async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace, purpose: str, max_turns: int = 12) -> str:
     from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, query
 
     options = ClaudeAgentOptions(
         cwd=str(cwd), model=model,
-        allowed_tools=["Read", "Write"], permission_mode="dontAsk", max_turns=12,
+        allowed_tools=["Read", "Write"], permission_mode="dontAsk", max_turns=max_turns,
         setting_sources=[],
     )
     t0 = time.time()

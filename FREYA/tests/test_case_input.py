@@ -74,3 +74,19 @@ def test_docx_and_xlsx_become_text_without_pandoc(tmp_path):
     text = _brief_text([str(docx), str(xlsx)])
     assert "Kural bir" in text and "Rule & two" in text
     assert "sheet: customers" in text and "c1 | Ayşe" in text
+
+
+def test_free_form_is_chosen_only_without_the_collections_tools():
+    from builder.freeform import template_fits
+    assert template_fits({t.name for t in parse_openapi(KIT_API)})
+    assert not template_fits({"cards.list", "cards.balance", "contact.email.get"})
+
+
+def test_free_form_check_catches_foreign_urls_and_bad_code():
+    from builder.freeform import check_workflow
+    wf = json.loads((KIT_API.parent.parent / "examples" / "base-agent.json").read_text())
+    wf = wf.get("workflow", wf)
+    urls = {t.url for t in parse_openapi(KIT_API)}
+    assert not [p for p in check_workflow(wf, urls) if "not an endpoint" in p]
+    other = {u.replace("https://", "https://other.") for u in urls}
+    assert [p for p in check_workflow(wf, other) if "not an endpoint" in p]

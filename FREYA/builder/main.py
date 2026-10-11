@@ -170,6 +170,28 @@ def main(argv=None) -> int:
 
     import freya  # the kit's client
 
+    # 0. a call the CallSpec template does not model (its tools are missing from the API): Claude designs the workflow
+    from .freeform import TEMPLATE_TOOLS, build_freeform, template_fits
+    api_tools = parse_openapi(a.openapi, base_url=a.mock_url)
+    if not a.spec and not template_fits({t.name for t in api_tools}):
+        trace.note(f"tool API has {sorted(t.name for t in api_tools)}; the collections template needs {sorted(TEMPLATE_TOOLS)} -> free-form build")
+        wf = build_freeform(a.briefs, a.openapi, api_tools, out_dir, slot, trace, a.model,
+                            validate=lambda w: freya_retry(lambda: freya.validate_workflow(f"{slot} dryrun", w), "dryRun", trace, deadline))
+        wf_path = out_dir / f"{slot}.workflow.json"
+        wf_path.write_text(json.dumps(wf, indent=1, ensure_ascii=False))
+        trace.note(f"free-form workflow: {len(wf['nodes'])} nodes -> {wf_path}")
+        ids = freya_retry(lambda: freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json")), "save", trace, deadline)
+        trace.created("workflow", wf, slot=slot, tag="free-form", **ids)
+        export_path = Path(a.export) if a.export else out_dir / f"{slot}.export.workflow.json"
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, time.time() + 480, tries=12)
+            trace.note(f"exported {export_path}")
+        finally:
+            trace.end(workflow_id=ids["workflow_id"], agent_id=ids["agent_id"], export=str(export_path) if export_path.exists() else "NOT WRITTEN", mode="free-form")
+        print(json.dumps({"workflow_id": ids["workflow_id"], "agent_id": ids["agent_id"], "export": str(export_path)}))
+        return 0
+
     # 1. extract
     if a.spec:
         spec = CallSpec.model_validate_json(Path(a.spec).read_text())
