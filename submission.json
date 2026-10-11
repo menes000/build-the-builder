@@ -1,0 +1,13 @@
+{
+  "team": "TAKIM_ADI",
+  "members": [
+    { "name": "Dora AD SOYAD", "email": "doraalkan@yahoo.com" },
+    { "name": "AD SOYAD", "email": "EMAIL" }
+  ],
+  "repo": "https://github.com/menes000/freya-hecaton",
+  "commit": "9e7aa77",
+  "run_command": "cd FREYA && python3 builder/build.py {case_folder} https://freya-mock.freya-hecaton.workers.dev --no-local-test",
+  "workflow": "FREYA/submission/case.workflow.json",
+  "trace": "FREYA/traces/final.log",
+  "mock_url": "https://freya-mock.freya-hecaton.workers.dev"
+}
