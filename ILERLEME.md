@@ -126,6 +126,18 @@ Sonuç: emülatör 28 vakanın 26'sında Freya ile aynı karar (2 farkın biri j
 | 7 | BYE listesi "Bye!" kaçırıyor | Regex oldu. |
 | 8 | Emülatör route() deterministiği her zaman önce almıyor | **Reddedildi.** Freya `route_evaluated` kaydı (OUR-01, 20:30): `opening`'de listede önce gelen intent (t4 → close_unclear) sonraki `always`'ten (t5 → opening_retry_1) önce eşleşti. Emülatör liste sırasını uyguluyor, Freya ile aynı. |
 
+## OUR-24 yan yana: lokal (Gemini ajan) vs Freya (experimental-5), v15 (11 Eki 00:20–00:40)
+| | Lokal 2 rep | Freya 2 rep (sim `b9951724`) |
+|---|---|---|
+| Sonuç | PASS, PASS | PASS, PASS |
+| Node yolu | setup > opening > security > load_account > account_facts > negotiate > **after_promise** > close_promise > decide_outcome > goodbye | birebir aynı |
+| Söz sonrası | "Your promise is recorded. You will receive a text message... Is there anything else?" | aynı cümle (TTS, hook'tan) |
+| "Cuma'ya alalım" | "A recorded promise cannot be changed or cancelled in the same call; they can change it in the mobile app. Is there anything else?" | kelimesi kelimesine aynı |
+| `create_promise` | 1 | 1 (v12'de 3–4'tü, düzeldi) |
+| Fark | Gemini doğum tarihinden sonra "That's correct" ekliyor; read-back cümle kalıbı az farklı | Freya run 1 929 sn sürdü (platform yavaş), run 2 80 sn |
+Sonuç: v15 `after_promise` node'u model farkını kapattı; experimental-5 artık kayıtlı ürün için tool'u tekrar çağırmıyor. Lokal ile Freya aynı kararları verdi. Judge artık `gpt-5.4-mini` (lokal) vs Freya judge: ikisi de PASS.
+- Not: ilk deneme 00:15'te ağ hatasıyla (DNS) başlamadan düştü; bilgisayar uyumuş olabilir. Uzun koşularda uyku kapalı olmalı.
+
 ## v15 lokal regresyon (10 Eki 23:10, kredi yüklendi, thinking low)
 | Vaka | Lokal v15 2 rep | Not |
 |---|---|---|
