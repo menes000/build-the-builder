@@ -80,6 +80,14 @@ The run prints `{"workflow_id", "agent_id", "export"}` at the end.
 
 Options: `--budget-min 25` (tests and fix rounds are skipped once the budget is spent), `--fix-rounds 1`, `--style <pieces|corrects|talkative|asks_back|in_words>`, `--model claude-opus-5-5`, `--spec file.json` (skip extraction, developer use), `--cases file.json`.
 
+## How it works, as a page
+
+`docs/workflow-map.html` explains the whole system for a newcomer (big picture, the builder's steps, how one call flows with a worked example, the engine's turn loop, a glossary) and draws the real node graph from a compiled workflow. Regenerate after a compiler change:
+
+```bash
+python3 tools/workflow_map.py out/brief-a.workflow.json docs/workflow-map.html
+```
+
 ## Layout
 
 ```
@@ -100,6 +108,7 @@ builder/
   test/scan.py            scans every call of a run for loops, silence, platform errors, invalid close_call
   extract/prompts/fix_callspec.md   the revision instructions
   build_from_spec.py      compile a CallSpec file without extraction (developer tool)
+tools/workflow_map.py     the explanatory page generator -> docs/workflow-map.html
 kit/                      the organisers' starter kit, unchanged
 fixtures/                 hand-written CallSpecs, the example builder's output, Claude's extractions
 results/, out/, traces/   run artefacts
