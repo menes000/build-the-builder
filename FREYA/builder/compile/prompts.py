@@ -100,7 +100,8 @@ def security_task(spec: CallSpec, after_explanation: bool = False) -> str:
         f"Ask {len(idn.questions)} security questions, {'one at a time' if idn.ask_one_at_a_time else 'together'}, in this order:",
         qs,
         "- Each time the customer gives a complete answer, call verify_identity with that field and the converted answer. Convert spoken dates and numbers yourself.",
-        "- If the customer gives only part of an answer, ask for the rest before calling the tool.",
+        "- A complete answer followed by an unfinished sentence (for example '21 July 1990. This is') is still a complete answer: call verify_identity at once, do not wait for the rest and do not repeat the question.",
+        "- Only when the answer itself is missing a part (no year, fewer than four digits), ask for the missing part before calling the tool.",
         "- If the customer corrects themselves, use the corrected value.",
         "- After each result, follow what_to_do_next.",
         (f"- You have just explained once why the questions are needed and asked again. If the customer refuses again{', or asks again what the call is about' if idn.decline.asking_purpose_counts_as_decline else ''}, or says again that they do not want to talk, call transition_to_close_declined. Do not explain a second time."
