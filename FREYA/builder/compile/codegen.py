@@ -1030,6 +1030,14 @@ try:
     vars['refusal_instruction'] = instr
     vars['refusal_state'] = state
     vars['refusal_attempt'] = n
+    # the model sometimes calls note_refusal twice in one message (one per product); the hooks then run pre, pre, post, post.
+    # A queue keeps each answer with its own call: the post-hook takes the oldest entry.
+    try:
+        q = json.loads(str(vars.get('refusal_queue') or '[]'))
+    except Exception:
+        q = []
+    q.append({'i': instr, 's': state, 'n': n})
+    vars['refusal_queue'] = json.dumps(q)
 except Exception as e:
     try:
         vars['refusal_instruction'] = 'Continue with your rules.'
@@ -1041,14 +1049,25 @@ except Exception as e:
 
 def refusal_post(spec: CallSpec) -> str:
     return r'''
+import json
 try:
     if isinstance(result, dict):
         result.pop('header', None)
+        entry = None
+        try:
+            q = json.loads(str(vars.get('refusal_queue') or '[]'))
+            if q:
+                entry = q.pop(0)
+                vars['refusal_queue'] = json.dumps(q)
+        except Exception:
+            entry = None
+        if not isinstance(entry, dict):
+            entry = {'i': vars.get('refusal_instruction'), 's': vars.get('refusal_state'), 'n': vars.get('refusal_attempt')}
         result['data'] = {
             'ok': True,
-            'attempt': vars.get('refusal_attempt'),
-            'refusal_state': str(vars.get('refusal_state') or 'continue'),
-            'what_to_do_next': str(vars.get('refusal_instruction') or 'Continue with your rules.'),
+            'attempt': entry.get('n'),
+            'refusal_state': str(entry.get('s') or 'continue'),
+            'what_to_do_next': str(entry.get('i') or 'Continue with your rules.'),
         }
         result['message'] = 'refusal noted'
 except Exception:

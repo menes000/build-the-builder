@@ -179,3 +179,16 @@ def test_layer3_automatic_switch():
                                   "third_party.callback.day_rule allows the business day after the next one but max_business_days_ahead is 1"])
     assert got == ["amounts.floor_mode", "third_party.callback.day_mode"]
     assert spec.amounts.floor_mode == "text" and spec.third_party.callback.day_mode == "text"
+
+
+def test_parallel_refusals_keep_their_own_answer(wf_ab):
+    """Final regression PUB-12: two note_refusal calls in one message (pre, pre, post, post) both answered 'car loan'."""
+    t = tool(wf_ab, "negotiate", "note_refusal")
+    v = {"facts_json": json.dumps(FACTS_2)}
+    run_hook(t["pre_process_code"], v, body={"product_id": "p1", "amount_too_much": "false", "customer_id": "c"})
+    run_hook(t["pre_process_code"], v, body={"product_id": "p3", "amount_too_much": "false", "customer_id": "c"})
+    r1 = {"data": {}, "header": {}}; run_hook(t["post_process_code"], v, result=r1)
+    r2 = {"data": {}, "header": {}}; run_hook(t["post_process_code"], v, result=r2)
+    assert "credit card" in r1["data"]["what_to_do_next"] and "car loan" in r2["data"]["what_to_do_next"]
+    r3 = {"data": {}, "header": {}}; run_hook(t["post_process_code"], v, result=r3)   # nothing queued: falls back, no crash
+    assert r3["data"]["what_to_do_next"]
