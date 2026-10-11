@@ -166,7 +166,7 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
     for attempt in (1, 2):
         asyncio.run(_ask_claude(PLAN_INSTRUCTIONS.replace("{plan}", str(plan)) + api_block + "\n\n## The case files" + _case_text(brief_paths) + "\n",
                                 plan, out_dir.resolve(), model, trace, purpose=f"free-form: write the agent's design from the case documents (attempt {attempt})",
-                                max_turns=20, timeout_s=20 * 60))
+                                max_turns=20))
         if plan.exists() and len(plan.read_text().strip()) >= 500:
             break
     if not plan.exists() or len(plan.read_text().strip()) < 500:
@@ -188,8 +188,7 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
             + "\n## Problems to fix\n- " + "\n- ".join(feedback) + f"\n\nFix every problem and write the complete corrected workflow again to {out}.")
         t0 = time.time()
         asyncio.run(_ask_claude(prompt, out, out_dir.resolve(), model, trace,
-                                purpose=f"free-form: write the workflow JSON from the design (round {rnd})", max_turns=40,
-                                timeout_s=25 * 60))
+                                purpose=f"free-form: write the workflow JSON from the design (round {rnd})", max_turns=40))
         if not out.exists():
             feedback = ["No workflow file was written to the output path."]
             trace.note(f"free-form round {rnd}: no file written ({time.time() - t0:.0f} s)")
