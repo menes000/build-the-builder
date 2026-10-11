@@ -119,3 +119,20 @@ def test_band_needs_exactly_one_deadline_number(tmp_path):
     with pytest.raises(Exception) as e:
         build(str(f), str(ROOT / "kit/tools/openapi.json"))
     assert "exactly one of" in str(e.value)
+
+
+def test_consistency_checks_flag_text_without_field():
+    """Layer 2: a text rule that names a variant without its structured field is reported to the extractor."""
+    from builder.extract.callspec import CallSpec
+    from builder.extract.tools import consistency_checks
+    spec = json.loads((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    assert consistency_checks(CallSpec.model_validate(spec)) == []
+    spec["amounts"]["floor_rule"] = "50 percent of the overdue amount, rounded up"
+    spec["dates"]["weekend_or_holiday_rule"] = "offer the last business day before it"
+    spec["dates"]["vague_period_rule"] = "ask once for the exact day; if none, propose the attempt-1 date, not the latest date"
+    spec["third_party"]["callback"]["day_rule"] = "never today; the next business day or the one after that"
+    spec["confirm"]["extra_rules"] = ["If create_promise fails, retry twice before giving up."]
+    errs = consistency_checks(CallSpec.model_validate(spec))
+    assert len(errs) == 5, errs
+    for key in ("floor_percent", "weekend_named_offer", "vague_period_fallback", "max_business_days_ahead", "max_tries_on_failure"):
+        assert any(key in e for e in errs), key

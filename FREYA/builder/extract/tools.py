@@ -176,8 +176,48 @@ def resp_name(fm: dict, tool: str, canon: str) -> str:
 
 
 # ----------------------------------------------------------------------------- CallSpec vs tool API
+def consistency_checks(spec) -> list[str]:
+    """A rule written in a text field must also be in its structured field, or the code computes one thing while the
+    prompt says another. Cheap word checks on the text fields; each hit is an error the extractor must resolve."""
+    import re
+    errs = []
+    low = lambda t: (t or "").lower()
+    fl = low(spec.amounts.floor_rule) + " " + " ".join(low(x) for x in spec.amounts.extra_rules)
+    if re.search(r"\b\d+(\.\d+)?\s*(%|percent|per cent)", fl) and not any(p.floor_percent for p in spec.products):
+        errs.append("amounts.floor_rule speaks of a percentage but no product has floor_percent: set products[].floor_percent (and floor_field = past_due)")
+    for b in spec.dates.bands:
+        r = low(b.deadline_rule)
+        if "calendar" in r and b.deadline_calendar_days_after_today is None:
+            errs.append(f"dates.bands[{b.name}].deadline_rule says calendar days but deadline_calendar_days_after_today is empty")
+        if "business" in r and "calendar" not in r and b.deadline_business_days_after_today is None:
+            errs.append(f"dates.bands[{b.name}].deadline_rule says business days but deadline_business_days_after_today is empty")
+    w = low(spec.dates.weekend_or_holiday_rule)
+    if re.search(r"\b(before|previous|preceding|prior|earlier|back)\b", w) and "next" not in w.split("before")[0] and spec.dates.weekend_named_offer != "previous_business_day":
+        errs.append("dates.weekend_or_holiday_rule moves the date backwards but weekend_named_offer is next_business_day")
+    v = low(spec.dates.vague_period_rule)
+    if re.search(r"attempt|first proposal|first offer|third business|next business day", v) and "deadline" not in v.replace("not the latest", "").replace("not the deadline", "") and spec.dates.vague_period_fallback != "attempt1":
+        errs.append("dates.vague_period_rule falls back to the attempt-1 date but vague_period_fallback is deadline")
+    c = " ".join(low(x) for x in spec.confirm.extra_rules) + " " + " ".join(low(x) for x in spec.global_extra_rules)
+    if re.search(r"\b(twice|two more|three (tries|times|attempts)|3 (tries|times|attempts)|retry twice|up to 3)\b", c) and spec.confirm.max_tries_on_failure <= 2:
+        errs.append("a text rule allows more than one retry of create_promise but confirm.max_tries_on_failure is 2")
+    cb = low(spec.third_party.callback.day_rule)
+    if re.search(r"after that|the one after|following business day|two business days|day after next", cb) and spec.third_party.callback.max_business_days_ahead < 2:
+        errs.append("third_party.callback.day_rule allows the business day after the next one but max_business_days_ahead is 1")
+    d = " ".join(low(x) for x in spec.identity.extra_rules) + " " + low(spec.identity.decline.explain_once_text)
+    if re.search(r"(first time|at once|immediately|straight away|without (an )?explanation|no explanation)", d) and re.search(r"(close|end the call|hang up)", d) and spec.identity.decline.explain_first:
+        errs.append("identity text says the first refusal closes the call but decline.explain_first is true")
+    q = low(spec.amounts.today_question) + " ".join(low(x) for x in spec.amounts.extra_rules + spec.persuasion.extra_rules)
+    if re.search(r"(asked|say|ask) (exactly|verbatim|once for all products.*:)", q) and not spec.amounts.today_question and not spec.multi_product.today_question_all:
+        errs.append("a text rule quotes the exact 'pay today' question but amounts.today_question / multi_product.today_question_all are empty")
+    m = low(spec.multi_product.closing_rule) + " ".join(low(x) for x in spec.multi_product.extra_rules)
+    if re.search(r"priorit|takes precedence|over (hardship|refused|service)|>", m) and not spec.multi_product.no_promise_reason_priority:
+        errs.append("multi_product text ranks the note reasons but no_promise_reason_priority is empty")
+    return errs
+
+
 def lint_spec(spec, tools: list[Tool], fm: dict) -> list[str]:
-    """Values the CallSpec sends to the bank must exist in the tool API's enums. Returns problems (empty = fine)."""
+    """Values the CallSpec sends to the bank must exist in the tool API's enums, and text rules must agree with the
+    structured fields. Returns problems (empty = fine)."""
     by = {t.name: t for t in tools}
 
     def enum_of(tool: str, canon: str) -> list[str]:
@@ -228,4 +268,5 @@ def lint_spec(spec, tools: list[Tool], fm: dict) -> list[str]:
         for r in spec.multi_product.note_reasons:
             if r not in reasons:
                 errs.append(f"multi_product.note_reasons: '{r}' is not in add_note.reason enum {reasons}")
+    errs += consistency_checks(spec)
     return errs
