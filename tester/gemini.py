@@ -89,3 +89,10 @@ def generate(system, history, json_mode=False, model=MODEL, temperature=None, th
             last = RuntimeError(f"Gemini connection: {e}")
         time.sleep(2 * (attempt + 1))
     raise last
+
+
+# LLM_BACKEND=claude: the same calls go to Claude through the logged-in `claude` CLI (tester/claude_cli.py), for runs without Gemini credit.
+if os.environ.get("LLM_BACKEND") == "claude":
+    import claude_cli
+    MODEL, USAGE = claude_cli.MODEL, claude_cli.USAGE
+    call, generate, usage_line = claude_cli.call, claude_cli.generate, claude_cli.usage_line

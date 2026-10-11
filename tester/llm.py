@@ -20,6 +20,7 @@ CACHED_KINDS = set(os.environ.get("LLM_CACHE_KINDS", "extract").split(","))   # 
 
 
 def provider(kind):
+    if os.environ.get("LLM_BACKEND") == "claude": return "gemini"      # gemini.py routes to Claude then
     env = os.environ.get(f"{kind.upper()}_PROVIDER")
     if env: return env
     if kind in ("extract", "judge") and os.environ.get("OPENAI_API_KEY"): return "openai"

@@ -26,6 +26,7 @@ Options:
     --spec PATH        skip extraction, start from this CallSpec (development)
     --name NAME        slot and output name (default: the brief's folder or file name)
     --model NAME       Claude model for extraction and fixes (default claude-opus-5-5)
+    --claude-test      run the local test on the Claude subscription (claude CLI, Haiku) instead of Gemini; without it: Gemini
 
 Needs: FREYA_API_KEY (+ FREYA_WORKSPACE_ID), a Claude login or ANTHROPIC_API_KEY, GEMINI_API_KEY for the local test,
 OPENAI_API_KEY optional (cross-check and judge; Gemini otherwise). Without GEMINI_API_KEY steps 5-6 are skipped and v1 is submitted.
@@ -103,6 +104,17 @@ def flat(o, p=""):
             out.update(flat(v, f"{p}[{i}]"))
         return out
     return {p: o}
+
+
+def save(path: Path, data) -> Path:
+    """Every hand-over in the loop is kept as a file in the run folder (what was sent, what came back, what was decided)."""
+    path.write_text(json.dumps(data, indent=1, ensure_ascii=False, default=str))
+    return path
+
+
+def new_notes(old: CallSpec, new: CallSpec) -> list[str]:
+    """The source_notes the model added: its own account of what it changed or kept, and why."""
+    return [n for n in new.source_notes if n not in set(old.source_notes)]
 
 
 def spec_changes(old: CallSpec, new: CallSpec) -> list[str]:
@@ -305,9 +317,14 @@ def main(argv=None) -> int:
     ap.add_argument("--no-test", action="store_true")
     ap.add_argument("--no-publish", action="store_true")
     ap.add_argument("--spec")
+    ap.add_argument("--claude-test", action="store_true", help="local test on the Claude subscription (claude CLI) instead of Gemini")
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     a = ap.parse_args(argv)
 
+    if a.claude_test:
+        os.environ["LLM_BACKEND"] = "claude"             # read by tester/gemini.py and tester/llm.py in the test subprocesses
+    else:
+        os.environ.pop("LLM_BACKEND", None)              # default: Gemini, even if the shell has LLM_BACKEND set
     name = a.name or name_of(a.brief)
     briefs = expand_briefs([a.brief])
     openapi = str(Path(a.openapi).resolve())
@@ -317,7 +334,7 @@ def main(argv=None) -> int:
     export = ROOT / "submission" / f"{name}.workflow.json"
     trace = Trace(str(ROOT / "traces"), label=name)
     trace.note(f"main.py brief={a.brief} files={len(briefs)} openapi={a.openapi} name={name} model={a.model} budget_min={a.budget_min} "
-               f"fix_rounds={a.fix_rounds} reps={a.reps} work={work}")
+               f"fix_rounds={a.fix_rounds} reps={a.reps} test_model={'claude subscription' if a.claude_test else 'gemini'} work={work}")
 
     # 1. extract
     if a.spec:
@@ -335,11 +352,15 @@ def main(argv=None) -> int:
             (work / "crosscheck.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False))
             trace.note(f"cross-check: {len(rows)} disagreement(s)" + "".join(f"\n    {p}: {json.dumps(x, ensure_ascii=False)[:70]} | {json.dumps(y, ensure_ascii=False)[:70]}" for p, x, y, _ in rows))
             if rows:
+                save(work / "recheck.request.json", {"disagreements": [{"field": p, "callspec": x, "second_reader": y, "source": s} for p, x, y, s in rows]})
                 new = recheck(spec, rows, briefs, openapi, work / "callspec.v1.json", trace, a.model)
                 if new is not None:
                     changes = spec_changes(spec, new)
+                    save(work / "recheck.result.json", {"accepted": True, "changes": changes, "notes": new_notes(spec, new)})
                     trace.note(f"cross-check: re-read changed {len(changes)} field(s)" + "".join(f"\n    {c}" for c in changes))
                     spec = new
+                else:
+                    save(work / "recheck.result.json", {"accepted": False, "changes": [], "notes": []})
         except Exception as e:                                   # the cross-check must never cost the run its agent
             trace.note(f"cross-check skipped: {type(e).__name__}: {str(e)[:200]}")
     spec_path = work / "callspec.json"
@@ -353,9 +374,9 @@ def main(argv=None) -> int:
         ids = publish(wf, name, export, trace, budget, "v1")
 
     # 5. local test
-    test_on = not a.no_test and bool(os.environ.get("GEMINI_API_KEY"))
+    test_on = not a.no_test and bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("LLM_BACKEND") == "claude")
     if not a.no_test and not test_on:
-        trace.note("local test skipped: GEMINI_API_KEY not set")
+        trace.note("local test skipped: neither GEMINI_API_KEY nor LLM_BACKEND=claude is set")
     cases = None
     if test_on and budget.allows(6 * 60):
         cases = make_cases(spec_path, openapi, work / "cases.json", re.sub(r"\W", "", name.upper())[:6] or "T", trace)
@@ -380,10 +401,14 @@ def main(argv=None) -> int:
                 trace.note(f"fix {rnd}: {int(budget.left())} s left, a fix and a retest need ~{last + 180} s; keeping {best['tag']}")
                 break
             tag = f"fix{rnd}"
+            save(work / f"{tag}.request.json", {"from": best["tag"], "failures": fails})
+            trace.note(f"{tag}: sending {len(fails)} failed customer(s) to Claude ({', '.join(f['id'] for f in fails)})")
             new = propose_fix(best["spec"], fails, briefs, str(work / f"callspec.{tag}.json"), trace, model=a.model)
             if new is None:
+                save(work / f"{tag}.result.json", {"changes": [], "notes": [], "verdict": "no revision (invalid, structural change, or platform noise only)"})
                 break
             changes = spec_changes(best["spec"], new)
+            save(work / f"{tag}.result.json", {"changes": changes, "notes": new_notes(best["spec"], new)})
             trace.note(f"{tag}: CallSpec changes ({len(changes)})" + "".join(f"\n    {c}" for c in changes[:25]))
             if not changes:
                 break
@@ -395,6 +420,9 @@ def main(argv=None) -> int:
                 break
             old_p, new_p = passing(r), passing(r2)
             lost = sorted(old_p - new_p)
+            save(work / f"{tag}.decision.json", {"before": f"{len(old_p)}/{r['total']}", "after": f"{len(new_p)}/{r2['total']}",
+                                                 "gained": sorted(new_p - old_p), "lost": lost,
+                                                 "accepted": len(new_p) > len(old_p) and not lost})
             if len(new_p) > len(old_p) and not lost:
                 trace.note(f"{tag}: accepted, {len(old_p)}/{r['total']} -> {len(new_p)}/{r2['total']}")
                 best = {"tag": tag, "spec": new, "wf": wf2, "result": r2}
