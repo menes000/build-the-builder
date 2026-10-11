@@ -54,6 +54,10 @@ def facts_code(spec: CallSpec) -> str:
         "FIRST_QUESTION": spec.identity.questions[0].ask if spec.identity.questions else "",
         "ATT1_KIND": spec.persuasion.attempt1_date_kind,
         "ATT1_N": int(spec.persuasion.attempt1_business_days or 0),
+        "FLOOR_TEXT_MODE": spec.amounts.floor_mode == "text",
+        "ATT1_TEXT_MODE": spec.persuasion.attempt1_mode == "text" or spec.persuasion.attempt1_date_kind == "other",
+        "CB_TEXT_MODE": cb.day_mode == "text",
+        "FLOOR_RULE": spec.amounts.floor_rule, "ATT1_RULE": spec.persuasion.attempt1_date_rule, "CB_RULE": cb.day_rule,
         "DEFAULT_OUTCOME": [spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason],
         "VERIFIED_DEFAULT": [spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason],
     }
@@ -162,6 +166,9 @@ try:
                 nbd = nth_bd(today, k)
                 cb.append(tag(nbd) + ', from ' + CB_FROM + ' until ' + CB_TO)
                 cbd.append(nbd.isoformat())
+    if CB_TEXT_MODE:
+        cb = ['the days this rule allows: ' + CB_RULE + ' (today is ' + tag(today) + '), from ' + CB_FROM + ' until ' + CB_TO]
+        cbd = []
     vars['callback_text'] = ' or '.join(cb)
     vars['cb_dates'] = ','.join(cbd)
     # this / next weekday table
@@ -219,6 +226,8 @@ try:
             else:
                 att1 = a1
             att1 = att1 if att1 <= deadline else deadline
+            if FLOOR_TEXT_MODE:
+                floor = 0.0
             valid = []
             d = today
             while d <= deadline:
@@ -276,19 +285,19 @@ try:
         ol = []
         for f in facts:
             dl_t = tag(datetime.date.fromisoformat(f['deadline']))
-            a1_t = tag(datetime.date.fromisoformat(f['att1']))
+            a1_t = ('the attempt-1 date from this rule: ' + ATT1_RULE + ' (never after the deadline ' + dl_t + ')') if ATT1_TEXT_MODE else tag(datetime.date.fromisoformat(f['att1']))
             ol.append('- ' + f['label'] + ' (product_id ' + f['pid'] + '): full past-due amount ' + money(f['past'])
-                      + ', ' + str(f['days_late']) + ' days late, band ' + f['band'] + ', floor ' + money(f['floor'])
+                      + ', ' + str(f['days_late']) + ' days late, band ' + f['band'] + ', floor ' + (('work it out from this rule: ' + FLOOR_RULE) if FLOOR_TEXT_MODE else money(f['floor']))
                       + ', deadline ' + dl_t + '.')
             plan = '  Refusal plan for ' + f['label'] + ' (the note_refusal tool tells you which attempt you are on; use ONLY after a flat refusal; a date or amount the customer proposes is handled by the DATES list and the amount rules instead; exactly ' + str(f['attempts']) + ' persuasion attempt' + ('s' if f['attempts'] != 1 else '') + ', then stop' + ('; do NOT ask again whether they can pay today, that was asked once for all products' if MULTI else '') + '):'
             if MULTI:
                 plan += '\n    open this product with exactly this question, which IS attempt 1 (never ask about today for this product): "For your ' + f['label'] + ', the past-due amount is ' + money(f['past']) + '. Can you pay it on ' + a1_t + '?"'
             else:
-                plan += '\n    attempt 1 -> propose ' + money(f['past']) + ' (or the floor ' + money(f['floor']) + ' if they already said the amount is too much) on ' + a1_t + '.'
+                plan += '\n    attempt 1 -> propose ' + money(f['past']) + ' (or the floor' + ('' if FLOOR_TEXT_MODE else ' ' + money(f['floor'])) + ' if they already said the amount is too much) on ' + a1_t + '.'
             if f['attempts'] >= 2:
-                plan += '\n    attempt 2 -> propose the floor ' + money(f['floor']) + ' on the deadline ' + dl_t + ', and say the rest stays overdue.'
+                plan += '\n    attempt 2 -> propose the floor' + ('' if FLOOR_TEXT_MODE else ' ' + money(f['floor'])) + ' on the deadline ' + dl_t + ', and say the rest stays overdue.'
             for k in range(3, f['attempts'] + 1):
-                plan += '\n    attempt ' + str(k) + ' -> propose the floor ' + money(f['floor']) + ' on the deadline ' + dl_t + '.'
+                plan += '\n    attempt ' + str(k) + ' -> propose the floor' + ('' if FLOOR_TEXT_MODE else ' ' + money(f['floor'])) + ' on the deadline ' + dl_t + '.'
             plan += '\n    after attempt ' + str(f['attempts']) + ' is refused -> stop proposing' + (', call add_note with reason refused for this product' if MULTI else ', call transition_to_close_refused') + '.'
             ol.append(plan)
         vars['offers_text'] = '\n'.join(ol)
@@ -297,11 +306,11 @@ try:
         # the engine would bake it and hide the parameter from the model.
         vars['product_label'] = f0['label']
         vars['past_due_text'] = money(f0['past'])
-        vars['floor_text'] = money(f0['floor'])
+        vars['floor_text'] = ('the floor from this rule: ' + FLOOR_RULE) if FLOOR_TEXT_MODE else money(f0['floor'])
         vars['days_late'] = f0['days_late']
         vars['attempts'] = f0['attempts']
         vars['deadline_text'] = tag(datetime.date.fromisoformat(f0['deadline']))
-        vars['attempt1_text'] = tag(datetime.date.fromisoformat(f0['att1']))
+        vars['attempt1_text'] = ('the date this rule gives: ' + ATT1_RULE) if ATT1_TEXT_MODE else tag(datetime.date.fromisoformat(f0['att1']))
         # the debt statement, spoken as the first line after verification
         sents = []
         for f in facts:
@@ -422,7 +431,7 @@ except Exception:
 
 def promise_pre(spec: CallSpec) -> str:
     R = ((spec.field_map or {}).get("req", {}).get("create_promise") or {})
-    return "R = " + _lit({k: R.get(k, k) for k in ("product_id", "amount", "date")}) + r'''
+    return "R = " + _lit({k: R.get(k, k) for k in ("product_id", "amount", "date")}) + "\nFLOOR_TEXT_MODE = " + _lit(spec.amounts.floor_mode == "text") + r'''
 import json
 try:
     b = config.get('body')
@@ -452,7 +461,7 @@ try:
         amt = None
         if f is not None and kind == 'full':
             amt = float(f['past'])
-        elif f is not None and kind == 'floor':
+        elif f is not None and kind == 'floor' and not FLOOR_TEXT_MODE:
             amt = float(f['floor'])
         else:
             try:
@@ -465,7 +474,8 @@ try:
         if f is not None:
             if dt not in f['valid']:
                 good = False
-            if amt is not None and (amt < float(f['floor']) - 0.001 or amt > float(f['past']) + 0.001):
+            low = 0.01 if FLOOR_TEXT_MODE else float(f['floor'])
+            if amt is not None and (amt < low - 0.001 or amt > float(f['past']) + 0.001):
                 good = False
             try:
                 done = json.loads(str(vars.get('promises_json') or '[]'))
@@ -942,12 +952,15 @@ def refusal_pre(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
     floor_text = spec.amounts.floor_offer_text
     ps = spec.persuasion
-    known1 = ps.attempt1_date_kind != "other"
+    floor_text_mode = spec.amounts.floor_mode == "text"
+    att1_text_mode = ps.attempt1_mode == "text" or ps.attempt1_date_kind == "other"
+    known1 = not att1_text_mode and not floor_text_mode
     params = {
         "MULTI": multi, "FLOOR_TEXT": floor_text,
         "OPENING_IS_ATTEMPT1": bool(multi and spec.multi_product.ask_today_for_all_once),
         "KNOWN1": known1, "ATT1_FULL": bool(ps.attempt1_uses_full_amount),
-        "KNOWN2": bool(ps.attempt2_uses_floor_on_deadline),
+        "KNOWN2": bool(ps.attempt2_uses_floor_on_deadline) and not floor_text_mode,
+        "FLOOR_RULE": spec.amounts.floor_rule if floor_text_mode else "", "ATT1_RULE": ps.attempt1_date_rule if att1_text_mode else "",
         "RULES_TEXT": " ".join(ps.attempt_rules) + (" " + ps.attempt1_date_rule if ps.attempt1_date_rule else ""),
     }
     return "import json\n" + "\n".join(f"{k} = {_lit(v)}" for k, v in params.items()) + r'''
@@ -1013,7 +1026,7 @@ try:
         else:
             state = 'continue'
             instr = ('Attempt ' + str(n) + ' of ' + str(allowed) + ' for ' + f['label'] + '. The bank rule for this attempt: ' + RULES_TEXT
-                     + ' Facts: full amount ' + money(f['past']) + ', floor ' + money(f['floor']) + ', deadline ' + say(f['deadline']) + ', attempt-1 date ' + say(f['att1']) + '. Make exactly the proposal that rule describes.')
+                     + ' Facts: full amount ' + money(f['past']) + ', floor ' + (('from this rule: ' + FLOOR_RULE) if FLOOR_RULE else money(f['floor'])) + ', deadline ' + say(f['deadline']) + ', attempt-1 date ' + (('from this rule: ' + ATT1_RULE) if ATT1_RULE else say(f['att1'])) + '. Make exactly the proposal that rule describes.')
     vars['refusal_instruction'] = instr
     vars['refusal_state'] = state
     vars['refusal_attempt'] = n

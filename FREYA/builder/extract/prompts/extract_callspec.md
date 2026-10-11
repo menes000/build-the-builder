@@ -48,3 +48,9 @@ Write the JSON to the output path you were given. Output only valid JSON that sa
 - A vague period that falls back to the attempt-1 date instead of the deadline: `dates.vague_period_fallback = "attempt1"`.
 Every number or choice that appears in a text rule must also be in its structured field. If a rule fits no field at all,
 put it in the nearest `extra_rules` list and say so in `source_notes`.
+
+## When a quantity fits no field at all
+Set `amounts.floor_mode`, `persuasion.attempt1_mode` or `third_party.callback.day_mode` to "text" ONLY when the brief's
+rule for the floor, the attempt-1 date or the allowed callback days cannot be expressed with the structured fields
+above. The code then stops computing that quantity and the agent applies the rule text (`floor_rule`,
+`attempt1_date_rule`, `callback.day_rule`), which must then state the rule completely. Prefer the fields whenever they fit.

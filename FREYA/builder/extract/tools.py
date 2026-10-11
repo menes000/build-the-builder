@@ -227,6 +227,21 @@ def consistency_checks(spec) -> list[str]:
     return errs
 
 
+def apply_text_modes(spec, problems: list[str]) -> list[str]:
+    """Last resort when a consistency problem survives every extraction attempt: the matching quantity is left to the
+    model (its *_mode becomes 'text'), so the code stops computing and enforcing a number the text contradicts.
+    Returns the fields switched."""
+    switched = []
+    blob = " ".join(problems).lower()
+    if ("floor_percent" in blob or "floor_rule" in blob) and spec.amounts.floor_mode != "text":
+        spec.amounts.floor_mode = "text"; switched.append("amounts.floor_mode")
+    if "callback" in blob and spec.third_party.callback.day_mode != "text":
+        spec.third_party.callback.day_mode = "text"; switched.append("third_party.callback.day_mode")
+    if ("attempt-1" in blob or "attempt1" in blob or "vague_period" in blob) and spec.persuasion.attempt1_mode != "text":
+        spec.persuasion.attempt1_mode = "text"; switched.append("persuasion.attempt1_mode")
+    return switched
+
+
 def lint_spec(spec, tools: list[Tool], fm: dict) -> list[str]:
     """Values the CallSpec sends to the bank must exist in the tool API's enums, and text rules must agree with the
     structured fields. Returns problems (empty = fine)."""

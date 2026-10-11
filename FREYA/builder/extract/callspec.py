@@ -88,6 +88,7 @@ class CallbackWindow(BaseModel):
     must_be_later_than_now: bool = True
     ask_again_once_if_outside: bool = True
     max_business_days_ahead: int = Field(1, description="How many days after today may be offered: 1 = only the next business day, 2 = the next business day or the one after it (business days unless calendar_days is true)")
+    day_mode: Literal["computed", "text"] = Field("computed", description="computed: the allowed callback days come from the structured fields. text: the day rule fits no field; the code checks only the time window and 'later than now', the agent follows day_rule")
     calendar_days: bool = Field(False, description="True when the window counts CALENDAR days after today (not business days); holidays and Sundays are still excluded")
     saturday_allowed: bool = Field(False, description="True when a Saturday callback is allowed")
 
@@ -153,6 +154,7 @@ class Amounts(BaseModel):
     floor_rule: str = Field(description="What the floor is per product type, in words")
     floor_offer_once: bool = True
     floor_offer_text: str = Field(description="What must be said when offering the floor, e.g. 'the rest stays overdue'")
+    floor_mode: Literal["computed", "text"] = Field("computed", description="computed: the floor comes from the structured fields (floor_field, floor_percent). text: the floor rule fits no field; the code does not compute or enforce a floor and the agent follows floor_rule")
     today_question: str = Field("", description="The exact first question about paying, if the brief dictates its wording (default: 'Can you make this payment today?'). Placeholders filled by the code: {amount} the past-due amount, {today}, {tomorrow} (first business day after today), {deadline}")
     customer_amount_rule: str = Field(description="Accept amounts from floor to full; below floor: say cannot record, offer floor once")
     extra_rules: list[str] = []
@@ -165,6 +167,7 @@ class Persuasion(BaseModel):
     attempt1_date_kind: Literal["last_business_day_this_week", "next_business_day", "deadline", "today", "business_days_after_today", "other"] = Field(
         "other", description="Classification of attempt1_date_rule. last_business_day_this_week = Brief-A style (this week's last business day, next week's if today is it); business_days_after_today needs attempt1_business_days")
     attempt1_business_days: int = Field(0, description="Only for business_days_after_today: N")
+    attempt1_mode: Literal["computed", "text"] = Field("computed", description="computed: the attempt-1 date comes from attempt1_date_kind. text: the rule fits no kind; the agent works the date out from attempt1_date_rule (also used automatically when attempt1_date_kind is other)")
     attempt1_uses_full_amount: bool = Field(True, description="Attempt 1 proposes the full amount (floor if the customer already said it is too much)")
     attempt2_uses_floor_on_deadline: bool = True
     stop_rule: str = Field(description="What to do when attempts are used up")

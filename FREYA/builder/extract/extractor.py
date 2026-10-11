@@ -109,6 +109,10 @@ def extract_callspec(brief_paths: list[str], out_path: str, trace, model: str | 
         if problems and attempt == max_retries:
             for pr in problems:
                 trace.note(f"extraction attempt {attempt + 1}: WARNING kept as is (last attempt): {pr[:200]}")
+            from .tools import apply_text_modes
+            for fld in apply_text_modes(spec, problems):
+                trace.note(f"extraction: left to the model: {fld} = text (the rule text and the structured field still disagree)")
+            out.write_text(spec.model_dump_json(indent=1))
             return spec
         if problems:
             errors = "The values below do not match the tool API (copy enum values exactly from the API file):\n- " + "\n- ".join(problems)

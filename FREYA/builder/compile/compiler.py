@@ -190,8 +190,11 @@ def compile_workflow(spec: CallSpec) -> dict:
         required=[tb.rq("verify_identity", "field"), tb.rq("verify_identity", "answer")], pre=codegen.verify_pre(spec), post=codegen.verify_post(spec), mapping=[("data.id_state", "id_state")])
 
     promise_body = {
-        "amount_kind": {"type": "string", "enum": ["full", "floor", "custom"], "default": "{{amount_kind}}",
-                        "description": "full: the full past-due amount of this product. floor: the floor of this product. custom: another agreed amount (then also give amount)."},
+        "amount_kind": ({"type": "string", "enum": ["full", "floor", "custom"], "default": "{{amount_kind}}",
+                        "description": "full: the full past-due amount of this product. floor: the floor of this product. custom: another agreed amount (then also give amount)."}
+                        if spec.amounts.floor_mode != "text" else
+                        {"type": "string", "enum": ["full", "custom"], "default": "{{amount_kind}}",
+                         "description": "full: the full past-due amount of this product. custom: any other agreed amount, including the floor (then also give amount)."}),
         tb.rq("create_promise", "amount"): tb.model_field("create_promise", tb.rq("create_promise", "amount"), desc_override="The agreed amount as a number, only when amount_kind is custom.", type_override="number"),
         tb.rq("create_promise", "date"): tb.model_field("create_promise", tb.rq("create_promise", "date"), desc_override="The agreed payment date, YYYY-MM-DD."),
     }

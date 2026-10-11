@@ -117,3 +117,65 @@ def test_hangup_keeps_decided_or_promised_outcome(wf_a):
     e = run_hook(t["pre_process_code"], v, body={"outcome": "promise", "reason": ""})
     assert e["config"]["body"] == {"outcome": "promise"}                   # promise wins; empty reason dropped
     assert "outcome_decided" in json.dumps(wf_a["nodes"]["decide_outcome"])
+
+
+def _variant_wf(tmp_path, **changes):
+    import pathlib
+    from conftest import ROOT
+    from builder.build_from_spec import build
+    spec = json.loads((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    for path, value in changes.items():
+        d = spec
+        keys = path.split(".")
+        for k in keys[:-1]:
+            d = d[int(k)] if k.isdigit() else d[k]
+        d[keys[-1]] = value
+    f = pathlib.Path(tmp_path) / "spec.json"
+    f.write_text(json.dumps(spec))
+    wf, problems = build(str(f), str(ROOT / "kit/tools/openapi.json"))
+    assert not problems, problems
+    return wf
+
+
+def test_layer3_floor_left_to_the_model(tmp_path):
+    """Floor rule fits no field: no computed floor in the prompt, no 'floor' amount kind, the check keeps only 0 < amount <= full."""
+    from builder.compile.selfcheck import facts_preview
+    wf = _variant_wf(tmp_path, **{"amounts.floor_mode": "text", "amounts.floor_rule": "The average of the last three instalments."})
+    v = facts_preview(wf, "2026-10-14T11:00", [{"product_id": "p1", "type": "credit_card", "card_last4": "9015", "past_due": 510.0, "days_late": 16, "minimum_payment": 153.0}])
+    assert "153" not in v["offers_text"] and "average of the last three instalments" in v["offers_text"]
+    t = tool(wf, "negotiate", "create_promise")
+    assert t["function"]["parameters"]["properties"]["body"]["properties"]["amount_kind"]["enum"] == ["full", "custom"]
+    facts = json.loads(v["facts_json"])
+    vv = {"facts_json": json.dumps(facts), "promises_json": "[]"}
+    e = run_hook(t["pre_process_code"], vv, body={"product_id": "p1", "amount_kind": "custom", "amount": "100", "date": facts[0]["valid"][0]})
+    assert e["config"]["body"]["date"] != "REJECTED"                         # 100 is below the old floor 153: now accepted
+    e = run_hook(t["pre_process_code"], vv, body={"product_id": "p1", "amount_kind": "custom", "amount": "600", "date": facts[0]["valid"][0]})
+    assert e["config"]["body"]["date"] == "REJECTED"                         # still never above the full amount
+    neg = wf["nodes"]["negotiate"]["task_message"]
+    assert "FLOOR RULE (work the floor out yourself" in neg
+
+
+def test_layer3_attempt1_other_and_callback_text(tmp_path):
+    from builder.compile.selfcheck import facts_preview
+    wf = _variant_wf(tmp_path, **{"persuasion.attempt1_date_kind": "other", "persuasion.attempt1_date_rule": "The customer's next payday.",
+                                  "third_party.callback.day_mode": "text", "third_party.callback.day_rule": "Any weekday of the next fortnight."})
+    v = facts_preview(wf, "2026-10-14T11:00", [{"product_id": "p1", "type": "credit_card", "card_last4": "9015", "past_due": 510.0, "days_late": 16, "minimum_payment": 153.0}])
+    assert "next payday" in v["offers_text"] and "16 October" not in v["offers_text"].split("Refusal plan")[1].split("attempt 2")[0]
+    assert "Any weekday of the next fortnight" in v["callback_text"] and v["cb_dates"] == ""
+    t = tool(wf, "third_party", "schedule_callback")
+    vv = dict(v)
+    e = run_hook(t["pre_process_code"], vv, body={"date": "2026-10-22", "time": "11:00"})
+    assert e["config"]["body"]["date"] == "2026-10-22"                      # a day the code no longer judges
+    e = run_hook(t["pre_process_code"], vv, body={"date": "2026-10-22", "time": "23:00"})
+    assert e["config"]["body"]["date"] == "REJECTED"                         # the time window is still enforced
+
+
+def test_layer3_automatic_switch():
+    from conftest import ROOT
+    from builder.extract.callspec import CallSpec
+    from builder.extract.tools import apply_text_modes
+    spec = CallSpec.model_validate_json((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    got = apply_text_modes(spec, ["amounts.floor_rule speaks of a percentage but no product has floor_percent",
+                                  "third_party.callback.day_rule allows the business day after the next one but max_business_days_ahead is 1"])
+    assert got == ["amounts.floor_mode", "third_party.callback.day_mode"]
+    assert spec.amounts.floor_mode == "text" and spec.third_party.callback.day_mode == "text"
