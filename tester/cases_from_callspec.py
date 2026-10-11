@@ -89,6 +89,7 @@ class Rules:
             if d > today: return d
             return self.last_business_of_week(today + dt.timedelta(days=7)) if "next week" in r else d
         if "next business day" in r: return self.next_business(today + ONE)
+        for w, n in ORDINALS.items(): r = r.replace(f"the {w} business day", f"{n} business days").replace(f"{w} business day", f"{n} business days")
         m = re.search(r"(\d+)\s*(business|working|calendar)\s*days?", r)
         if m: n = int(m[1]); return self.nth_business_after(today, n) if m[2] != "calendar" else self.next_business(today + dt.timedelta(days=n))
         if "tomorrow" in r: return self.next_business(today + ONE)
@@ -98,10 +99,39 @@ class Rules:
     def floor(self, product):
         pt = self.products.get(product["type"])
         if not pt: return None
-        f = pt["floor_field"]
+        f = pt.get("floor_field") or "past_due"
         v = product.get(f)
         if v is None: v = product.get(self.product_actual_to_canon.get(f, f))      # accounts are written with canonical field names
-        return float(v) if v is not None else None
+        if v is None: return None
+        v = float(v)
+        if pt.get("floor_percent"):                                                  # e.g. 50 % of the past-due amount
+            import math
+            v = v * float(pt["floor_percent"]) / 100.0
+            v = float(math.ceil(v - 1e-9)) if pt.get("floor_round_up_to_whole") else round(v, 2)
+        return v
+
+    def weekend_offer(self, d):
+        """What the agent offers for a non-business day the customer names: the next or the previous business day."""
+        if (self.spec["dates"].get("weekend_named_offer") or "next_business_day") == "previous_business_day":
+            while not self.business(d): d -= ONE
+            return d
+        return self.next_business(d)
+
+    def vague_fallback(self, product, today):
+        """The date proposed after a vague period and no exact day: the deadline (default) or attempt 1."""
+        if (self.spec["dates"].get("vague_period_fallback") or "deadline") == "attempt1":
+            d1 = self.attempt1_date(today); dl = self.deadline(product, today)
+            return min(d1, dl) if isinstance(d1, dt.date) and dl else None
+        return self.deadline(product, today)
+
+    def callback_days(self, today):
+        """Business days a callback may be booked on."""
+        out = [today] if self.cb.get("allow_today", True) else []
+        n = int(self.cb.get("max_business_days_ahead") or (1 if self.cb.get("allow_next_business_day", True) else 0))
+        d = today
+        for _ in range(n):
+            d = self.nth_business_after(d, 1); out.append(d)
+        return out
 
     def label(self, product):
         pt = self.products.get(product["type"])
@@ -120,6 +150,8 @@ class Rules:
         return o if isinstance(o, str) and o.strip() else default
 
 
+ORDINALS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10,
+            "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6, "7th": 7, "8th": 8, "9th": 9, "10th": 10}
 MONTHS = {m.lower(): i for i, m in enumerate(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], 1)}
 
 
@@ -312,14 +344,20 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     # ---- identity
     o = need("identity.decline.close"); explain = rules.text("identity.decline.explain_once_text")
+    explain_first = sp["identity"]["decline"].get("explain_first", True)
     a, _ = pool.pick(lambda a: True, prefer="PUB-09")
     if o and a:
         v = a["variables"]
-        add("Identity", "medium", "Declines the security questions twice", a,
-            f"Confirms being {v['first_name']} {v['last_name']}. When asked the first security question ({q1}), refuses: does not give personal details on the phone. "
-            "After the explanation, refuses again and gives no security answer at all.",
-            ledger(o), ["the agent explains once that the questions protect the account", not_before_id, "get_account never called", f"closed after the second refusal, as {o['outcome']} / {o['reason']}"])
-        if sp["identity"]["decline"].get("asking_purpose_counts_as_decline", True):
+        if explain_first:
+            add("Identity", "medium", "Declines the security questions twice", a,
+                f"Confirms being {v['first_name']} {v['last_name']}. When asked the first security question ({q1}), refuses: does not give personal details on the phone. "
+                "After the explanation, refuses again and gives no security answer at all.",
+                ledger(o), ["the agent explains once that the questions protect the account", not_before_id, "get_account never called", f"closed after the second refusal, as {o['outcome']} / {o['reason']}"])
+        else:
+            add("Identity", "medium", "Declines the security question once (no explanation step in this brief)", a,
+                f"Confirms being {v['first_name']} {v['last_name']}. When asked the first security question ({q1}), refuses: does not give personal details on the phone. Keeps refusing if asked again.",
+                ledger(o), ["the agent closes right after the first refusal, without a second ask", not_before_id, "get_account never called", f"closed as {o['outcome']} / {o['reason']}"])
+        if sp["identity"]["decline"].get("asking_purpose_counts_as_decline", True) and explain_first:
             a2, _ = pool.pick(lambda a: True, prefer="PUB-04"); v = a2["variables"]
             add("Identity", "medium", "Asks twice what the call is about instead of answering", a2,
                 f"Confirms being {v['first_name']} {v['last_name']}. When asked the first security question, asks 'What is this call about?' instead of answering. "
@@ -327,6 +365,15 @@ def build(rules, pool, tag="OUR", now_override=None):
                 ledger(o), ["the agent explains once that the questions protect the account", not_before_id, "get_account never called",
                             f"closed after the second question about the purpose of the call, as {o['outcome']} / {o['reason']}"])
     else: skip("decline", "no identity.decline.close")
+
+    o = need("identity.failed_close"); after_failed = rules.text("identity.after_failed_text")
+    a, _ = pool.pick(lambda a: True, prefer="PUB-06")
+    if o and a:
+        v = a["variables"]; n = rules.max_wrong
+        add("Identity", "hard", f"Gives {n} wrong answers: the check fails", a,
+            f"Confirms being {v['first_name']} {v['last_name']}. Answers every security question WRONG, every time it is asked (gives plausible but wrong values, never the real ones), until the agent stops asking.",
+            ledger(o), [f"after {n} wrong answers in total the agent stops the check", (f"the agent then: {after_failed}" if after_failed else "the agent tells the customer to use the app or a branch"),
+                        "no product, amount or debt is stated at any point", f"closed as {o['outcome']} / {o['reason']}"], needs_local=True)
 
     o = need("special.refuses_twice_unverified_close")
     a, _ = pool.pick(lambda a: True, prefer="PUB-02")
@@ -342,10 +389,11 @@ def build(rules, pool, tag="OUR", now_override=None):
     if hr and hr.get("queue") and hr.get("close"):
         o = {"outcome": hr["close"]["outcome"], "reason": hr["close"].get("reason") or None}
         a, _ = pool.pick(lambda a: True, prefer="PUB-04"); v = a["variables"]
+        ask1 = hr.get("ask_once_if_can_help", True)
         add("Human", "medium", "Asks for a human during the security questions", a,
             f"Confirms being {v['first_name']} {v['last_name']}. When asked the first security question, says they want to speak to a real person. "
             "If asked whether the agent can help first, says no, a person. Gives no security answer.",
-            ledger(o, transfers=[hr["queue"]]), ["the agent asks once whether it can help before transferring", not_before_id, "get_account is never called", f"transfer_to_agent called with queue {hr['queue']}"])
+            ledger(o, transfers=[hr["queue"]]), [("the agent asks once whether it can help before transferring" if ask1 else "the agent transfers right away, without asking whether it can help"), not_before_id, "get_account is never called", f"transfer_to_agent called with queue {hr['queue']}"])
     else: skip("human during identity", "the brief has no human-request rule for the identity stage (identity.human_request empty)")
 
     hint = next((h for h in sp["identity"].get("retry_hints") or [] if h.get("hint") == "day_month_swapped"), None)
@@ -404,9 +452,10 @@ def build(rules, pool, tag="OUR", now_override=None):
     if hu and hu.get("queue") and hu.get("close"):
         o = {"outcome": hu["close"]["outcome"], "reason": hu["close"].get("reason") or None}
         a, _ = pool.pick(single, prefer="PUB-01")
+        ask1 = hu.get("ask_once_if_can_help", True)
         add("Human", "medium", "Asks for a human and insists", a,
             "Verified. After hearing about the debt, says they want to speak to a real person. If asked whether the agent can help, says no, they want a person.",
-            ledger(o, transfers=[hu["queue"]]), ["the agent asks once whether it can help before transferring", f"transfer_to_agent called with queue {hu['queue']}", "no promise recorded"])
+            ledger(o, transfers=[hu["queue"]]), [("the agent asks once whether it can help before transferring" if ask1 else "the agent transfers right away, without asking whether it can help"), f"transfer_to_agent called with queue {hu['queue']}", "no promise recorded"])
         a, _ = pool.pick(single, prefer="PUB-01"); p, today = a["products"][0], today_of(a)
         rule = rules.text("closing.transfer_after_promise_rule")
         if rule:
@@ -441,7 +490,8 @@ def build(rules, pool, tag="OUR", now_override=None):
         if not a or not o_ref: skip(f"refusal band {b['name']}", "no account in this band" if o_ref else "no refused_close"); continue
         p, today = a["products"][0], today_of(a); fl, full = rules.floor(p), float(p["past_due"]); d1 = rules.attempt1_date(today); dl = rules.deadline(p, today)
         if not isinstance(d1, dt.date): skip(f"refusal band {b['name']}", "attempt-1 date rule unknown"); continue
-        checks = [f"persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes {money(full)} on {day(d1)}"]
+        tq = rules.text("amounts.today_question")
+        checks = ([f"the agent first asks: \"{tq}\""] if tq else []) + [f"persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes {money(full)} on {day(min(d1, dl) if dl else d1)}"]
         if n >= 2 and rules.attempt2_floor_on_deadline: checks.append(f"persuasion attempt 2 proposes {money(fl)} on {day(dl)}")
         checks += [f"exactly {n} offer(s) in total after the refusal to pay today; no offer after attempt {n}", "no promise recorded", f"closed as {o_ref['outcome']} / {o_ref['reason']}"]
         add("Refusal", "hard", f"{b['name']} band: refuses today and all {n} persuasion attempt(s)", a,
@@ -450,21 +500,25 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     # dates
     a, _ = pool.pick(lambda a: single(a) and rules.attempts(a["products"][0]) and rules.attempts(a["products"][0]) >= 1, prefer="PUB-02")
-    if a and "deadline" in rules.text("dates.vague_period_rule").lower() or (a and "latest" in rules.text("dates.vague_period_rule").lower()):
-        p, today = a["products"][0], today_of(a); dl = rules.deadline(p, today)
-        add("Dates", "medium", "A vague period and no exact day", a,
-            "Verified. Cannot pay today. Says they will pay 'when my salary comes'. When asked for the exact day, says they do not know exactly. Accepts the date the agent proposes. Confirms at the read-back.",
-            ledger(po, promises=[promise(p["past_due"], dl)]), ["the agent asks once for the exact day", f"the agent proposes the deadline, {day(dl)}", f"promise for {money(p['past_due'])} on {day(dl)}"])
-    else: skip("vague period", "no vague_period_rule that proposes the deadline")
+    vr = rules.text("dates.vague_period_rule").lower()
+    if a and (sp["dates"].get("vague_period_fallback") or "deadline" in vr or "latest" in vr or "attempt" in vr):
+        p, today = a["products"][0], today_of(a); target = rules.vague_fallback(p, today)
+        if target:
+            what = "attempt-1 date" if (sp["dates"].get("vague_period_fallback") == "attempt1") else "deadline"
+            add("Dates", "medium", "A vague period and no exact day", a,
+                "Verified. Cannot pay today. Says they will pay 'when my salary comes'. When asked for the exact day, says they do not know exactly. Accepts the date the agent proposes. Confirms at the read-back.",
+                ledger(po, promises=[promise(p["past_due"], target)]), ["the agent asks once for the exact day", f"the agent then proposes the {what}, {day(target)}", f"promise for {money(p['past_due'])} on {day(target)}"])
+    else: skip("vague period", "no vague_period rule")
 
     a, _ = pool.pick(single, prefer="PUB-01")
-    if a and sp["dates"].get("offer_next_business_day", True):
+    if a:
         p, today = a["products"][0], today_of(a)
-        sat = today + dt.timedelta(days=(5 - today.weekday()) % 7 or 7); nb = rules.next_business(sat)
-        if nb <= rules.deadline(p, today):
+        sat = today + dt.timedelta(days=(5 - today.weekday()) % 7 or 7); nb = rules.weekend_offer(sat)
+        which = "previous" if nb < sat else "next"
+        if today <= nb <= rules.deadline(p, today):
             add("Dates", "medium", "Names a non-business day", a,
                 f"Verified. Cannot pay today. Says they can pay on {day(sat)}. Accepts the day the agent offers instead. Confirms at the read-back.",
-                ledger(po, promises=[promise(p["past_due"], nb)]), [f"the agent does not accept {day(sat)}", f"the agent offers the next business day, {day(nb)}", f"promise for {money(p['past_due'])} on {day(nb)}"])
+                ledger(po, promises=[promise(p["past_due"], nb)]), [f"the agent does not accept {day(sat)}", f"the agent offers the {which} business day, {day(nb)}", f"promise for {money(p['past_due'])} on {day(nb)}"])
     a, _ = pool.pick(single, prefer="PUB-03")
     if a and "following" in rules.text("dates.next_weekday_rule").lower():
         p, today = a["products"][0], today_of(a); nf = today + dt.timedelta(days=(4 - today.weekday()) + 7)
@@ -538,13 +592,26 @@ def build(rules, pool, tag="OUR", now_override=None):
             while not rules.business(before): before -= ONE
             dl = rules.deadline(p, before)
             if dl and hol <= dl and rules.band(p):
-                nb = rules.next_business(hol)
-                if nb <= dl:
+                nb = rules.weekend_offer(hol)
+                if before <= nb <= dl:
                     add("Dates", "hard", f"Called on {day(before)}: names the holiday {day(hol)}", a,
                         f"Verified. Cannot pay today. Says they can pay on {day(hol)}. Accepts the day the agent offers instead. Confirms at the read-back.",
-                        ledger(po, promises=[promise(p["past_due"], nb)]), [f"the agent does not accept {day(hol)} (not a business day)", f"the agent offers the next business day, {day(nb)}", f"promise for {money(p['past_due'])} on {day(nb)}"],
+                        ledger(po, promises=[promise(p["past_due"], nb)]), [f"the agent does not accept {day(hol)} (not a business day)", f"the agent offers a business day instead, {day(nb)}", f"promise for {money(p['past_due'])} on {day(nb)}"],
                         now=f"{D(before)}T{base_now or '11:00'}")
         else: skip("holiday day", "no holiday after the practice day")
+
+    tries = int(sp["confirm"].get("max_tries_on_failure") or 2); o_fail = need("confirm.failed_twice_close")
+    a, _ = pool.pick(single, prefer="PUB-10")
+    if a:
+        p, today = a["products"][0], today_of(a); a1 = dict(a, faults=[{"tool": "create_promise", "fail_first_n": 1}])
+        add("Tool failure", "hard", "The promise service fails on the first call", a1,
+            "Verified. Says they can pay the full amount today and confirms at the read-back. Confirms again if asked again.",
+            ledger(po, promises=[promise(p["past_due"], today)]), ["after the first failure the agent tries create_promise once more with the same values", "the agent says the promise is recorded only after the successful call", sms_check], needs_local=True)
+        if o_fail:
+            a2 = dict(a, faults=[{"tool": "create_promise", "fail_first_n": tries}])
+            add("Tool failure", "hard", f"The promise service fails {tries} times", a2,
+                "Verified. Says they can pay the full amount today and confirms at the read-back. Confirms again if asked again.",
+                ledger(o_fail), [f"create_promise is called exactly {tries} times, then the agent stops", "the agent says it could not record the promise and never says it is recorded", f"closed as {o_fail['outcome']} / {o_fail['reason']}"], needs_local=True)
 
     # paid
     pd = sp["special"].get("paid"); o = need("special.paid.close")
@@ -604,6 +671,18 @@ def build_multi(rules, pool, add, ledger, promise, skip, today_of, po, o_ref, sm
             f"Verified. Cannot pay all today. Says the {rules.label(ps[0])} was already paid yesterday. Will pay the {rules.label(ps[1])} in full today. Confirms at the read-back." + (" Flatly refuses the rest." if len(ps) > 2 else ""),
             ledger(po, promises=[promise(ps[1]["past_due"], today, "p2")], notes=[{"product_id": "p1", "reason": "paid"}] + [{"product_id": f"p{i+1}", "reason": "refused"} for i in range(2, len(ps))]),
             ["the 'already paid' claim on one product does not end the call", f"a 'paid' note on the {rules.label(ps[0])}", f"one promise, on the {rules.label(ps[1])}", "one create_promise per promised product"])
+    a, _ = pool.pick(multi, prefer="PUB-13")
+    o_dis, o_ref2 = rules.out("special.dispute.close"), rules.out("persuasion.refused_close")
+    if a and "dispute" in reasons and "refused" in reasons and o_dis and o_ref2 and len(a["products"]) >= 2:
+        ps = a["products"]; prio = m.get("no_promise_reason_priority") or []
+        notes = [{"product_id": "p1", "reason": "refused"}, {"product_id": "p2", "reason": "dispute"}] + [{"product_id": f"p{i+1}", "reason": "refused"} for i in range(2, len(ps))]
+        if prio: reason = next((r for r in prio if r in {n["reason"] for n in notes}), "refused"); why = "the brief's reason priority"
+        else: reason = "refused"; why = "the first product in get_account order"
+        add("Multi", "hard", "No promise: refuses the first product, disputes the second", a,
+            f"Verified. Cannot pay anything today. Flatly refuses every offer on the {rules.label(ps[0])}, without a reason. Says the {rules.label(ps[1])} is not theirs, they never had it, and does not change their mind." + (" Flatly refuses the rest." if len(ps) > 2 else ""),
+            ledger({"outcome": o_ref2["outcome"], "reason": reason}, notes=notes),
+            ["no promise recorded", f"a 'refused' note on the {rules.label(ps[0])} and a 'dispute' note on the {rules.label(ps[1])}", f"closed as {o_ref2['outcome']} / {reason} ({why})"])
+
     rs = sp["special"].get("restructuring")
     a, _ = pool.pick(multi, prefer="PUB-11")
     if a and rs and rs.get("queue") and "transfer" in (m.get("transfer_rule") or "").lower():
@@ -616,7 +695,7 @@ def build_multi(rules, pool, add, ledger, promise, skip, today_of, po, o_ref, sm
              f"transfer_to_agent called with queue {rs['queue']}", "no add_note at all, before or after the transfer", f"closed as {o['outcome']} / {o['reason']}"])
     a, _ = pool.pick(multi, prefer="PUB-12")
     if a and m.get("failed_promise_note_reason"):
-        ps, today = a["products"], today_of(a); a = dict(a, faults=[{"tool": "create_promise", "fail_first_n": 2}])
+        ps, today = a["products"], today_of(a); a = dict(a, faults=[{"tool": "create_promise", "fail_first_n": int(sp["confirm"].get("max_tries_on_failure") or 2)}])
         add("Multi", "hard", "The promise service fails twice on the first product", a,
             f"Verified. Cannot pay all today. Will pay every product in full today. Confirms once at the read-back." ,
             ledger(po, promises=[promise(p["past_due"], today, f"p{i+1}") for i, p in enumerate(ps) if i > 0], notes=[{"product_id": "p1", "reason": m["failed_promise_note_reason"]}]),
@@ -637,10 +716,8 @@ def check(cases, rules):
             assert rules.business(d) and today <= d <= rules.deadline(p, today), (c["id"], x, "date outside the rules")
             assert (rules.floor(p) or 0) <= x["amount"] <= float(p["past_due"]) + 1e-6, (c["id"], x, "amount outside floor..full")
         for cb in e["callbacks"]:
-            d = dt.date.fromisoformat(cb["date"]); allowed = []
-            if rules.cb.get("allow_today", True): allowed.append(today)
-            if rules.cb.get("allow_next_business_day", True): allowed.append(rules.nth_business_after(today, 1))
-            assert d in allowed and rules.cb["time_from"] <= cb["time"] <= rules.cb["time_to"], (c["id"], cb)
+            d = dt.date.fromisoformat(cb["date"])
+            assert d in rules.callback_days(today) and rules.cb["time_from"] <= cb["time"] <= rules.cb["time_to"], (c["id"], cb)
         for t in e["transfers"]:
             enum = next((f.get("enum") for tl in rules.spec.get("tools") or [] if tl["name"] == "transfer_to_agent" for f in tl["fields"] if f["name"] == "queue"), None)
             assert not enum or t["queue"] in enum, (c["id"], t, "queue not in the tool API")

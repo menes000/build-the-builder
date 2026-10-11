@@ -1,3 +1,71 @@
+# GÜNCEL DURUM ÖZETİ (11 Ekim 2026, 15:30) — /clear sonrası önce bunu oku
+
+## Bağlam
+- Freya × YC "Build the Builder" hackathonu. Final **bugün 20:00–23:00 İstanbul**: 2 gizli brief (biri temiz spec, biri mail+politika+memo+kod listesi), her birinin kendi `openapi.json`'u. 7 tool adı sabit, alan adları/enum'lar değişebilir. Müşteriler 3 ürüne kadar. Jüri: brief başına 30 gizli müşteri × 3 koşu, 3/3 geçen sayılır, skor = geçen/60. Eşitlikte söz tutarı toplamı → kısa build süresi → erken teslim.
+- Kural: builder koşusu ≤30 dk, elle müdahale yok, ajan koşudan sonra düzenlenmez. **Koşular arası builder'daki genel bug düzeltilebilir, builder birden çok koşulabilir, bir koşunun ajanı + trace'i teslim edilir.** Gizli brief'ten koda/prompt'a değer yazmak yasak. Kaynak: `docs/build-the-builder/README.md` satır 72–91 + organizatör maili (teslim formu: `run_command: python3 builder/build.py {brief_path} {tool_api_path}`, `submission/<ad>.workflow.json`, `traces/<ad>.log`, 20:00 UTC'ye kadar mail).
+- İş bölümü: **Dora = builder** (`FREYA/`, kendi makinesi, bu repoya da commit atıyor; biz `FREYA/` ve `kit/`'e dokunmuyoruz). **Biz = test** (`tester/`, `test-briefs/`, `docs/`, `results/`, bu dosya).
+- Çalışma kuralı (kullanıcı): para/token harcayan hiçbir şey (Gemini, OpenAI, Claude build, Freya simülasyonu, alt ajan) **sorulmadan başlatılmaz**; onaylanan adımın dışına çıkılmaz. Gemini kredisi 15:00'te bitti; yüklenene kadar lokal koşu yok.
+
+## Elimizdeki araçlar (`tester/`)
+| Dosya | Ne yapar | Nasıl çağrılır |
+|---|---|---|
+| `health.py` | key'ler, Freya API, simülasyon kuyruğu, bank mock, Gemini, OpenAI, sahte banka kontrolü | `source env.sh && python3 tester/health.py [--no-llm]` |
+| `cases_from_callspec.py` | Dora'nın CallSpec'inden ~30 tek ürün + 7 çok ürün vakası üretir; tarih/tutar koddan (bant, deadline iş/takvim günü/sabit tarih, floor alanı veya yüzdesi, callback penceresi + ileri gün, deneme-1 kuralı: "last business day of week", "N/third business day", "deadline"); hesap havuzu PUB + sentez (eksik kimlik alanı, boş bant, yeni ürün tipi); `check()` doğrular; kuralı olmayan şablon atlanır ve listelenir | `python3 tester/cases_from_callspec.py <callspec> --brief X --tag X --local-bank [--openapi api.json] --out results/X-cases.json` |
+| `fakebank.py` | organizatör mock'unun lokal kopyası: her kimlik alanı, her hesap, `faults` (fail_first_n), yanlış cevap limiti (`identity_max_wrong`), `field_map` ile alan adı çevirisi, openapi'den zorunlu alan/enum doğrulama, GET desteği, `audit()` | `local_sim.py --bank local` içinden otomatik |
+| `emulator.py` | workflow JSON'unu lokalde yürütür: extraction (OpenAI, cache), routing (Gemini), diyalog (Gemini), code node + hook lokal Python, api_call → banka; `audit()` desteklenmeyen Freya özelliğini söyler; flags (routing kararı, sessiz tur, paralel tool, tekrarlanan red) | `local_sim.py --agent local` içinden |
+| `local_sim.py` | runner. `--agent local|freya`, `--bank local|mock`, `--style`, `--reps`, `--parallel`, `--judge-view`, `--openapi`; satırda PASS/FAIL, failed[], flags, path; token sayaçları | `python3 tester/local_sim.py <export.json> --agent local --bank local --cases X --reps 2 --parallel 8 --out results/X-local.json` |
+| `local_test.py` | tek çağrı: callspec + export → vakalar → koşu → JSON (`rows`: id, status, failed, flags, judge_reason, transcript, path); exit 0/1/2. Dora'nın `build.py --local-test` kancası bunu arıyor | `python3 tester/local_test.py --callspec C --export E --out results/X-localtest.json [--openapi A] [--reps 1]` |
+| `final.sh` | tek komut: vakalar → lokal koşu → `results/<slot>-report.md`; yolları `FREYA/out`, `FREYA/submission`, `final/`, `submission/` altında arar; `OPENAPI=`, `STYLE=`, `CALLSPEC=`, `EXPORT=` env | `OPENAPI=final/h1/openapi.json BRIEF=H1 TAG=H1 tester/final.sh hidden-1 2 8` |
+| `rule_diff.py` | gpt-5.4-mini ham brief'i (klasör; md/txt/docx/pdf) bağımsız okur, CallSpec ile alan alan diff; `field_map` vs openapi deterministik kontrol | `python3 tester/rule_diff.py <callspec> <brief klasörü> --openapi api.json` |
+| `run_coverage.py` | resmi yol: kit'in `run_cases.py`'ı (Freya simülasyon + Freya judge), `session_case` + vaka `now` desteği, 5xx'te yeniden deneme | `python3 tester/run_coverage.py <agent_id> --cases X --only A,B --reps 2 --out results/X-freya.json` |
+| `gemini.py`, `openai_client.py`, `llm.py` | model istemcileri; thinking seviyeleri (`CUSTOMER_THINKING=low`, `ENGINE_THINKING=low`, `JUDGE_THINKING=low`); sadece extraction cache'li (`results/llm-cache.json`) | env: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5.4-mini` |
+| `coverage_cases.py` / `coverage-cases.json` | eski elle yazılmış 28 Brief A vakası (regresyon referansı) | — |
+| `dump_call.py` | Freya arama kaydını okunur yazar | — |
+
+Diğer: `docs/PAZAR-PROTOKOLU.md` (saat saat plan, karar kuralları, kırmızı çizgiler), `test-briefs/` (prova brief'leri: `brief-c` bizim, `brief-d`/`brief-e` + `keys/` Dora'nın), `results/handoff-dora-tester-20261011.zip` (tester paketi + README, Dora'nın repo'suna kopyalanır, kit'i `kit/` altında bulur).
+
+## Pazar iş akışı (brief başına)
+```
+20:00 brief + openapi gelir → final/hidden-1/ (ikimiz 5 dk okuruz; okumak serbest, değer yazmak yasak)
+Dora:  python3 builder/build.py final/hidden-1 final/hidden-1/openapi.json 2>&1 | tee traces/hidden-1.log      (~1–5 dk)
+       → out/hidden-1.callspec.json, submission/hidden-1.workflow.json, agent id  → bize atar
+Biz:   dosyaları final/ altına koy
+       OPENAPI=final/hidden-1/openapi.json BRIEF=H1 TAG=H1 tester/final.sh hidden-1 1 8        (hızlı sinyal, ~3 dk, ~40 arama)
+       python3 tester/rule_diff.py final/hidden-1.callspec.json final/hidden-1 --openapi ...   (~30 sn)
+       [onayla] ağır: tester/final.sh hidden-1 3 10 ; STYLE=talkative|pieces|corrects|asks_back|in_words ...
+Karar: her FAIL sınıflanır: judge/vaka ifadesi → geç · ajan GENEL (routing intent, hook, prompt şablonu) → Dora builder kodunu düzeltir → yeni build
+       · extraction kaçırmış (diff) → extraction prompt'unun genel zaafı → yeni build · model farkı şüphesi → resmi yol
+Resmi: python3 tester/run_coverage.py <agent> --cases results/hidden-1-cases.json --only <3–5 riskli, needs_local_bank olmayan>  (limitli, platform dalgalı)
+Dondur → hidden-2 aynı akış → 22:30 Dora teslim (commit + form + mail), 23:00 son.
+```
+Riskli vaka seçimi: flags'li, `after_promise`/transfer yolları, intent routing geçenler, çıplak "bugün ödeyemem" senaryoları, çok ürünlü.
+
+## Bugüne kadar ölçülenler
+- Emülatör vs Freya kalibrasyonu (10 Eki, v6, 28 vaka): 26/28 aynı karar; farklar "model huyu" (experimental-5 reddedilen tool'u tekrar çağırır). Judge gpt-5.4-mini vs Freya judge: aynı vakalarda aynı.
+- Brief A v15 üretilmiş set: 29/31 lokal (OUR-09 v14 regresyonu: kimlik sırasında insan isteği ret sayılıyor; OUR-11 floor iki kez, Gemini).
+- Brief C provası (görülmemiş gibi): build bizim login'le 62 sn; extraction memo'nun 6 maddesini yakaladı; rule diff 0; 31 vaka; 3 zor vaka lokal 6/6; Freya ayağı platform 504 (bekçi arka planda). Bulgu: çıplak "I cannot pay today"de ajan `note_refusal` tool'unu çağırmayıp açık soru sordu (TC-25 2/2), TC-23'te çağırdı → ikna denemesi model disiplinine bağlı; Dora'ya deterministik extraction önerildi.
+- Brief D (Dora'nın provası, 8 yeni CallSpec alanı): üretici yeni alanları okuyor; 40 vaka, anahtarla uyumlu (deneme 1 = 20 Ekim, deadline'lar 6 Kas/27 Eki/19 Eki). **Lokal koşu yapılmadı (kredi yok).** Freya'da agent `7843f2bc` hazır (standart openapi, dob+phone).
+- Maliyet: 30 arama ≈ 600k Gemini prompt token + 150 OpenAI çağrısı ≈ 2–3 dk; thinking kısıtlı.
+
+## Dora'ya iletilmiş / iletilecek bulgular
+1. OUR-09 (v14+): `declined_1/2` extraction "insan/temsilci isteği"ni ret sayıyor → tanıma "leave empty when the customer asks for a human" ya da `human` enum + transfer yolu.
+2. TC-25: ikna denemesi `note_refusal` tool çağrısına bağlı; çıplak hayırda model çağırmıyor → düz reddi `declined_1` kalıbıyla extraction + code node ile deterministik yap.
+3. Dora'nın soruları (a) bizde CallSpec karşılığı olmayan kural: `closing.transfer_after_promise_rule` ve `dates.next_weekday_rule` sadece metin (biz varlık/anahtar kelimeye bakıyoruz); diğer her şey yapılı. (b) Yeni alanlar üreticiye eklendi: floor_percent/round_up, max_business_days_ahead, explain_first, ask_once_if_can_help=false, max_tries_on_failure (tek ürün 1× ve N× arıza şablonları), no_promise_reason_priority (refused+dispute şablonu), weekend_named_offer, vague_period_fallback, today_question check'i, "third business day" ayrıştırma, yanlış cevapla kilitlenme şablonu. (c) Brief D için Freya'ya 3–5 vaka: D-19/20 (bant denemeleri, 3. iş günü), D-24 (deadline reddi), D-34 (çok ürün: söz + redler), D-38 (sebep önceliği), D-14/15 (insan isteği, yardım sorusuz transfer).
+4. `--local-test` entegrasyonu: `tester/` klasörü repo köküne, `local_test.py` JSON'u fix loop'a.
+
+## Açık işler (önem sırası)
+- [ ] Gemini kredisi → Brief D lokal (40 vaka, ~1 M token) → rapor → Dora'ya D-sonuçları + Freya için vaka listesi.
+- [ ] Freya dönünce: Brief C 3 vaka (TC-14, TC-23, TC-25; agent 3dfb3d55, `--cases test-briefs/brief-c/cases.json`), Brief D 3–5 vaka (agent 7843f2bc, `--cases test-briefs/brief-d/cases.json`) resmi yol. /clear ile arka plandaki bekçi ölmüş olabilir; elle başlat (önce kuyruk boş mu bak, sonra onay al).
+- [ ] Organizatöre sorular (Dora bize bıraktı): final hesapları için practice sessions çalışır mı; Pazar limiti hangi endpoint, kaç koşu.
+- [ ] Commit: `tester/cases_from_callspec.py` (Brief D alanları), `test-briefs/brief-d/cases.json`, bu dosya. `git status` ile bak.
+- [ ] 19:30: `health.py`, protokolü ikimiz okuruz, uyku kapalı, `final/` boş.
+- [ ] (opsiyonel) `diagnose.py`: local_test JSON + workflow + CallSpec → `claude -p` ile FAIL sınıflama + genel yama önerisi (insan onaylı kapalı döngü, Seviye 2). Yazılmadı.
+
+## Bilinen sınırlar
+Şemada olmayan kural tipi test edilmez; experimental-5 huyları Gemini'de görünmez (resmi koşu şart); sahte banka brief'i uygulamaz; `needs_local_bank` vakalar resmi yola gidemez; Freya platformu dalgalı (503/504), `run_coverage` 8 deneme yapar ama simülasyon sonucu kaybolabilir.
+
+---
+
 # İlerleme notları (10 Ekim 2026, akşam)
 
 ## Görev özeti

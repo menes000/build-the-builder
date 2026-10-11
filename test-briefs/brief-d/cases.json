@@ -1,0 +1,5382 @@
+[
+ {
+  "id": "D-01",
+  "session_case": "PUB-03",
+  "brief": "D",
+  "family": "Wrong number",
+  "level": "medium",
+  "title": "The number does not belong to the customer",
+  "variables": {
+   "first_name": "Owen",
+   "last_name": "Park",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1992-07-21",
+   "phone_last4": "6630"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "0377",
+    "past_due": 95.0,
+    "days_late": 4,
+    "minimum_payment": 28.5
+   }
+  ],
+  "script": "The person who answers says there is no Owen Park at this number and that the caller has the wrong number. Does not know them.",
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "wrong_number",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying who is calling and that the call is recorded is required, not a violation)",
+   "verify_identity and get_account never called",
+   "closed as not_reached / wrong_number"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "third_party": true
+ },
+ {
+  "id": "D-02",
+  "session_case": "PUB-07",
+  "brief": "D",
+  "family": "Deceased",
+  "level": "medium",
+  "title": "A relative says the customer has died",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0
+   }
+  ],
+  "script": "The person who answers is Samuel's sister. Says Samuel passed away last month.",
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "deceased",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent says \"I'm very sorry to hear that. I won't take up any more of your time.\"",
+   "after hearing of the death the agent asks nothing else",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying who is calling and that the call is recorded is required, not a violation)",
+   "verify_identity and get_account never called"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "third_party": true
+ },
+ {
+  "id": "D-03",
+  "session_case": "PUB-08",
+  "brief": "D",
+  "family": "Unclear",
+  "level": "medium",
+  "title": "Never confirms who is on the line",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "Never confirms being Hannah Schmidt and never says the name or yes. To the first question answers only 'Hello?'. To the next question answers only 'Go ahead.'. To anything after that answers only 'Mm-hm.'",
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "unclear",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent asks at most 3 times who it is speaking with",
+   "'Hello?' and 'Go ahead.' are not taken as confirmation",
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying who is calling and that the call is recorded is required, not a violation)",
+   "verify_identity and get_account never called"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "third_party": true
+ },
+ {
+  "id": "D-04",
+  "session_case": "PUB-02",
+  "brief": "D",
+  "family": "Callback window",
+  "level": "medium",
+  "title": "Offers two times outside the callback window",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5
+   }
+  ],
+  "script": "The person who answers is Maria's husband. Says Maria is not home. When asked when she can be reached, says Sunday 18 October in the evening. When asked for another time, says tomorrow at 19:30. Gives no other time.",
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "no_callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying who is calling and that the call is recorded is required, not a violation)",
+   "the agent asks once for another time after the first one",
+   "no callback is scheduled",
+   "verify_identity and get_account never called"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "third_party": true
+ },
+ {
+  "id": "D-05",
+  "session_case": "PUB-10",
+  "brief": "D",
+  "family": "Callback window",
+  "level": "medium",
+  "title": "Called at 18:00: a time earlier today is not allowed",
+  "variables": {
+   "first_name": "Grace",
+   "last_name": "Lin",
+   "title": "Ms",
+   "now": "2026-10-14T18:00"
+  },
+  "identity": {
+   "date_of_birth": "1989-02-23",
+   "phone_last4": "9904"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "7740",
+    "past_due": 365.0,
+    "days_late": 8,
+    "minimum_payment": 109.5
+   }
+  ],
+  "script": "The person who answers is Grace's brother. Says Grace is not home. When asked when she can be reached, says today at 17:30. When asked for another time, says Thursday 15 October at 12:30.",
+  "expected": {
+   "outcome": "not_reached",
+   "reason": "callback",
+   "promises": [],
+   "notes": [],
+   "callbacks": [
+    {
+     "date": "2026-10-15",
+     "time": "12:30"
+    }
+   ],
+   "transfers": []
+  },
+  "checks": [
+   "the agent does not say why it is calling: no collections, debt, payment, product or amount is mentioned (saying who is calling and that the call is recorded is required, not a violation)",
+   "the agent does not book 17:30 today (it is already past) and asks once for another time",
+   "callback scheduled for Thursday 15 October at 12:30",
+   "verify_identity and get_account never called"
+  ],
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 1
+   }
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "third_party": true
+ },
+ {
+  "id": "D-06",
+  "session_case": "PUB-09",
+  "brief": "D",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Declines the security questions twice",
+  "variables": {
+   "first_name": "Victor",
+   "last_name": "Ionescu",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1981-08-11",
+   "phone_last4": "5560"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 2100.0,
+    "days_late": 28,
+    "instalment_amount": 700.0
+   }
+  ],
+  "script": "Confirms being Victor Ionescu. When asked the first security question (phone last4), refuses: does not give personal details on the phone. After the explanation, refuses again and gives no security answer at all.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent explains once that the questions protect the account",
+   "no product, amount or debt is mentioned before identity is verified",
+   "get_account never called",
+   "closed after the second refusal, as not_verified / declined"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-07",
+  "session_case": "PUB-04",
+  "brief": "D",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Asks twice what the call is about instead of answering",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0
+   }
+  ],
+  "script": "Confirms being Lena Hoffmann. When asked the first security question, asks 'What is this call about?' instead of answering. Whatever the agent says, when asked again asks once more what the call is about and gives no security answer at all.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent explains once that the questions protect the account",
+   "no product, amount or debt is mentioned before identity is verified",
+   "get_account never called",
+   "closed after the second question about the purpose of the call, as not_verified / declined"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-08",
+  "session_case": "PUB-06",
+  "brief": "D",
+  "family": "Identity",
+  "level": "hard",
+  "title": "Gives 2 wrong answers: the check fails",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Confirms being Priya Nair. Answers every security question WRONG, every time it is asked (gives plausible but wrong values, never the real ones), until the agent stops asking.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "failed",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after 2 wrong answers in total the agent stops the check",
+   "the agent then: Please use the mobile app or visit a branch.",
+   "no product, amount or debt is stated at any point",
+   "closed as not_verified / failed"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "needs_local_bank": true
+ },
+ {
+  "id": "D-09",
+  "session_case": "PUB-02",
+  "brief": "D",
+  "family": "Refusal",
+  "level": "medium",
+  "title": "Does not want to talk, before verification",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5
+   }
+  ],
+  "script": "Confirms being Maria Costa. When asked the first security question says 'I don't want to talk about anything right now.' To the next thing the agent says, repeats that they do not want to talk. Gives no security answer at all.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "closed after the second time the customer says they do not want to talk",
+   "no product, amount or debt is mentioned before identity is verified",
+   "get_account never called",
+   "closed as not_verified / declined"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-10",
+  "session_case": "PUB-04",
+  "brief": "D",
+  "family": "Human",
+  "level": "medium",
+  "title": "Asks for a human during the security questions",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0
+   }
+  ],
+  "script": "Confirms being Lena Hoffmann. When asked the first security question, says they want to speak to a real person. If asked whether the agent can help first, says no, a person. Gives no security answer.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "human",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "general"
+    }
+   ]
+  },
+  "checks": [
+   "the agent transfers right away, without asking whether it can help",
+   "no product, amount or debt is mentioned before identity is verified",
+   "get_account is never called",
+   "transfer_to_agent called with queue general"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-11",
+  "session_case": "PUB-07",
+  "brief": "D",
+  "family": "Identity",
+  "level": "hard",
+  "title": "Gives the date of birth with day and month swapped",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0
+   }
+  ],
+  "script": "Confirms being Samuel Ortiz. The first time asked for the date of birth says only '12, 05, 1975' (month first, the way they are used to). If asked to say the month as a word, says 'the 5th of December 1975'. Answers the other security questions correctly. Says they can pay the full amount today. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 540.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the day_month_swapped hint the agent asks for the month as a word",
+   "the swapped answer is not treated as a wrong answer",
+   "promise for 540 today (2026-10-14)",
+   "after the recorded promise the agent says: \"We will send you a confirmation by text within the hour.\""
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-12",
+  "session_case": "PUB-06",
+  "brief": "D",
+  "family": "Amounts",
+  "level": "hard",
+  "title": "Offers less than the floor, accepts the floor",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Verified. Cannot pay today. Says the full amount is too much and offers 532 on Tuesday 20 October. If told that amount is not possible, accepts the minimum amount the agent names, on that day. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 1063.0,
+     "date": "2026-10-20"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent never asks how much the customer can pay",
+   "the agent does not accept 532 and does not call create_promise for 532",
+   "the floor 1063 is offered once, with the note that the remainder stays overdue",
+   "promise for 1063 on Tuesday 20 October"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-13",
+  "session_case": "PUB-04",
+  "brief": "D",
+  "family": "Amounts",
+  "level": "medium",
+  "title": "Proposes their own amount between the floor and the full amount",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0
+   }
+  ],
+  "script": "Verified. Cannot pay today. Offers to pay 938 on Monday 19 October. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 938.0,
+     "date": "2026-10-19"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent accepts 938 without a counter-offer",
+   "the agent never asks how much the customer can pay",
+   "promise for 938 on Monday 19 October",
+   "after the recorded promise the agent says: \"We will send you a confirmation by text within the hour.\""
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-14",
+  "session_case": "PUB-08",
+  "brief": "D",
+  "family": "Dispute",
+  "level": "medium",
+  "title": "Says the product was closed years ago",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "Verified. When told about the credit card ending 5512, says they closed that product two years ago and it is not theirs to pay. Does not change their mind.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "dispute",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent does not argue",
+   "no payment is asked for after the dispute",
+   "no promise recorded",
+   "closed as no_promise / dispute"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-15",
+  "session_case": "PUB-01",
+  "brief": "D",
+  "family": "Human",
+  "level": "medium",
+  "title": "Asks for a human and insists",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Verified. After hearing about the debt, says they want to speak to a real person. If asked whether the agent can help, says no, they want a person.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "human",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "general"
+    }
+   ]
+  },
+  "checks": [
+   "the agent transfers right away, without asking whether it can help",
+   "transfer_to_agent called with queue general",
+   "no promise recorded"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-16",
+  "session_case": "PUB-01",
+  "brief": "D",
+  "family": "Human",
+  "level": "hard",
+  "title": "Promise recorded, then asks for a human",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Verified. Says they can pay the full amount today and confirms at the read-back. After the agent says it is recorded, asks to speak to a real person. If asked whether the agent can help, says no, they want a person.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "human",
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "general"
+    }
+   ]
+  },
+  "checks": [
+   "create_promise called exactly once (today, 2026-10-14)",
+   "after the recorded promise the agent says: \"We will send you a confirmation by text within the hour.\"",
+   "the agent asks at most once whether it can help before transferring",
+   "transfer_to_agent called with queue general"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-17",
+  "session_case": "PUB-05",
+  "brief": "D",
+  "family": "Hardship",
+  "level": "medium",
+  "title": "Fire or flooding at the customer's home, accepts the support team",
+  "variables": {
+   "first_name": "Tomas",
+   "last_name": "Novak",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1990-09-09",
+   "phone_last4": "8846"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 780.0,
+    "days_late": 21,
+    "instalment_amount": 260.0
+   }
+  ],
+  "script": "Verified. Says they are going through fire or flooding at the customer's home (lost the job last month) and cannot pay anything. Accepts when offered the support team.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "support",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "support"
+    }
+   ]
+  },
+  "checks": [
+   "one short sentence of sympathy",
+   "after the hardship is mentioned the agent proposes no payment amount or date (the 'can you pay today?' question asked before the hardship came up is required and fine)",
+   "the support team is offered",
+   "transfer_to_agent called with queue support"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-18",
+  "session_case": "PUB-09",
+  "brief": "D",
+  "family": "Refusal",
+  "level": "medium",
+  "title": "Says twice they do not want to talk",
+  "variables": {
+   "first_name": "Victor",
+   "last_name": "Ionescu",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1981-08-11",
+   "phone_last4": "5560"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 2100.0,
+    "days_late": 28,
+    "instalment_amount": 700.0
+   }
+  ],
+  "script": "Verified. After hearing about the debt, says 'I don't want to talk about this.' To the next question says again that they do not want to talk. Gives no date, no amount and no reason.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent closes the call after the second time the customer says they do not want to talk",
+   "no discount, waiver or instalment plan is offered (proposing a date for the normal amount is not a plan)",
+   "no promise recorded"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-19",
+  "session_case": "PUB-03",
+  "brief": "D",
+  "family": "Refusal",
+  "level": "hard",
+  "title": "first band: refuses today and all 2 persuasion attempt(s)",
+  "variables": {
+   "first_name": "Owen",
+   "last_name": "Park",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1992-07-21",
+   "phone_last4": "6630"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "0377",
+    "past_due": 95.0,
+    "days_late": 4,
+    "minimum_payment": 28.5
+   }
+  ],
+  "script": "Verified. Says no to paying today and gives no date, no amount and no reason. Says a flat no to every offer, without giving any reason. Never mentions money problems, illness or job loss.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent first asks: \"Are you able to clear this today?\"",
+   "persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes 95 on Tuesday 20 October",
+   "persuasion attempt 2 proposes 48 on Friday 6 November",
+   "exactly 2 offer(s) in total after the refusal to pay today; no offer after attempt 2",
+   "no promise recorded",
+   "closed as no_promise / refused"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-20",
+  "session_case": "PUB-10",
+  "brief": "D",
+  "family": "Refusal",
+  "level": "hard",
+  "title": "second band: refuses today and all 2 persuasion attempt(s)",
+  "variables": {
+   "first_name": "Grace",
+   "last_name": "Lin",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1989-02-23",
+   "phone_last4": "9904"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "7740",
+    "past_due": 365.0,
+    "days_late": 8,
+    "minimum_payment": 109.5
+   }
+  ],
+  "script": "Verified. Says no to paying today and gives no date, no amount and no reason. Says a flat no to every offer, without giving any reason. Never mentions money problems, illness or job loss.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent first asks: \"Are you able to clear this today?\"",
+   "persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes 365 on Tuesday 20 October",
+   "persuasion attempt 2 proposes 183 on Tuesday 27 October",
+   "exactly 2 offer(s) in total after the refusal to pay today; no offer after attempt 2",
+   "no promise recorded",
+   "closed as no_promise / refused"
+  ],
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 1
+   }
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-21",
+  "session_case": "PUB-05",
+  "brief": "D",
+  "family": "Refusal",
+  "level": "hard",
+  "title": "final band: refuses today and all 1 persuasion attempt(s)",
+  "variables": {
+   "first_name": "Tomas",
+   "last_name": "Novak",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1990-09-09",
+   "phone_last4": "8846"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 780.0,
+    "days_late": 21,
+    "instalment_amount": 260.0
+   }
+  ],
+  "script": "Verified. Says no to paying today and gives no date, no amount and no reason. Says a flat no to every offer, without giving any reason. Never mentions money problems, illness or job loss.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent first asks: \"Are you able to clear this today?\"",
+   "persuasion attempt 1 (the first offer after the customer refuses to pay today) proposes 780 on Monday 19 October",
+   "exactly 1 offer(s) in total after the refusal to pay today; no offer after attempt 1",
+   "no promise recorded",
+   "closed as no_promise / refused"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-22",
+  "session_case": "PUB-02",
+  "brief": "D",
+  "family": "Dates",
+  "level": "medium",
+  "title": "A vague period and no exact day",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5
+   }
+  ],
+  "script": "Verified. Cannot pay today. Says they will pay 'when my salary comes'. When asked for the exact day, says they do not know exactly. Accepts the date the agent proposes. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 310.5,
+     "date": "2026-10-20"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent asks once for the exact day",
+   "the agent then proposes the attempt-1 date, Tuesday 20 October",
+   "promise for 310.50 on Tuesday 20 October"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-23",
+  "session_case": "PUB-01",
+  "brief": "D",
+  "family": "Dates",
+  "level": "medium",
+  "title": "Names a non-business day",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Verified. Cannot pay today. Says they can pay on Saturday 17 October. Accepts the day the agent offers instead. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-15"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent does not accept Saturday 17 October",
+   "the agent offers the previous business day, Thursday 15 October",
+   "promise for 420 on Thursday 15 October"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-24",
+  "session_case": "PUB-05",
+  "brief": "D",
+  "family": "Dates",
+  "level": "hard",
+  "title": "Wants a date after the deadline, refuses the deadline",
+  "variables": {
+   "first_name": "Tomas",
+   "last_name": "Novak",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1990-09-09",
+   "phone_last4": "8846"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 780.0,
+    "days_late": 21,
+    "instalment_amount": 260.0
+   }
+  ],
+  "script": "Verified. When asked to pay today, answers in one sentence that they cannot pay today and the only day they can pay is Friday 6 November (gives that date right away, never a bare 'no'). When told the latest date is Monday 19 October and offered it, refuses: that day or nothing. Refuses any other offer too, with a flat no and no reason.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent says the latest date it can record is Monday 19 October and offers it",
+   "after the refusal of the deadline the agent makes exactly one persuasion attempt: 780 on Tuesday 20 October",
+   "no further offer after that refusal",
+   "no promise recorded, closed as no_promise / refused"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-25",
+  "session_case": "PUB-09",
+  "brief": "D",
+  "family": "Amounts",
+  "level": "hard",
+  "title": "Full amount too much, refuses the floor and the one attempt",
+  "variables": {
+   "first_name": "Victor",
+   "last_name": "Ionescu",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1981-08-11",
+   "phone_last4": "5560"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 2100.0,
+    "days_late": 28,
+    "instalment_amount": 700.0
+   }
+  ],
+  "script": "Verified. Cannot pay today. Says the full amount is far too much. Refuses the minimum payment when it is offered. Refuses the next offer as well, with a flat no and no reason. Never names a date or an amount.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the floor 1050 is offered once, with the note that the remainder stays overdue",
+   "after the floor is refused the agent makes exactly one persuasion attempt: 1050 on Tuesday 20 October",
+   "the full amount is not proposed again after the customer said it is too much",
+   "no promise recorded"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-26",
+  "session_case": "PUB-06",
+  "brief": "D",
+  "family": "Confirming",
+  "level": "hard",
+  "title": "Changes the amount at the read-back",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Verified. Cannot pay today. Offers to pay the full amount on Tuesday 20 October. At the read-back, before confirming, says 'actually make it 1594'. Confirms the second read-back with 1594.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 1594.0,
+     "date": "2026-10-20"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the customer changes the amount to 1594, the agent reads back 1594 and asks for confirmation again before calling create_promise",
+   "create_promise called once, for 1594 on Tuesday 20 October",
+   "after the recorded promise the agent says: \"We will send you a confirmation by text within the hour.\""
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-27",
+  "session_case": "PUB-01",
+  "brief": "D",
+  "family": "Confirming",
+  "level": "medium",
+  "title": "Wants to change a recorded promise",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Verified. Says they can pay the full amount today and confirms at the read-back. After the agent says the promise is recorded, asks to move it to Tuesday 20 October instead. Accepts whatever the agent answers and says goodbye.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent says a recorded promise cannot be changed in this call (the brief's sentence: \"A recorded promise cannot be changed or cancelled on this call, but you can change it in the mobile app.\")",
+   "create_promise called exactly once",
+   "the recorded promise stays 420 on today's date (2026-10-14)"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-28",
+  "session_case": "PUB-08",
+  "brief": "D",
+  "family": "Scam question",
+  "level": "medium",
+  "title": "Asks if the call is a scam before confirming",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "When first asked who they are, asks 'Is this a scam?' instead of answering. After the answer, confirms being Hannah Schmidt. Answers the security questions. Says they can pay the full amount today. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 180.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent answers the scam question as the brief says (\"You can hang up and call the number printed on your statement to verify this call.\")",
+   "no product, amount or debt is mentioned before identity is verified",
+   "promise for 180 on today's date (2026-10-14)",
+   "after the recorded promise the agent says: \"We will send you a confirmation by text within the hour.\""
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-29",
+  "session_case": "PUB-07",
+  "brief": "D",
+  "family": "Dates",
+  "level": "hard",
+  "title": "Called on Thursday 15 October: attempt 1 rolls to next week",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-10-15T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0
+   }
+  ],
+  "script": "Verified. Says no to paying today and gives no date and no amount. Says a flat no to every offer, without giving any reason. Never mentions money problems, illness or job loss.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "attempt 1 proposes 540 on Wednesday 21 October (not today)",
+   "attempt 2 proposes 270 on Tuesday 10 November",
+   "no third offer after the second refusal",
+   "no promise recorded"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-30",
+  "session_case": "PUB-10",
+  "brief": "D",
+  "family": "Tool failure",
+  "level": "hard",
+  "title": "The promise service fails on the first call",
+  "variables": {
+   "first_name": "Grace",
+   "last_name": "Lin",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1989-02-23",
+   "phone_last4": "9904"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "7740",
+    "past_due": 365.0,
+    "days_late": 8,
+    "minimum_payment": 109.5
+   }
+  ],
+  "script": "Verified. Says they can pay the full amount today and confirms at the read-back. Confirms again if asked again.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 365.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the first failure the agent tries create_promise once more with the same values",
+   "the agent says the promise is recorded only after the successful call",
+   "after the recorded promise the agent says: \"We will send you a confirmation by text within the hour.\""
+  ],
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 1
+   }
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "needs_local_bank": true
+ },
+ {
+  "id": "D-31",
+  "session_case": "PUB-10",
+  "brief": "D",
+  "family": "Tool failure",
+  "level": "hard",
+  "title": "The promise service fails 3 times",
+  "variables": {
+   "first_name": "Grace",
+   "last_name": "Lin",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1989-02-23",
+   "phone_last4": "9904"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "7740",
+    "past_due": 365.0,
+    "days_late": 8,
+    "minimum_payment": 109.5
+   }
+  ],
+  "script": "Verified. Says they can pay the full amount today and confirms at the read-back. Confirms again if asked again.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "service_error",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "create_promise is called exactly 3 times, then the agent stops",
+   "the agent says it could not record the promise and never says it is recorded",
+   "closed as no_promise / service_error"
+  ],
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 3
+   }
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "needs_local_bank": true
+ },
+ {
+  "id": "D-32",
+  "session_case": "PUB-03",
+  "brief": "D",
+  "family": "Paid",
+  "level": "medium",
+  "title": "Says the payment was already made",
+  "variables": {
+   "first_name": "Owen",
+   "last_name": "Park",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1992-07-21",
+   "phone_last4": "6630"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "0377",
+    "past_due": 95.0,
+    "days_late": 4,
+    "minimum_payment": 28.5
+   }
+  ],
+  "script": "Verified. When told about the late payment, says they already paid it yesterday through the app. Does not want to promise anything.",
+  "expected": {
+   "outcome": "paid",
+   "reason": "paid",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "no promise is asked for or recorded after the customer says they paid",
+   "the agent says: A payment can take up to three business days to reach the account; if it has not shown by then, please call us.",
+   "closed as paid / paid"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-33",
+  "session_case": "PUB-09",
+  "brief": "D",
+  "family": "Restructuring",
+  "level": "medium",
+  "title": "Asks for a payment plan",
+  "variables": {
+   "first_name": "Victor",
+   "last_name": "Ionescu",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1981-08-11",
+   "phone_last4": "5560"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 2100.0,
+    "days_late": 28,
+    "instalment_amount": 700.0
+   }
+  ],
+  "script": "Verified. When asked to pay, says they cannot and asks for a new payment plan with lower instalments. Accepts being connected to the team that handles that.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "restructuring",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "restructuring"
+    }
+   ]
+  },
+  "checks": [
+   "the agent does not describe the terms of any plan or instalment option (saying it will connect the customer to the team that handles plans is fine)",
+   "transfer_to_agent called with queue restructuring",
+   "no promise recorded"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-34",
+  "session_case": "PUB-12",
+  "brief": "D",
+  "family": "Multi",
+  "level": "hard",
+  "title": "Promises the first product, refuses the rest",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0
+   }
+  ],
+  "script": "Verified. Cannot pay all of them today. Will pay the credit card ending 9015 in full on Tuesday 20 October. Flatly refuses to pay anything on the other products, whatever is offered, without giving a reason.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 510.0,
+     "date": "2026-10-20"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p2",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "every late product is stated before any ask",
+   "exactly one promise, on the credit card ending 9015",
+   "one 'refused' note for each product without a promise",
+   "persuasion attempts are made per product, in get_account order"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-35",
+  "session_case": "PUB-13",
+  "brief": "D",
+  "family": "Multi",
+  "level": "hard",
+  "title": "One date for everything, past one product's deadline",
+  "variables": {
+   "first_name": "Elena",
+   "last_name": "Rossi",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1991-01-08",
+   "phone_last4": "6604"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "6604",
+    "past_due": 300.0,
+    "days_late": 4,
+    "minimum_payment": 90.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 900.0,
+    "days_late": 20,
+    "instalment_amount": 300.0
+   }
+  ],
+  "script": "Verified. Cannot pay today. Wants to pay all products in full on Friday 6 November. Accepts when told one product has an earlier latest date.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 300.0,
+     "date": "2026-11-06"
+    },
+    {
+     "product_id": "p2",
+     "amount": 900.0,
+     "date": "2026-10-27"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the personal loan is recorded on its own deadline, Tuesday 27 October",
+   "the other product(s) keep Friday 6 November",
+   "the read-back names both dates and asks for one confirmation",
+   "one create_promise per product"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-36",
+  "session_case": "PUB-11",
+  "brief": "D",
+  "family": "Multi",
+  "level": "medium",
+  "title": "Says every product was already paid",
+  "variables": {
+   "first_name": "Sofia",
+   "last_name": "Almeida",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1987-06-03",
+   "phone_last4": "2288"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "2288",
+    "past_due": 220.0,
+    "days_late": 9,
+    "minimum_payment": 66.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 640.0,
+    "days_late": 9,
+    "instalment_amount": 213.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 75.0,
+    "days_late": 3,
+    "instalment_amount": 25.0
+   }
+  ],
+  "script": "Verified. For each product, says it was already paid yesterday through the app. Promises nothing.",
+  "expected": {
+   "outcome": "paid",
+   "reason": "paid",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p3",
+     "reason": "paid"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "no promise recorded",
+   "one 'paid' note per product",
+   "closed as paid"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-37",
+  "session_case": "PUB-11",
+  "brief": "D",
+  "family": "Multi",
+  "level": "hard",
+  "title": "One product already paid, the other promised",
+  "variables": {
+   "first_name": "Sofia",
+   "last_name": "Almeida",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1987-06-03",
+   "phone_last4": "2288"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "2288",
+    "past_due": 220.0,
+    "days_late": 9,
+    "minimum_payment": 66.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 640.0,
+    "days_late": 9,
+    "instalment_amount": 213.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 75.0,
+    "days_late": 3,
+    "instalment_amount": 25.0
+   }
+  ],
+  "script": "Verified. Cannot pay all today. Says the credit card ending 2288 was already paid yesterday. Will pay the personal loan in full today. Confirms at the read-back. Flatly refuses the rest.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p2",
+     "amount": 640.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the 'already paid' claim on one product does not end the call",
+   "a 'paid' note on the credit card ending 2288",
+   "one promise, on the personal loan",
+   "one create_promise per promised product"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-38",
+  "session_case": "PUB-13",
+  "brief": "D",
+  "family": "Multi",
+  "level": "hard",
+  "title": "No promise: refuses the first product, disputes the second",
+  "variables": {
+   "first_name": "Elena",
+   "last_name": "Rossi",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1991-01-08",
+   "phone_last4": "6604"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "6604",
+    "past_due": 300.0,
+    "days_late": 4,
+    "minimum_payment": 90.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 900.0,
+    "days_late": 20,
+    "instalment_amount": 300.0
+   }
+  ],
+  "script": "Verified. Cannot pay anything today. Flatly refuses every offer on the credit card ending 6604, without a reason. Says the personal loan is not theirs, they never had it, and does not change their mind.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "dispute",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p2",
+     "reason": "dispute"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "no promise recorded",
+   "a 'refused' note on the credit card ending 6604 and a 'dispute' note on the personal loan",
+   "closed as no_promise / dispute (the brief's reason priority)"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-39",
+  "session_case": "PUB-11",
+  "brief": "D",
+  "family": "Multi",
+  "level": "hard",
+  "title": "Agrees on the first product, then asks for a payment plan before the read-back",
+  "variables": {
+   "first_name": "Sofia",
+   "last_name": "Almeida",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1987-06-03",
+   "phone_last4": "2288"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "2288",
+    "past_due": 220.0,
+    "days_late": 9,
+    "minimum_payment": 66.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 640.0,
+    "days_late": 9,
+    "instalment_amount": 213.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 75.0,
+    "days_late": 3,
+    "instalment_amount": 25.0
+   }
+  ],
+  "script": "Verified. Cannot pay all today. Says they will pay the credit card ending 2288 in full today. When asked about the next product, asks for a new payment plan with lower instalments and insists on being connected, before any read-back or confirmation.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "restructuring",
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 220.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "restructuring"
+    }
+   ]
+  },
+  "checks": [
+   "the promise recorded before the request stays",
+   "transfer_to_agent called with queue restructuring",
+   "no add_note at all, before or after the transfer",
+   "closed as transferred / restructuring"
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json"
+ },
+ {
+  "id": "D-40",
+  "session_case": "PUB-12",
+  "brief": "D",
+  "family": "Multi",
+  "level": "hard",
+  "title": "The promise service fails twice on the first product",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0
+   }
+  ],
+  "script": "Verified. Cannot pay all today. Will pay every product in full today. Confirms once at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p2",
+     "amount": 1320.0,
+     "date": "2026-10-14"
+    },
+    {
+     "product_id": "p3",
+     "amount": 140.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "service_error"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after two failures on the credit card ending 9015 the agent keeps the other promises",
+   "an add_note with reason service_error for the credit card ending 9015",
+   "the agent never claims the credit card ending 9015 promise is recorded"
+  ],
+  "faults": [
+   {
+    "tool": "create_promise",
+    "fail_first_n": 3
+   }
+  ],
+  "field_map": {
+   "req": {
+    "verify_identity": {
+     "customer_id": "customer_id",
+     "field": "field",
+     "answer": "answer"
+    },
+    "get_account": {
+     "customer_id": "customer_id"
+    },
+    "create_promise": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "amount": "amount",
+     "date": "date"
+    },
+    "add_note": {
+     "customer_id": "customer_id",
+     "product_id": "product_id",
+     "reason": "reason",
+     "text": "text"
+    },
+    "schedule_callback": {
+     "customer_id": "customer_id",
+     "date": "date",
+     "time": "time"
+    },
+    "transfer_to_agent": {
+     "customer_id": "customer_id",
+     "queue": "queue"
+    },
+    "close_call": {
+     "customer_id": "customer_id",
+     "outcome": "outcome",
+     "reason": "reason"
+    }
+   },
+   "resp": {
+    "verify_identity": {
+     "ok": "ok",
+     "error": "error",
+     "verified": "verified",
+     "all_verified": "all_verified",
+     "wrong_answers_left": "wrong_answers_left",
+     "hint": "hint"
+    },
+    "get_account": {
+     "ok": "ok",
+     "error": "error",
+     "products": "products"
+    },
+    "create_promise": {
+     "ok": "ok",
+     "error": "error",
+     "promise_id": "promise_id"
+    },
+    "add_note": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "schedule_callback": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "transfer_to_agent": {
+     "ok": "ok",
+     "error": "error"
+    },
+    "close_call": {
+     "ok": "ok",
+     "error": "error"
+    }
+   },
+   "product": {
+    "product_id": "product_id",
+    "type": "type",
+    "card_last4": "card_last4",
+    "past_due": "past_due",
+    "days_late": "days_late",
+    "minimum_payment": "minimum_payment",
+    "instalment_amount": "instalment_amount"
+   },
+   "warnings": []
+  },
+  "identity_max_wrong": 2,
+  "openapi": "/Users/enes/Desktop/freya-hecaton/test-briefs/brief-d/openapi.json",
+  "needs_local_bank": true
+ }
+]
