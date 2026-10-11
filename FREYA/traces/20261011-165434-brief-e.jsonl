@@ -1,0 +1,9 @@
+{"t": 0.0, "kind": "start", "at": "2026-10-11T16:54:34+0300", "label": "brief-e"}
+{"t": 0.0, "kind": "note", "text": "briefs=['../test-briefs/brief-e/brief.md'] openapi=../test-briefs/brief-e/openapi.json slot=brief-e model=claude-opus-5-5 budget_min=25"}
+{"t": 92.0, "kind": "model_call", "model": "claude-opus-5-5", "purpose": "extract CallSpec from brief (attempt 1)", "seconds": 91.7, "cost_usd": 0.6043354000000001, "tokens": null}
+{"t": 92.0, "kind": "note", "text": "extraction attempt 1: CallSpec valid (25092 bytes)"}
+{"t": 92.0, "kind": "note", "text": "compiled 30 nodes -> /Users/doraalkan/Desktop/freya-hecaton/FREYA/out/brief-e.workflow.json"}
+{"t": 92.9, "kind": "note", "text": "dryRun valid"}
+{"t": 95.7, "kind": "created_on_freya", "what": "workflow", "steps": 30, "tools": 10, "slot": "brief-e", "tag": "v1", "workflow_id": "e4b37dbe-9914-4f44-a6c0-acfea7603b04", "agent_id": "c184cf70-af64-4c48-95d7-af97dd9502ae", "version": 3}
+{"t": 96.0, "kind": "note", "text": "exported /Users/doraalkan/Desktop/freya-hecaton/FREYA/submission/brief-e.workflow.json"}
+{"t": 96.0, "kind": "end", "at": "2026-10-11T16:56:10+0300", "total_seconds": 96, "workflow_id": "e4b37dbe-9914-4f44-a6c0-acfea7603b04", "agent_id": "c184cf70-af64-4c48-95d7-af97dd9502ae", "export": "/Users/doraalkan/Desktop/freya-hecaton/FREYA/submission/brief-e.workflow.json", "tests": {}}

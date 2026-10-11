@@ -191,6 +191,12 @@ def consistency_checks(spec) -> list[str]:
     it = " ".join(low(x) for x in spec.identity.extra_rules) + " " + " ".join(low(x) for x in spec.opening.extra_rules)
     if re.search(r"(immediately|right) after the name is confirmed.*say", it) and not spec.identity.intro_text:
         errs.append("a text rule dictates a sentence right after the name is confirmed but identity.intro_text is empty")
+    ot = low(spec.opening.first_sentence) + " " + " ".join(low(x) for x in spec.opening.extra_rules)
+    if "good afternoon" in ot and "good morning" in ot and "{greeting}" not in spec.opening.first_sentence:
+        errs.append("the greeting depends on the time of day but opening.first_sentence has no {greeting} placeholder (fill opening.greetings)")
+    idt = " ".join(low(x) for x in spec.identity.extra_rules)
+    if re.search(r"per question|same question", idt) and not spec.identity.max_wrong_per_question:
+        errs.append("identity text counts wrong answers per question but identity.max_wrong_per_question is empty")
     mc = low(spec.multi_product.closing_rule)
     if "first product" in mc and not re.search(r"not paid|non-paid|other than paid|isn't paid|is not noted paid", mc) and not spec.multi_product.closing_by_first_product:
         errs.append("multi_product.closing_rule follows the first product but closing_by_first_product is false")

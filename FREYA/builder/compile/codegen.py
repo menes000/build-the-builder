@@ -54,6 +54,7 @@ def facts_code(spec: CallSpec) -> str:
         "FIRST_QUESTION": spec.identity.questions[0].ask if spec.identity.questions else "",
         "ATT1_KIND": spec.persuasion.attempt1_date_kind,
         "ATT1_N": int(spec.persuasion.attempt1_business_days or 0),
+        "GREETINGS": dict(sorted((spec.opening.greetings or {}).items())) or ({"00:00": "Good morning", "12:00": "Good afternoon", "18:00": "Good evening"} if "{greeting}" in spec.opening.first_sentence else {}),
         "FLOOR_TEXT_MODE": spec.amounts.floor_mode == "text",
         "ATT1_TEXT_MODE": spec.persuasion.attempt1_mode == "text" or spec.persuasion.attempt1_date_kind == "other",
         "CB_TEXT_MODE": cb.day_mode == "text",
@@ -138,6 +139,12 @@ try:
     now_hm = nowdt.strftime('%H:%M')
     vars['today_iso'] = today.isoformat()
     vars['now_hm'] = now_hm
+    if GREETINGS:
+        g = ''
+        for start in sorted(GREETINGS):
+            if now_hm >= start:
+                g = GREETINGS[start]
+        vars['greeting'] = g or GREETINGS[sorted(GREETINGS)[0]]
     # a safe default outcome so close_call never needs a model-filled value (decide_outcome overrides it)
     if not vars.get('outcome'):
         vars['outcome'] = DEFAULT_OUTCOME[0]
@@ -373,7 +380,7 @@ def verify_post(spec: CallSpec) -> str:
     qs = [q.field for q in spec.identity.questions]
     asks = {q.field: q.ask for q in spec.identity.questions}
     F = ((spec.field_map or {}).get("resp", {}).get("verify_identity") or {})
-    return "import json\nHINTS = " + _lit(hints) + "\nQS = " + _lit(qs) + "\nASKS = " + _lit(asks) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error", "verified", "all_verified", "wrong_answers_left", "hint")}) + r'''
+    return "import json\nMAXQ = " + _lit(spec.identity.max_wrong_per_question) + "\nMAXT = " + _lit(spec.identity.max_wrong_total) + "\nHINTS = " + _lit(hints) + "\nQS = " + _lit(qs) + "\nASKS = " + _lit(asks) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error", "verified", "all_verified", "wrong_answers_left", "hint")}) + r'''
 try:
     if isinstance(result, dict):
         result.pop('header', None)
@@ -422,8 +429,21 @@ try:
                 nxt = []
             d['what_to_do_next'] = 'This answer is correct. Now ask the next security question: ' + (ASKS.get(nxt[0], '') if nxt else '') + ' (order: ' + ', '.join(QS) + ')'
         else:
-            d['id_state'] = 'retry'
-            d['what_to_do_next'] = 'This answer is wrong. Tell the customer it does not match our records and ask the same question again.' + ('' if left is None else ' Wrong answers left: ' + str(left) + '.')
+            # a wrong answer: count it per question and in total; the brief's limits apply even if the bank allows more
+            fld = str(vars.get('last_verify_field') or '')
+            try:
+                per = json.loads(str(vars.get('wrong_by_field') or '{}'))
+            except Exception:
+                per = {}
+            per[fld] = int(per.get(fld) or 0) + 1
+            vars['wrong_by_field'] = json.dumps(per)
+            total = sum(int(x) for x in per.values())
+            if (MAXQ and per[fld] >= int(MAXQ)) or (MAXT and total >= int(MAXT)):
+                d['id_state'] = 'failed'
+                d['what_to_do_next'] = 'The check has failed: the allowed number of wrong answers is reached. Say nothing about the account.'
+            else:
+                d['id_state'] = 'retry'
+                d['what_to_do_next'] = 'This answer is wrong. Tell the customer it does not match our records and ask the same question again.' + ('' if left is None else ' Wrong answers left: ' + str(left) + '.')
 except Exception:
     pass
 '''

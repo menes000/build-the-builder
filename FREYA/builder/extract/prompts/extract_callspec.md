@@ -54,3 +54,9 @@ Set `amounts.floor_mode`, `persuasion.attempt1_mode` or `third_party.callback.da
 rule for the floor, the attempt-1 date or the allowed callback days cannot be expressed with the structured fields
 above. The code then stops computing that quantity and the agent applies the rule text (`floor_rule`,
 `attempt1_date_rule`, `callback.day_rule`), which must then state the rule completely. Prefer the fields whenever they fit.
+
+## Time-of-day greeting and per-question identity limits
+- If the opening sentence starts with a greeting that depends on the time ("Good morning" before 12:00, "Good afternoon"
+  after), write `{greeting}` in `opening.first_sentence` and fill `opening.greetings` with start times.
+- If wrong security answers are counted per question, set `identity.max_wrong_per_question`; `identity.max_wrong_total`
+  stays the total limit the brief states.

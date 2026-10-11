@@ -192,3 +192,35 @@ def test_parallel_refusals_keep_their_own_answer(wf_ab):
     assert "credit card" in r1["data"]["what_to_do_next"] and "car loan" in r2["data"]["what_to_do_next"]
     r3 = {"data": {}, "header": {}}; run_hook(t["post_process_code"], v, result=r3)   # nothing queued: falls back, no crash
     assert r3["data"]["what_to_do_next"]
+
+
+def test_identity_per_question_and_total_limits(tmp_path):
+    """Brief E: two wrong answers to the same question end the check even though the bank allows three in total."""
+    wf = _variant_wf(tmp_path, **{"identity.max_wrong_per_question": 2})
+    t = tool(wf, "security", "verify_identity")
+    v = {}
+    states = []
+    for fld, left in (("date_of_birth", 2), ("date_of_birth", 1)):
+        run_hook(t["pre_process_code"], v, body={"field": fld, "answer": "x"})
+        res = {"data": {"ok": True, "verified": False, "wrong_answers_left": left}}
+        run_hook(t["post_process_code"], v, result=res)
+        states.append(res["data"]["id_state"])
+    assert states == ["retry", "failed"]
+    v = {}
+    states = []                                                          # one wrong on each question does not end it
+    for fld, left in (("date_of_birth", 2), ("phone_last4", 1)):
+        run_hook(t["pre_process_code"], v, body={"field": fld, "answer": "x"})
+        res = {"data": {"ok": True, "verified": False, "wrong_answers_left": left}}
+        run_hook(t["post_process_code"], v, result=res)
+        states.append(res["data"]["id_state"])
+    assert states == ["retry", "retry"]
+
+
+def test_greeting_follows_the_time_of_day(tmp_path):
+    from builder.compile.selfcheck import facts_preview
+    wf = _variant_wf(tmp_path, **{"opening.first_sentence": "{greeting}, my name is Freya and I am calling on behalf of Freya Bank.",
+                                  "opening.greetings": {"00:00": "Good morning", "12:00": "Good afternoon"}})
+    assert wf["nodes"]["opening"]["on_enter"]["text"].startswith("{{greeting}}, my name is Freya")
+    acc = [{"product_id": "p1", "type": "credit_card", "card_last4": "9015", "past_due": 510.0, "days_late": 16, "minimum_payment": 153.0}]
+    assert facts_preview(wf, "2026-10-14T11:00", acc)["greeting"] == "Good morning"
+    assert facts_preview(wf, "2026-10-14T14:30", acc)["greeting"] == "Good afternoon"

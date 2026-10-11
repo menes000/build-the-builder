@@ -54,7 +54,7 @@ def system_prompt(spec: CallSpec) -> str:
 
 
 def opening_line(spec: CallSpec) -> str:
-    return f"{spec.opening.first_sentence} {spec.opening.ask_person_question}"
+    return f"{spec.opening.first_sentence} {spec.opening.ask_person_question}".replace("{greeting}", "{{greeting}}")
 
 
 def opening_task(spec: CallSpec) -> str:

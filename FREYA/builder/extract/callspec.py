@@ -53,6 +53,7 @@ class Identity(BaseModel):
     intro_text: str = Field("", description="Exact sentence(s) spoken right after the name is confirmed and before the first security question, if the brief dictates them (e.g. a recording notice). Default: 'Thank you, <customer>. Before I continue, I need to ask you N security questions.'")
     ask_one_at_a_time: bool = True
     max_wrong_total: int = Field(description="Total wrong answers that end the check")
+    max_wrong_per_question: Optional[int] = Field(None, description="If wrong answers are counted PER QUESTION (e.g. two wrong answers to the same question end the check), that number; otherwise null")
     retry_hints: list[RetryHint] = []
     wrong_answer_may_be_repeated: bool = True
     after_failed_text: str = Field(description="The exact sentence the agent SAYS to the customer after the check failed, in the agent's own voice, e.g. 'Please use the mobile app or visit a branch.' Not an instruction, not 'Say that...'")
@@ -65,7 +66,8 @@ class Identity(BaseModel):
 # ----------------------------------------------------------------------------- opening
 
 class Opening(BaseModel):
-    first_sentence: str = Field(description="The exact required opening sentence (who is calling, recording notice)")
+    first_sentence: str = Field(description="The exact required opening sentence (who is calling, recording notice). If its first words depend on the time of day, write the placeholder {greeting} there and fill greetings")
+    greetings: dict[str, str] = Field({}, description="Only when the first sentence uses {greeting}: start time HH:MM -> greeting, e.g. {'00:00': 'Good morning', '12:00': 'Good afternoon'}")
     ask_person_question: str = Field(description="The question that asks whether the customer is on the line, with {{title}} {{last_name}} placeholders")
     confirmation_examples: list[str] = Field(description="Answers that count as confirmation")
     non_confirmation_examples: list[str] = Field(description="Answers that do NOT count")
