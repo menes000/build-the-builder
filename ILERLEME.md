@@ -5,7 +5,8 @@
 - Senaryo: gecikmiş borç tahsilat araması. 7 tool: `verify_identity`, `get_account`, `create_promise`, `add_note`, `schedule_callback`, `transfer_to_agent`, `close_call`.
 - **Final:** Pazar 17:00–20:00 UTC (20:00–23:00 İstanbul). 2 gizli brief (biri temiz spesifikasyon, biri dağınık materyal: mail + politika + memo + kod listesi), her birinin kendi `openapi.json`'u var. Tool isimleri aynı kalıyor, alanlar ve enum'lar değişebilir.
 - Brief başına 30 müşteri (1–3 ürün, farklı takvim günleri, insan gibi konuşan müşteriler), her vaka 3 kez koşuluyor, 3/3 geçmesi gerekiyor. Skor = geçen / 60. Eşitlikte: toplam söz tutarı, sonra build süresi.
-- Builder bir brief için en fazla 30 dk (testler dahil), tek komut, elle müdahale yok. Gizli brief'ten koda bilgi yazmak yasak.
+- Builder bir brief için en fazla 30 dk (kendi koştuğu testler dahil), elle müdahale yok, ajan elle düzenlenmez. Gizli brief'ten koda bilgi yazmak yasak (kural, değer, isim).
+- **Final sırasında builder'daki genel bir bug düzeltilebilir** (README: "After the final briefs open you may fix a bug in your builder... Fixing a crash on a table your parser did not expect is allowed"). **Builder birden çok kez koşulabilir, bir koşunun ajanı + o koşunun trace'i teslim edilir.** Eşitlikte kısa build süresi avantaj → builder'ın kendi içindeki test kısa olmalı; bizim lokal test builder dışında koşar, build süresine girmez.
 - Teslim: repo + commit, `export_workflow` ile 2 workflow JSON, 2 trace.
 - Ajan modeli `experimental-5` sabit. Müşteri ve judge `gemini-3-flash-preview`.
 - **Pazar 17–20 platform test limiti:** docs'ta sayı/kapsam yok. Kickoff transcript'i (36:30–36:48): "limit on our platform, but no limit if you test yourself in your local… your system should simulate personas in itself". Chat API'nin sayılıp sayılmadığı bilinmiyor → lokal emülatör bu yüzden yazıldı.
@@ -162,6 +163,20 @@ Sonuç: v15 `after_promise` node'u model farkını kapattı; experimental-5 art�
 - **Gemini judge** bazen çok uzun düşünüyor (215 sn); 90 sn timeout × 3 retry ile ERROR'a düşebiliyor.
 - **Workspace paylaşımlı** (Dora ile): aynı anda 1 simülasyon. Chat API simülasyon kuyruğunu kullanmıyor.
 - Ajan modeli `agent_config.llmConfig` = experimental-5 (`freya.save_workflow` ayarlıyor).
+
+## Pazar için problem tanımı (11 Eki 01:30)
+Pazar 20:00'de iki görülmemiş brief gelecek; Dora'nın builder'ı ~5 dk'da ajan üretecek; 3 saat içinde o ajanın gizli jüri müşterilerinde nerede düşeceğini bulup Dora'ya genel düzeltme fırsatı vermemiz gerekiyor. Bugünkü düzenek bunu yapamıyor:
+1. **Vakalar elle ve tek brief'e özgü.** 28 vaka Brief A değerleriyle elle yazıldı. Yeni brief için elle yazmaya zaman yok, gizli değerleri elle yazmak gri alan. Brief → vaka dönüşümü otomatik değil.
+2. **Çok ürün kapsanmıyor.** Final müşterileri 3 ürüne kadar (README). Brief B tipi vaka yok; emülatör `ours-ab` ile hiç koşulmadı (paralel `create_promise`, `add_note` sayaçları, "bitti" geçişi Dora'nın en kırılgan alanı).
+3. **Extraction kör noktası.** Ajan da vakalar da aynı CallSpec'ten beslenirse extraction'ın kaçırdığı kural test edilmez. Dağınık brief'te (memo eski kuralı eziyor) en olası hata bu.
+4. **Model farkı.** Lokal ajan Gemini, gerçek experimental-5; 28'de 26 uyum ama farklar "model huyu" sınıfında. Pazar resmi koşu limitli; hangi vakaların resmi yola ayrılacağı kuralı yok.
+5. **Operasyon.** Tek komut zinciri (export → vaka üret → koş → rapor) yok; bank mock final hesaplarıyla çalışır mı bilinmiyor; teslim formatı (`builder/build.py {brief} {openapi}`, `submission/`, `traces/<ad>.log`) Dora tarafında henüz yok.
+
+Çözüm planı (sıra):
+- (1)+(3) `tester/cases_from_callspec.py`: 28 şablon, değerler CallSpec'ten, tarihler koddan, assert'li; + LLM ile ham brief'ten bağımsız kural listesi → CallSpec diff (extraction hatası adayları); + şablon dışı kurallar için LLM senaryo önerisi, beklenen ledger kodla doğrulanır. Check yazım kuralları sabit: davranış + somut sayı/tarih, brief kelimeleri, "X zorunludur, ihlal değildir" netleştirmeleri, API tool adı.
+- (2) 8–10 çok ürünlü şablon (kısmi söz + kısmi red, tek tarih bir ürünün deadline'ını aşıyor, bir ürün "ödedim" diğeri söz, restructuring sonrası not yok, bir üründe `create_promise` hatası, hepsi "ödedim" → paid, iki farklı bant); PUB-11..13 hesapları; `ours-ab` lokal + 1 resmi.
+- (5) `tester/final.sh` + `health.py`; Brief C ile baştan sona prova, süre ölçümü. Dora'ya teslim formatı iletildi (01:00 mesajı).
+- (4) riskli vaka kuralı: tool tekrar bayrağı, `after_promise`, intent routing geçen vakalar, ret sayacı → resmi yolda öncelik.
 
 ## Sıradaki adımlar
 - [ ] (onay bekliyor) `ours-a-chattest` kopyasını oluştur, 18 vakayı Freya modunda koş, lokal ile karşılaştır → emülatör kalibrasyonu (`path` alanı bunun için).
