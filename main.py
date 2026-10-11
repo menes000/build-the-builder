@@ -17,7 +17,7 @@ Steps (every step is written to the trace; nothing is edited by hand):
 
 Options:
     --budget-min N     hard time budget for the whole run (default 25; the rules allow 30)
-    --fix-rounds N     fix rounds after the local test (default 1; 0 = test and report only)
+    --no-fix           test and report only (default: fix rounds until nothing fails, a fix is rejected, or the budget is spent)
     --reps N           runs per generated customer in the local test (default 2)
     --parallel N       customers tested at the same time (default 8)
     --cross-check      run step 2 (off by default)
@@ -28,6 +28,7 @@ Options:
     --model NAME       Claude model for extraction and fixes (default claude-opus-5-5)
     --only 20,24       test only these generated customers: numbers, full ids, a level (hard), families (Refusal,Multi) or level:family (hard:Refusal);
                        the full set is kept in cases.all.json
+    --max 10           with --only: at most 10 of the chosen customers, spread over the families
     --claude-test      run the local test on the Claude subscription (claude CLI, Haiku) instead of Gemini; without it: Gemini
 
 Needs: FREYA_API_KEY (+ FREYA_WORKSPACE_ID), a Claude login or ANTHROPIC_API_KEY, GEMINI_API_KEY for the local test,
@@ -354,7 +355,7 @@ def main(argv=None) -> int:
     ap.add_argument("openapi", help="the bank's tool API file")
     ap.add_argument("--name")
     ap.add_argument("--budget-min", type=float, default=25)
-    ap.add_argument("--fix-rounds", type=int, default=1)
+    ap.add_argument("--no-fix", action="store_true", help="test and report only: no fix rounds")
     ap.add_argument("--reps", type=int, default=2)
     ap.add_argument("--parallel", type=int, default=8)
     ap.add_argument("--cross-check", action="store_true", help="step 2: a second model (GPT-5.5) reads the brief; disputed fields go back to Claude (off by default)")
@@ -362,6 +363,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-publish", action="store_true")
     ap.add_argument("--spec")
     ap.add_argument("--only", help="test only these generated customers: numbers (20,24), full ids, a level (hard) or families (Refusal,Multi)")
+    ap.add_argument("--max", type=int, help="with --only: at most this many customers, spread over the families")
     ap.add_argument("--claude-test", action="store_true", help="local test on the Claude subscription (claude CLI) instead of Gemini")
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     a = ap.parse_args(argv)
@@ -381,7 +383,7 @@ def main(argv=None) -> int:
     export = ROOT / "submission" / f"{name}.workflow.json"
     trace = Trace(str(ROOT / "traces"), label=name)
     trace.note(f"main.py brief={a.brief} files={len(briefs)} openapi={a.openapi} name={name} model={a.model} budget_min={a.budget_min} "
-               f"fix_rounds={a.fix_rounds} reps={a.reps} test_model={'claude subscription' if a.claude_test else 'gemini'} work={work}")
+               f"fix={'off' if a.no_fix else 'until the budget'} reps={a.reps} test_model={'claude subscription' if a.claude_test else 'gemini'} work={work}")
 
     # 1. extract
     if a.spec:
@@ -439,6 +441,14 @@ def main(argv=None) -> int:
             return (c["id"] == w or (w.isdigit() and c["id"].endswith(f"-{w.zfill(2)}"))
                     or w2 == str(c.get("level", "")).lower() or w2 == str(c.get("family", "")).lower())
         pick = [c for c in cases if any(chosen(c, w) for w in want)]
+        if a.max and len(pick) > a.max:          # spread over the families: one from each family in turn
+            fams = {}
+            for c in pick: fams.setdefault(c.get("family", ""), []).append(c)
+            spread = []
+            while len(spread) < a.max:
+                for f in list(fams):
+                    if fams[f] and len(spread) < a.max: spread.append(fams[f].pop(0))
+            pick = sorted(spread, key=lambda c: c["id"])
         save(work / "cases.all.json", cases)
         trace.note(f"--only {a.only}: testing {len(pick)} of {len(cases)} customers: " + "; ".join(f"{c['id']} {c['title']}" for c in pick))
         cases = pick
@@ -451,7 +461,9 @@ def main(argv=None) -> int:
 
         # 6. fix rounds, on the same customers
         from builder.test.fixer import propose_fix
-        for rnd in range(1, a.fix_rounds + 1):
+        rnd = 0
+        while not a.no_fix:                     # fix rounds run until nothing fails, a fix is rejected, or the time budget is spent
+            rnd += 1
             r = best["result"]
             if not r or r["passed"] == r["total"]:
                 break
