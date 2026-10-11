@@ -5,7 +5,7 @@
 
 Steps (every step is written to the trace; nothing is edited by hand):
   1. EXTRACT      Claude reads every brief file and fills the CallSpec form (FREYA/builder, unchanged).
-  2. CROSS-CHECK  a second model reads the raw brief on its own; the fields where the two readings disagree go back to
+  2. CROSS-CHECK  (only with --cross-check) a second model reads the raw brief on its own; the fields where the two readings disagree go back to
                   Claude, which re-reads the brief for exactly those fields and corrects the CallSpec where the brief says so.
   3. COMPILE      deterministic CallSpec -> workflow (FREYA/builder), lint, local run of every code snippet.
   4. PUBLISH v1   dryRun, save + publish, export. From here on a valid submission file always exists.
@@ -20,7 +20,7 @@ Options:
     --fix-rounds N     fix rounds after the local test (default 1; 0 = test and report only)
     --reps N           runs per generated customer in the local test (default 2)
     --parallel N       customers tested at the same time (default 8)
-    --no-cross-check   skip step 2
+    --cross-check      run step 2 (off by default)
     --no-test          skip steps 5 and 6
     --no-publish       offline: compile and test, never call Freya (development)
     --spec PATH        skip extraction, start from this CallSpec (development)
@@ -357,7 +357,7 @@ def main(argv=None) -> int:
     ap.add_argument("--fix-rounds", type=int, default=1)
     ap.add_argument("--reps", type=int, default=2)
     ap.add_argument("--parallel", type=int, default=8)
-    ap.add_argument("--no-cross-check", action="store_true")
+    ap.add_argument("--cross-check", action="store_true", help="step 2: a second model (GPT-5.5) reads the brief; disputed fields go back to Claude (off by default)")
     ap.add_argument("--no-test", action="store_true")
     ap.add_argument("--no-publish", action="store_true")
     ap.add_argument("--spec")
@@ -393,7 +393,9 @@ def main(argv=None) -> int:
     (work / "callspec.v0.json").write_text(spec.model_dump_json(indent=1))
 
     # 2. cross-check
-    if not a.no_cross_check and budget.allows(15 * 60):
+    if not a.cross_check:
+        trace.note("cross-check: off (add --cross-check to run it)")
+    elif budget.allows(15 * 60):
         try:
             rows = cross_check(spec, [a.brief], openapi, trace)
             (work / "crosscheck.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False))

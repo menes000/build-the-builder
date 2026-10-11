@@ -249,7 +249,7 @@ function analyse(ev){
    if(/^cross-check: \d+ disagreement/.test(t))set("cross",/^cross-check: 0 /.test(t)?"ok":"run",t.split("\n")[0]);
    if(/^cross-check: re-read changed/.test(t))set("cross","ok",t.split("\n")[0]);
    if(/^cross-check: (no revised|revised CallSpec)/.test(t))set("cross","ok",t);
-   if(/^cross-check skipped/.test(t))set("cross","skip",t);
+   if(/^cross-check (skipped|: off)/.test(t))set("cross","skip",/off/.test(t)?"kapalı (--cross-check ile açılır)":t);
    if(/^compiled v1/.test(t)){set("compile","ok",t.replace(/ -> .*/,""));if(s.cross.st==="")set("cross","skip","kapalı");if(s.extract.st!=="bad")set("extract","ok")}
    if(/^dryRun valid \(v1\)/.test(t))set("publish1","run");
    if(/^exported v1/.test(t))set("publish1","ok","teslim dosyası hazır");
