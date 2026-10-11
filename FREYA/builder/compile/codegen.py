@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from ..extract.callspec import CallSpec
+from ..extract.callspec import CallSpec, phrase
 
 
 def _lit(x) -> str:
@@ -50,6 +50,7 @@ def facts_code(spec: CallSpec) -> str:
         "PER_PRODUCT_ATT1": bool(spec.multi_product.per_product_question_is_attempt1),
         "DEBT_RULE": spec.debt_statement_rule,
         "DEBT_INTRO": (spec.debt_intro_sentence or "").strip(),
+        "PH": {k: phrase(spec, k) for k in ("security_done", "debt_intro", "product_line", "product_line_one_day", "pay_today", "pay_all_today")},
         "PF": (spec.field_map or {}).get("product") or {},
         "PRODUCTS_KEY": ((spec.field_map or {}).get("resp", {}).get("get_account") or {}).get("products", "products"),
         "FIRST_QUESTION": spec.identity.questions[0].ask if spec.identity.questions else "",
@@ -322,12 +323,12 @@ try:
         # the debt statement, spoken as the first line after verification
         sents = []
         for f in facts:
-            sents.append('On your ' + f['label'] + ' the past-due amount is ' + money(f['past']) + ', and the payment is '
-                         + str(f['days_late']) + (' day' if f['days_late'] == 1 else ' days') + ' late.')
+            sents.append(PH['product_line_one_day' if f['days_late'] == 1 else 'product_line'].replace('{product}', f['label'])
+                         .replace('{amount}', money(f['past'])).replace('{days}', str(f['days_late'])))
         if len(facts) > 1:
-            q = TODAY_Q_ALL or 'Can you pay all of them today?'
+            q = TODAY_Q_ALL or PH['pay_all_today']
         else:
-            q = TODAY_Q or 'Can you make this payment today?'
+            q = TODAY_Q or PH['pay_today']
         if '{' in q:
             total = sum(float(f['past']) for f in facts)
             tmr = next_bd(today + ONE)
@@ -345,10 +346,10 @@ try:
             q = re.sub(r'\{([^}]*)\}', fill, q)
         vars['outcome'] = VERIFIED_DEFAULT[0]
         vars['reason'] = VERIFIED_DEFAULT[1]
-        intro = DEBT_INTRO if DEBT_INTRO else 'I am calling about an overdue payment.'
-        if not intro.endswith('.'):
+        intro = DEBT_INTRO if DEBT_INTRO else PH['debt_intro']
+        if not intro.endswith(('.', '!', '?')):
             intro = intro + '.'
-        vars['debt_statement'] = ('Thank you, the security check is complete. ' + intro + ' ' + ' '.join(sents) + ' ' + q)
+        vars['debt_statement'] = (PH['security_done'] + ' ' + intro + ' ' + ' '.join(sents) + ' ' + q)
         vars['account_state'] = 'ok'
     else:
         vars['account_state'] = 'missing'
@@ -522,7 +523,7 @@ def promise_post(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
     F = ((spec.field_map or {}).get("resp", {}).get("create_promise") or {})
     immutable = spec.confirm.promise_immutable_text or "A recorded promise cannot be changed on this call; you can change it in the mobile app."
-    return "MULTI = " + _lit(multi) + "\nPROMISE_TRIES = " + _lit(max(1, int(spec.confirm.max_tries_on_failure or 2))) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nIMMUTABLE = " + _lit(immutable) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
+    return "MULTI = " + _lit(multi) + "\nPROMISE_TRIES = " + _lit(max(1, int(spec.confirm.max_tries_on_failure or 2))) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nIMMUTABLE = " + _lit(immutable) + "\nANYTHING_ELSE = " + _lit(phrase(spec, "anything_else")) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 import json
 try:
     if isinstance(result, dict):
@@ -557,7 +558,7 @@ try:
         elif str(vars.get('promise_duplicate') or '') == 'yes':
             d['promise_state'] = 'duplicate'
             d['error'] = 'this product already has a recorded promise'
-            d['what_to_do_next'] = 'NOT recorded: this product already has a recorded promise and it cannot be changed or cancelled on this call. Say exactly: "' + IMMUTABLE + '" Then ask exactly: "Is there anything else?"'
+            d['what_to_do_next'] = 'NOT recorded: this product already has a recorded promise and it cannot be changed or cancelled on this call. Say exactly: "' + IMMUTABLE + '" Then ask exactly: "' + ANYTHING_ELSE + '"'
         elif str(vars.get('promise_precheck') or '') == 'rejected' or 'must be' in err or 'REJECTED' in err or 'invalid' in err.lower() or 'already' in err.lower():
             d['promise_state'] = 'rejected'
             d['error'] = 'not allowed by bank rules'
@@ -911,6 +912,7 @@ def decide_outcome_code(spec: CallSpec, promise_farewell: str, farewells: dict |
     paid_outcome = spec.special.paid.close.outcome
     no_promise_outcome = spec.persuasion.refused_close.outcome
     params = {
+        "BYE": phrase(spec, "thanks_goodbye"),
         "PROMISE_OUTCOME": c.promise_outcome, "XFER_OUTCOME": transferred_outcome, "XFER_REASON": transfer_reason_by_queue,
         "PAID_OUTCOME": paid_outcome, "NO_PROMISE_OUTCOME": no_promise_outcome, "MULTI": mp.enabled, "REASON_PRIORITY": list(mp.no_promise_reason_priority or []),
         "CLOSE_BY_FIRST": bool(mp.closing_by_first_product),
@@ -922,7 +924,7 @@ import json
 try:
     outcome = str(vars.get('hint_outcome') or NO_PROMISE_OUTCOME)
     reason = str(vars.get('hint_reason') or '')
-    farewell = str(vars.get('hint_farewell') or 'Thank you for your time. Goodbye.')
+    farewell = str(vars.get('hint_farewell') or BYE)
     try:
         promises = json.loads(str(vars.get('promises_json') or '[]'))
     except Exception:
@@ -988,7 +990,7 @@ except Exception:
     try:
         vars['outcome'] = str(vars.get('hint_outcome') or NO_PROMISE_OUTCOME)
         vars['reason'] = str(vars.get('hint_reason') or '')
-        vars['farewell'] = 'Thank you for your time. Goodbye.'
+        vars['farewell'] = BYE
     except Exception:
         pass
 '''

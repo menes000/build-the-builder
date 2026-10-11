@@ -63,3 +63,14 @@ above. The code then stops computing that quantity and the agent applies the rul
 
 - `multi_product.per_product_question_is_attempt1`: true when, after the one question for all products, the first
   question for each product already counts as persuasion attempt 1; false when the brief says it is not an attempt.
+
+- Language. `language` is the language the calls are held in (the brief or its example conversations say it; default
+  English). When it is not English: every sentence the agent says that you write into the CallSpec (opening, questions,
+  confirmation and closing sentences, examples of what the customer may say) is in that language, in the wording and tone
+  of the brief's example conversations if it has any; and fill `phrases` with every key listed in its description,
+  translated into that language with every {placeholder} kept. Field names, enum values, outcome and reason codes stay
+  exactly as the tool API writes them. When the calls are in English, leave `phrases` empty.
+- A folder of loose material can include a README that says what each document is, test customers, a Q&A and example
+  conversations: read all of them. Rules come from the brief, its announcements and the Q&A (a later announcement or
+  answer overrides an earlier text); the example conversations show the expected wording and order, and the test
+  customers show the data the agent will see.

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from ..extract.callspec import CallSpec, Outcome, Tool
+from ..extract.callspec import CallSpec, Outcome, Tool, phrase
 from . import codegen, prompts
 
 
@@ -69,10 +69,10 @@ def conv(name, task, tools=(), transitions=(), on_enter=None, extraction=(), max
     return n
 
 
-def _confirm_line(after_record_sentence: str) -> str:
+def _confirm_line(after_record_sentence: str, recorded: str = "Your promise is recorded.") -> str:
     """'Your promise is recorded.' + the brief's sentence, unless the brief's sentence already speaks of the promise."""
     s = (after_record_sentence or "").strip()
-    return s if s.lower().startswith(("your promise", "the promise", "your payment promise")) else f"Your promise is recorded. {s}".strip()
+    return s if s.lower().startswith(("your promise", "the promise", "your payment promise", recorded.lower()[:12])) else f"{recorded} {s}".strip()
 
 
 def _dedupe_sentences(text: str) -> str:
@@ -247,29 +247,32 @@ def compile_workflow(spec: CallSpec) -> dict:
 
     # ---- closing nodes: hint (outcome, reason, farewell); decide_outcome may override
     name_tok = "NAME"
-    thanks = f"Thank you for your time, {name_tok}. Goodbye."
-    promise_farewell = f"{_confirm_line(cf.after_record_sentence)} {thanks}"
+    def P(key: str) -> str:
+        return phrase(spec, key)
+    thanks = P("thanks_goodbye_name").replace("{name}", name_tok)
+    bye = P("thanks_goodbye")
+    promise_farewell = f"{_confirm_line(cf.after_record_sentence, P('promise_recorded'))} {thanks}"
     closes: dict[str, tuple[str, str, str]] = {
         "close_promise": (spec.closing.promise_outcome, "", promise_farewell),
-        "close_service_error": (cf.failed_twice_close.outcome, cf.failed_twice_close.reason, f"I am sorry, I could not record your promise because of a technical problem. {thanks}"),
-        "close_paid": (sp.paid.close.outcome, sp.paid.close.reason, f"Thank you for letting me know. {_sentence(sp.paid.say)} {thanks}"),
-        "close_dispute": (sp.dispute.close.outcome, sp.dispute.close.reason, f"I understand. {thanks}"),
-        "close_refused": (spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason, f"I understand. {thanks}"),
-        "close_hardship": (hs.decline_close.outcome, hs.decline_close.reason, f"Thank you for your time, {name_tok}. Goodbye."),
-        f"close_xfer_{hs.offer_queue}": (hs.accept_close.outcome, hs.accept_close.reason, f"I am connecting you with our {hs.offer_queue} team now. Thank you for your time. Goodbye."),
-        f"close_xfer_{sp.restructuring.queue}": (sp.restructuring.close.outcome, sp.restructuring.close.reason, "I am connecting you with the team that handles payment plans now. Thank you for your time. Goodbye."),
-        f"close_xfer_{sp.human.queue}": (sp.human.close.outcome, sp.human.close.reason, "I am connecting you with a colleague now. Thank you for your time. Goodbye."),
-        "close_failed": (idn.failed_close.outcome, idn.failed_close.reason, f"I am sorry, I could not verify your identity. {_sentence(idn.after_failed_text.split(';')[0].replace('Do not state the debt.', ''))} Thank you for your time. Goodbye."),
-        "close_declined": (idn.decline.close.outcome, idn.decline.close.reason, "I understand. Without the security questions I cannot continue. Thank you for your time. Goodbye."),
-        "close_callback": (tp.callback_close.outcome, tp.callback_close.reason, "Thank you, we will call back then. Thank you for your time. Goodbye."),
-        "close_no_callback": (tp.no_callback_close.outcome, tp.no_callback_close.reason, "Thank you, we will try again another time. Thank you for your time. Goodbye."),
-        "close_wrong_number": (tp.wrong_number_close.outcome, tp.wrong_number_close.reason, "I apologise for the inconvenience. Thank you for your time. Goodbye."),
-        "close_deceased": (tp.deceased_close.outcome, tp.deceased_close.reason, f"{tp.deceased_sentence} Thank you for your time. Goodbye."),
-        "close_unclear": (spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason, "I could not confirm who I am speaking with, so I will end the call here. Thank you for your time. Goodbye."),
-        "close_account_error": (cf.failed_twice_close.outcome, cf.failed_twice_close.reason, "I am sorry, I cannot reach your account details right now because of a technical problem. Thank you for your time. Goodbye."),
+        "close_service_error": (cf.failed_twice_close.outcome, cf.failed_twice_close.reason, f"{P('sorry_promise_failed')} {thanks}"),
+        "close_paid": (sp.paid.close.outcome, sp.paid.close.reason, f"{P('thanks_for_telling')} {_sentence(sp.paid.say)} {thanks}"),
+        "close_dispute": (sp.dispute.close.outcome, sp.dispute.close.reason, f"{P('i_understand')} {thanks}"),
+        "close_refused": (spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason, f"{P('i_understand')} {thanks}"),
+        "close_hardship": (hs.decline_close.outcome, hs.decline_close.reason, thanks),
+        f"close_xfer_{hs.offer_queue}": (hs.accept_close.outcome, hs.accept_close.reason, f"{P('xfer_offer_team').replace('{team}', hs.offer_queue)} {bye}"),
+        f"close_xfer_{sp.restructuring.queue}": (sp.restructuring.close.outcome, sp.restructuring.close.reason, f"{P('xfer_plan')} {bye}"),
+        f"close_xfer_{sp.human.queue}": (sp.human.close.outcome, sp.human.close.reason, f"{P('xfer_human')} {bye}"),
+        "close_failed": (idn.failed_close.outcome, idn.failed_close.reason, f"{P('sorry_not_verified')} {_sentence(idn.after_failed_text.split(';')[0].replace('Do not state the debt.', ''))} {bye}"),
+        "close_declined": (idn.decline.close.outcome, idn.decline.close.reason, f"{P('declined')} {bye}"),
+        "close_callback": (tp.callback_close.outcome, tp.callback_close.reason, f"{P('callback_booked')} {bye}"),
+        "close_no_callback": (tp.no_callback_close.outcome, tp.no_callback_close.reason, f"{P('no_callback')} {bye}"),
+        "close_wrong_number": (tp.wrong_number_close.outcome, tp.wrong_number_close.reason, f"{P('wrong_number')} {bye}"),
+        "close_deceased": (tp.deceased_close.outcome, tp.deceased_close.reason, f"{tp.deceased_sentence} {bye}"),
+        "close_unclear": (spec.opening.unclear_close.outcome, spec.opening.unclear_close.reason, f"{P('unclear')} {bye}"),
+        "close_account_error": (cf.failed_twice_close.outcome, cf.failed_twice_close.reason, f"{P('account_error')} {bye}"),
     }
     if mp.enabled:
-        closes["close_done"] = (spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason, f"I understand. {thanks}")
+        closes["close_done"] = (spec.persuasion.refused_close.outcome, spec.persuasion.refused_close.reason, f"{P('i_understand')} {thanks}")
 
     # ---- extraction for the opening
     line_status = {
@@ -326,7 +329,7 @@ def compile_workflow(spec: CallSpec) -> dict:
     # first refusal -> an explanation node (spoken once, deterministically); second refusal there -> declined
     nodes["security"] = conv(
         "security", prompts.security_task(spec),
-        on_enter={"type": "tts", "text": f"{_sentence(idn.intro_text) if idn.intro_text else f'Thank you, {spec.address_customer_as}. Before I continue, I need to ask you {len(idn.questions)} security questions.'} {first_q.ask}"},
+        on_enter={"type": "tts", "text": f"{_sentence(idn.intro_text) if idn.intro_text else phrase(spec, 'security_intro').replace('{name}', spec.address_customer_as).replace('{n}', str(len(idn.questions)))} {first_q.ask}"},
         first_only=True, tools=sec_tools, extraction=[declined_extraction("declined_1")],
         transitions=common_sec_routes + [
             go("security_explain" if idn.decline.explain_first else "close_declined",
@@ -442,7 +445,7 @@ def compile_workflow(spec: CallSpec) -> dict:
     if True:
         nodes["after_promise"] = conv(
             "after_promise", prompts.after_promise_task(spec),
-            on_enter={"type": "tts", "text": f"{_confirm_line(cf.after_record_sentence)} Is there anything else?"}, first_only=True,
+            on_enter={"type": "tts", "text": f"{_confirm_line(cf.after_record_sentence, phrase(spec, 'promise_recorded'))} {phrase(spec, 'anything_else')}"}, first_only=True,
             tools=[transfer_to_agent], extraction=[situation],
             transitions=[
                 go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done"))),
@@ -451,7 +454,7 @@ def compile_workflow(spec: CallSpec) -> dict:
             ],
             max_turns=6, cap_to="close_promise")
         if not mp.enabled:
-            closes["close_promise"] = (spec.closing.promise_outcome, "", f"Thank you for your time, {name_tok}. Goodbye.")
+            closes["close_promise"] = (spec.closing.promise_outcome, "", thanks)
     if mp.enabled:
         nodes["wrap_up"] = conv(
             "wrap_up", prompts.wrap_up_task(spec), tools=[transfer_to_agent], extraction=[situation],
@@ -505,7 +508,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         "xfer_" + sp.restructuring.queue: closes[f"close_xfer_{sp.restructuring.queue}"][2],
         "xfer_" + sp.human.queue: closes[f"close_xfer_{sp.human.queue}"][2],
     }
-    nodes["decide_outcome"] = code_node("decide_outcome", codegen.decide_outcome_code(spec, promise_farewell if mp.enabled else f"Thank you for your time, {name_tok}. Goodbye.", farewells, f"Thank you for your time, {name_tok}. Goodbye."), "goodbye")
+    nodes["decide_outcome"] = code_node("decide_outcome", codegen.decide_outcome_code(spec, promise_farewell if mp.enabled else thanks, farewells, thanks), "goodbye")
     nodes["goodbye"] = {
         "name": "goodbye", "node_type": "end_call", "on_enter": {"type": "silent"},
         "disable_inactivity_monitor": True, "transitions": [],

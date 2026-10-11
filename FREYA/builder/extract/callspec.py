@@ -301,6 +301,42 @@ class Tool(BaseModel):
 
 # ----------------------------------------------------------------------------- root
 
+# Fixed sentences the builder speaks itself (not the model). English defaults; a brief in another language gets them
+# translated by the extraction into CallSpec.phrases (same keys, same {placeholders}). Nothing here is case-specific.
+PHRASES_EN: dict[str, str] = {
+    "thanks_goodbye_name": "Thank you for your time, {name}. Goodbye.",
+    "thanks_goodbye": "Thank you for your time. Goodbye.",
+    "promise_recorded": "Your promise is recorded.",
+    "sorry_promise_failed": "I am sorry, I could not record your promise because of a technical problem.",
+    "thanks_for_telling": "Thank you for letting me know.",
+    "i_understand": "I understand.",
+    "xfer_offer_team": "I am connecting you with our {team} team now.",
+    "xfer_plan": "I am connecting you with the team that handles payment plans now.",
+    "xfer_human": "I am connecting you with a colleague now.",
+    "sorry_not_verified": "I am sorry, I could not verify your identity.",
+    "declined": "I understand. Without the security questions I cannot continue.",
+    "callback_booked": "Thank you, we will call back then.",
+    "no_callback": "Thank you, we will try again another time.",
+    "wrong_number": "I apologise for the inconvenience.",
+    "unclear": "I could not confirm who I am speaking with, so I will end the call here.",
+    "account_error": "I am sorry, I cannot reach your account details right now because of a technical problem.",
+    "security_intro": "Thank you, {name}. Before I continue, I need to ask you {n} security questions.",
+    "security_done": "Thank you, the security check is complete.",
+    "debt_intro": "I am calling about an overdue payment.",
+    "product_line": "On your {product} the past-due amount is {amount}, and the payment is {days} days late.",
+    "product_line_one_day": "On your {product} the past-due amount is {amount}, and the payment is {days} day late.",
+    "pay_today": "Can you make this payment today?",
+    "pay_all_today": "Can you pay all of them today?",
+    "anything_else": "Is there anything else?",
+}
+
+
+def phrase(spec, key: str) -> str:
+    """The spoken sentence for `key` in the call's language: the brief's translation if the extraction gave one, else English."""
+    v = ((getattr(spec, "phrases", None) or {}).get(key) or "").strip()
+    return v or PHRASES_EN[key]
+
+
 class CallSpec(BaseModel):
     bank_name: str
     language: str = "English"
@@ -314,6 +350,7 @@ class CallSpec(BaseModel):
     identity: Identity
     debt_statement_rule: str = Field(description="What must be said after verification: team, product in words, amount, days late")
     debt_intro_sentence: str = Field("", description="The exact first sentence after verification, in the agent's voice, that names the team and the purpose, e.g. 'I am calling from the collections team about a late payment.' The product, amount and days late are added by the builder.")
+    phrases: dict[str, str] = Field(default_factory=dict, description="ONLY when the call language is not English: the builder's fixed spoken sentences in the call language. Keys (fill every one): " + ", ".join(f"{k} = {v!r}" for k, v in PHRASES_EN.items()) + ". Translate each English sentence naturally into the call language, in the tone of the brief's example conversations if it has any; keep every {placeholder} exactly. Leave this empty for an English call.")
     products: list[ProductType]
     dates: Dates
     amounts: Amounts
