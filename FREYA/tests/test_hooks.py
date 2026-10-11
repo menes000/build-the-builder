@@ -224,3 +224,19 @@ def test_greeting_follows_the_time_of_day(tmp_path):
     acc = [{"product_id": "p1", "type": "credit_card", "card_last4": "9015", "past_due": 510.0, "days_late": 16, "minimum_payment": 153.0}]
     assert facts_preview(wf, "2026-10-14T11:00", acc)["greeting"] == "Good morning"
     assert facts_preview(wf, "2026-10-14T14:30", acc)["greeting"] == "Good afternoon"
+
+
+
+def test_one_product_call_never_writes_a_note(wf_ab):
+    """Multi-agent check 17:20, PUB-08: a one-product customer said 'already paid' and the model called add_note."""
+    t = tool(wf_ab, "negotiate", "add_note")
+    v = {"facts_json": json.dumps(FACTS_1), "promises_json": "[]"}
+    e = run_hook(t["pre_process_code"], v, body={"product_id": "p1", "reason": "paid"})
+    assert e["config"]["body"]["product_id"] == "REJECTED"                  # the bank refuses it: nothing in the ledger
+    res = {"data": {"ok": False, "error": "unknown product"}, "header": {}}
+    run_hook(t["post_process_code"], v, result=res)
+    assert res["data"]["note_state"] == "not_needed" and "transition_to_close_paid" in res["data"]["what_to_do_next"]
+    assert "notes_json" not in v
+    v = {"facts_json": json.dumps(FACTS_2), "promises_json": "[]"}               # several products: notes still work
+    e = run_hook(t["pre_process_code"], v, body={"product_id": "p1", "reason": "paid"})
+    assert e["config"]["body"]["product_id"] == "p1"

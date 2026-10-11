@@ -611,7 +611,12 @@ try:
         except Exception:
             facts = []
         pid = str(b.get(R['product_id']) or '').strip()
-        if len(facts) == 1:
+        single = len(facts) == 1
+        try:
+            vars['note_single'] = 'yes' if single else 'no'
+        except Exception:
+            pass
+        if single:
             pid = facts[0]['pid']
         b[R['product_id']] = pid
         try:
@@ -626,6 +631,8 @@ try:
                 ok = False
         except Exception:
             pass
+        if single:
+            ok = False          # a call with one product never writes a note: the bank must not record it
         try:
             vars['note_precheck'] = 'ok' if ok else 'rejected'
         except Exception:
@@ -677,6 +684,14 @@ try:
                     d['all_products_done'] = 'no'
             except Exception:
                 pass
+        elif str(vars.get('note_single') or '') == 'yes':
+            d['note_state'] = 'not_needed'
+            d.pop(F['error'], None)
+            d['what_to_do_next'] = ('No note is written on a call with only one product. Do not call add_note again. '
+                                    'Call the transition_to_close_... tool that matches the situation now: '
+                                    + (('transition_to_close_' + reason) if reason else 'the matching one') + ' if it exists'
+                                    + ' (already paid -> close_paid, not my debt -> close_dispute, attempts used up -> close_refused, '
+                                    'difficult circumstances -> close_hardship, the promise service failed -> close_service_error).')
         else:
             d['note_state'] = 'rejected' if str(vars.get('note_precheck') or '') == 'rejected' or d.get(F['error']) else 'failed'
             d['what_to_do_next'] = 'The note was not accepted (unknown product or reason, or that product already has a promise). Use a product_id from the account and a listed reason.'
