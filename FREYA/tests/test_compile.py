@@ -220,3 +220,12 @@ def test_extraction_never_crashes_on_lint(tmp_path, monkeypatch):
     got = extractor.extract_callspec([str(brief)], str(out), tr, openapi_path=str(ROOT / "kit/tools/openapi.json"))
     assert got.amounts.floor_rule.startswith("50 percent")
     assert "WARNING kept as is" in tr.txt.read_text()
+
+
+def test_closing_lines_do_not_repeat_a_sentence(tmp_path):
+    """Regression run 15:40: the extracted after-failed text already said 'I am sorry, I could not verify your identity'."""
+    wf = _variant(tmp_path, **{"identity.after_failed_text": "I am sorry, I could not verify your identity, so please use the Freya Bank mobile app or visit a branch."})
+    txt = json.dumps(wf["nodes"]["close_failed"])
+    assert txt.count("could not verify your identity") == 1
+    from builder.compile.compiler import _dedupe_sentences
+    assert _dedupe_sentences("Thank you. Goodbye. Thank you. Goodbye.") == "Thank you. Goodbye."

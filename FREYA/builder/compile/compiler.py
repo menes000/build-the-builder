@@ -69,6 +69,25 @@ def conv(name, task, tools=(), transitions=(), on_enter=None, extraction=(), max
     return n
 
 
+def _dedupe_sentences(text: str) -> str:
+    """Spoken closing lines are built from a fixed part plus a sentence from the CallSpec; when the extracted sentence
+    already contains the fixed part, drop the shorter repeat (the judge reads every repeated sentence literally)."""
+    import re
+    parts = [x.strip() for x in re.split(r"(?<=[.!?])\s+", (text or "").strip()) if x.strip()]
+    norm = lambda x: re.sub(r"[^a-z0-9 ]", "", x.lower()).strip()
+    keep = []
+    for i, a in enumerate(parts):
+        na = norm(a)
+        if not na:
+            continue
+        if any(j != i and na != norm(b) and na in norm(b) for j, b in enumerate(parts)):
+            continue                                    # a shorter sentence that a longer one already says
+        if any(norm(k) == na for k in keep):
+            continue                                    # an exact repeat
+        keep.append(a)
+    return " ".join(keep)
+
+
 def _sentence(rule: str) -> str:
     """Turn an instruction-shaped text into the spoken sentence: 'Say that X.' -> 'X.'; 'Tell the customer to use Y' -> 'Please use Y.'"""
     s = rule.strip().strip('"').strip("'")
@@ -427,6 +446,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         max_turns=20, cap_to="close_no_callback")
 
     closes.pop("close_on_goodbye", None)
+    closes = {nm: (v if v is None else (v[0], v[1], _dedupe_sentences(v[2]))) for nm, v in closes.items()}
     for nm, (o, r, text) in closes.items():
         nodes[nm] = code_node(nm, codegen.close_hint_code(o, r, text), "decide_outcome")
     goodbye_map = {
