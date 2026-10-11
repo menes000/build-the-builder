@@ -24,6 +24,7 @@ KIT = ROOT / "kit"
 TEMPLATE_TOOLS = {"verify_identity", "get_account", "create_promise", "close_call"}
 
 BIG_FILE = 60_000      # characters: a larger case file is shown in part; Claude reads the rest with the Read tool
+DATA_FILE = 6_000      # a JSON/CSV data file larger than this is shown in part (its shape), not in full
 
 
 def template_fits(tool_names: set[str]) -> bool:
@@ -61,12 +62,39 @@ Then write a short design note (the flow as a list of nodes and why, the conflic
 """
 
 
+PLAN_INSTRUCTIONS = """You are the first half of a phone-agent builder. Read every case document below and write the DESIGN of the
+phone agent they describe, as a Markdown file, so that a second step can turn it into a Freya workflow without the documents.
+The documents were written at different times and do not always agree: the most recent decision wins (decision recaps, later
+mails and meeting notes over older analysis versions). Example conversations show the expected order and wording.
+
+Write, compactly but completely (aim for 2,000-4,000 words):
+1. Call variables the platform passes in (exact names) and realistic test values from the test data.
+2. Language and speaking rules (how amounts, dates, card numbers are said; what is never said or done).
+3. The tools: for each endpoint of the tool API, when it is called, the exact request body (field names, which values come from
+   variables, which from earlier tool results, which from the caller), and which response fields matter.
+4. The flow as numbered steps (each will become a node): what the agent says (in the call language, exact sentences where the
+   documents fix them), what it asks, and every branch: per tool result (success, each error code, empty or missing data, slow
+   answer), per caller answer (including refusals, vague answers, off-topic or adversarial requests), and where each step goes next.
+5. Every way the call ends (hand back to the menu, transfer to a person, ...) and what is said before it.
+6. The conflicts between documents you found and which version you followed.
+Write the file with the Write tool to exactly this path: {plan}
+"""
+
+JSON_INSTRUCTIONS_HEAD = """The design below was written from the bank's case documents by the first step of this builder; it is
+authoritative. Turn it into the Freya workflow, following it exactly.
+Keep the workflow compact: one node per step of the design (merge trivial steps), shared rules once in `system_prompt`,
+no repeated text across nodes.
+"""
+
+
 def _case_text(paths: list[str]) -> str:
     """The case files as text; a very large file (e.g. a big data dump) is cut, with its path for the Read tool."""
     parts = []
     for p in paths:
         t = _brief_text([p])
-        if len(t) > BIG_FILE:
+        if Path(p).suffix.lower() in (".json", ".csv") and len(t) > DATA_FILE:   # a data dump: its start shows the shape
+            t = t[:DATA_FILE] + f"\n\n[... data file cut at {DATA_FILE} characters; the full data is at {Path(p).resolve()} ...]\n"
+        elif len(t) > BIG_FILE:
             t = t[:BIG_FILE] + f"\n\n[... file cut at {BIG_FILE} characters; read the rest with the Read tool at {Path(p).resolve()} ...]\n"
         parts.append(t)
     return "".join(parts)
@@ -129,11 +157,24 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
     notes = (out_dir / f"{slot}.freeform.notes.md").resolve()
     api_urls = {t.url for t in tools}
     api_text = Path(openapi_path).read_text()
-    base = (INSTRUCTIONS.replace("{out}", str(out)).replace("{notes}", str(notes))
-            + "\n\n## Tool API (OpenAPI; every server URL is the team's mock, use these URLs exactly)\n```json\n" + api_text + "\n```\n"
-            + "\n## Endpoint URLs\n" + "\n".join(f"- {t.name}: POST {t.url}" for t in tools) + "\n"
-            + _kit_docs()
-            + "\n\n## The case files" + _case_text(brief_paths) + "\n")
+    api_block = ("\n\n## Tool API (OpenAPI; every server URL is the team's mock, use these URLs exactly)\n```json\n" + api_text + "\n```\n"
+                 + "\n## Endpoint URLs\n" + "\n".join(f"- {t.name}: POST {t.url}" for t in tools) + "\n")
+    # step 1: the design, read from the documents (text, short); step 2: the workflow JSON from the design (no raw documents)
+    plan = (out_dir / f"{slot}.freeform.plan.md").resolve()
+    if plan.exists():
+        plan.unlink()
+    for attempt in (1, 2):
+        asyncio.run(_ask_claude(PLAN_INSTRUCTIONS.replace("{plan}", str(plan)) + api_block + "\n\n## The case files" + _case_text(brief_paths) + "\n",
+                                plan, out_dir.resolve(), model, trace, purpose=f"free-form: write the agent's design from the case documents (attempt {attempt})",
+                                max_turns=20, timeout_s=20 * 60))
+        if plan.exists() and len(plan.read_text().strip()) >= 500:
+            break
+    if not plan.exists() or len(plan.read_text().strip()) < 500:
+        raise RuntimeError("free-form build: no design written from the case documents")
+    trace.note(f"free-form design written: {plan} ({len(plan.read_text())} chars)")
+    base = (JSON_INSTRUCTIONS_HEAD + "\n" + INSTRUCTIONS.replace("{out}", str(out)).replace("{notes}", str(notes))
+            + "\n\n## The design (authoritative)\n" + plan.read_text() + "\n"
+            + api_block + _kit_docs() + "\n")
     feedback = ""
     best = None
     for rnd in range(1, rounds + 1):
@@ -147,7 +188,7 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
             + "\n## Problems to fix\n- " + "\n- ".join(feedback) + f"\n\nFix every problem and write the complete corrected workflow again to {out}.")
         t0 = time.time()
         asyncio.run(_ask_claude(prompt, out, out_dir.resolve(), model, trace,
-                                purpose=f"free-form: design the workflow from the case documents (round {rnd})", max_turns=40,
+                                purpose=f"free-form: write the workflow JSON from the design (round {rnd})", max_turns=40,
                                 timeout_s=25 * 60))
         if not out.exists():
             feedback = ["No workflow file was written to the output path."]
