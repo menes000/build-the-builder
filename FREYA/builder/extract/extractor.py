@@ -99,6 +99,7 @@ async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace,
         disallowed_tools=["Agent", "Task", "Bash", "Edit", "WebFetch", "WebSearch"],
         permission_mode="dontAsk", max_turns=max_turns,
         setting_sources=[],
+        env={"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"},     # the builder reads only the case, not a developer's memory
     )
     t0 = time.time()
     text = []
