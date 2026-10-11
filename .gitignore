@@ -27,3 +27,4 @@ results/
 
 # Kit runner caches (persona ids)
 .personas.json
+/runs

@@ -26,6 +26,7 @@ Options:
     --spec PATH        skip extraction, start from this CallSpec (development)
     --name NAME        slot and output name (default: the brief's folder or file name)
     --model NAME       Claude model for extraction and fixes (default claude-opus-5-5)
+    --only 20,24       test only these generated customers (number or full id); the full set is kept in cases.all.json
     --claude-test      run the local test on the Claude subscription (claude CLI, Haiku) instead of Gemini; without it: Gemini
 
 Needs: FREYA_API_KEY (+ FREYA_WORKSPACE_ID), a Claude login or ANTHROPIC_API_KEY, GEMINI_API_KEY for the local test,
@@ -154,9 +155,15 @@ def cross_check(spec: CallSpec, brief_args: list[str], openapi: str, trace: Trac
     text, names = rule_diff.read_material(brief_args)
     text += "\n\n===== TOOL API (openapi.json) =====\n" + Path(openapi).read_text()[:12000]
     t0 = time.time()
-    raw = llm.generate("judge", rule_diff.PROMPT, [("user", text)], json_mode=True)
-    trace.model_call(model=llm.model_of(llm.provider("judge")), purpose=f"cross-check: second, independent reading of {', '.join(names)}", seconds=time.time() - t0)
-    second = json.loads(raw)
+    model = os.environ.get("CROSSCHECK_MODEL", "claude-sonnet-5-5")      # strong, and not the extractor's model (independence)
+    try:
+        import claude_cli
+        second = claude_cli.ask_json(rule_diff.PROMPT, text, model=model)
+    except Exception as e:                                               # no claude CLI login: the tester's judge model instead
+        trace.note(f"cross-check: {model} unavailable ({str(e)[:120]}); using the judge model")
+        model = llm.model_of(llm.provider("judge"))
+        second = json.loads(llm.generate("judge", rule_diff.PROMPT, [("user", text)], json_mode=True))
+    trace.model_call(model=model, purpose=f"cross-check: second, independent reading of {', '.join(names)}", seconds=time.time() - t0)
     mine = rule_diff.from_callspec(json.loads(spec.model_dump_json()))
     src = second.get("sources") or {}
     return [(p, x, y, src.get(p.split(".")[0].split("[")[0], "")) for p, x, y in rule_diff.diff(mine, {k: second.get(k) for k in mine})]
@@ -256,7 +263,7 @@ def local_run(wf_path: Path, cases_path: Path, openapi: str, reps: int, parallel
     except subprocess.TimeoutExpired:
         trace.note(f"local test {tag}: stopped after {int(timeout_s)} s (time budget); no result")
         return None
-    usage = [line for line in p.stdout.splitlines() if line.startswith(("Gemini", "OpenAI", "LLM cache")) or "audit:" in line]
+    usage = [line for line in p.stdout.splitlines() if line.startswith(("Gemini", "Claude", "OpenAI", "LLM cache")) or "audit:" in line]
     for line in usage:
         trace.note(f"local test {tag}: {line.strip()}")
     if not out.exists():
@@ -317,6 +324,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-test", action="store_true")
     ap.add_argument("--no-publish", action="store_true")
     ap.add_argument("--spec")
+    ap.add_argument("--only", help="test only these generated customers: numbers (20,24) or full ids")
     ap.add_argument("--claude-test", action="store_true", help="local test on the Claude subscription (claude CLI) instead of Gemini")
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     a = ap.parse_args(argv)
@@ -380,6 +388,13 @@ def main(argv=None) -> int:
     cases = None
     if test_on and budget.allows(6 * 60):
         cases = make_cases(spec_path, openapi, work / "cases.json", re.sub(r"\W", "", name.upper())[:6] or "T", trace)
+    if cases and a.only:
+        want = [x.strip() for x in a.only.split(",") if x.strip()]
+        pick = [c for c in cases if any(c["id"] == w or c["id"].endswith(f"-{w.zfill(2)}") for w in want)]
+        save(work / "cases.all.json", cases)
+        trace.note(f"--only {a.only}: testing {len(pick)} of {len(cases)} customers: " + "; ".join(f"{c['id']} {c['title']}" for c in pick))
+        cases = pick
+        save(work / "cases.json", cases)
     if cases:
         by_id = {c["id"]: c for c in cases}
         tpath = work / "workflow.v1.test.json"

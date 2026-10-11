@@ -53,7 +53,7 @@ def local_progress(started: float, events: list[dict]) -> dict | None:
         row = rec.get("row") or {}
         rows.append({"id": row.get("id") or rec.get("case"), "rep": row.get("rep"), "status": row.get("status", "?"),
                      "family": row.get("family", ""), "failed": (row.get("failed") or [])[:3], "error": row.get("error", ""),
-                     "turns": row.get("turns"), "at": f.stat().st_mtime})
+                     "turns": row.get("turns"), "at": f.stat().st_mtime, "file": str(f)})
     total = None
     work = next((m.group(1) for e in events if e.get("kind") == "note" for m in [re.search(r"work=(\S+)", e.get("text", ""))] if m), None)
     reps = next((int(m.group(1)) for e in events if e.get("kind") == "note" for m in [re.search(r"reps=(\d+)", e.get("text", ""))] if m), 1)
@@ -78,14 +78,15 @@ def work_files(events: list[dict]) -> dict | None:
     if not work or not Path(work).exists():
         return None
     w = Path(work)
-    cases = {c["id"]: {"title": c.get("title", ""), "family": c.get("family", ""), "script": c.get("script", ""), "checks": c.get("checks", [])}
+    cases = {c["id"]: {"title": c.get("title", ""), "family": c.get("family", ""), "level": c.get("level", ""), "script": c.get("script", ""),
+                      "checks": c.get("checks", []), "expected": c.get("expected", {})}
              for c in (load(w / "cases.json") or [])}
     tests = {}
     for f in sorted(w.glob("test.*.json")):
         r = load(f)
         if not r:
             continue
-        rows = [{k: x.get(k) for k in ("id", "rep", "status", "failed", "judge_reason", "transcript", "path", "flags", "error")} for x in r.get("rows", [])]
+        rows = [{k: x.get(k) for k in ("id", "rep", "status", "failed", "judge_reason", "path", "flags", "error", "record", "turns")} for x in r.get("rows", [])]
         tests[f.stem.split(".", 1)[1]] = {"passed": r.get("passed"), "total": r.get("total"), "seconds": r.get("seconds"), "final": r.get("final", []), "rows": rows}
     rounds = {}
     for f in sorted(w.glob("fix*.json")):
@@ -112,7 +113,13 @@ def state(name: str | None) -> dict:
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
-        if u.path == "/api/state":
+        if u.path == "/api/record":
+            p = Path((parse_qs(u.query).get("path") or [""])[0]).resolve()
+            if not p.is_relative_to(LOCAL.resolve()) or p.suffix != ".json" or not p.exists():   # only the local test's own records
+                self.send_error(404)
+                return
+            body, ctype = p.read_bytes(), "application/json"
+        elif u.path == "/api/state":
             body = json.dumps(state((parse_qs(u.query).get("file") or [None])[0]), default=str).encode()
             ctype = "application/json"
         elif u.path == "/":
@@ -169,6 +176,27 @@ details pre{font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;wor
 .diff{font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word}.diff div{padding:2px 0;border-bottom:1px dashed var(--line)}
 .verdict{display:inline-block;padding:3px 10px;border-radius:6px;font-weight:600;font-size:13px}.verdict.ok{background:color-mix(in srgb,var(--ok) 25%,transparent)}.verdict.bad{background:color-mix(in srgb,var(--bad) 25%,transparent)}
 .flowline{font-size:12px;color:var(--mute);margin:2px 0 8px}
+.chip{cursor:pointer}.chip:hover{outline:1px solid var(--acc)}
+.open{background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:1px 7px;margin:0 2px;font-size:12px;cursor:pointer}.open:hover{border-color:var(--acc)}
+.open.PASS{color:var(--ok)}.open.FAIL{color:var(--bad)}.open.ERROR{color:var(--run)}
+.crow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}.crow .t{flex:1;min-width:200px}
+#viewer{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:10;padding:20px 12px;overflow:auto}
+#viewer .box{background:var(--bg);max-width:1200px;margin:0 auto;border-radius:12px;border:1px solid var(--line);padding:16px}
+#viewer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;margin-bottom:12px}
+#viewer .cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px}@media(max-width:850px){#viewer .cols{grid-template-columns:1fr}}
+.chat{display:flex;flex-direction:column;gap:6px}
+.msg{max-width:85%;padding:7px 11px;border-radius:12px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.msg small{display:block;font-size:10px;font-weight:700;letter-spacing:.05em;opacity:.65;margin-bottom:2px}
+.msg.cus{align-self:flex-start;background:var(--card);border:1px solid var(--line)}
+.msg.agt{align-self:flex-end;background:color-mix(in srgb,var(--acc) 18%,var(--card));border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+.tool{align-self:stretch;font:12px/1.4 ui-monospace,Menlo,monospace;border-left:3px solid var(--line);padding:3px 9px;color:var(--mute);word-break:break-word}
+.tool.res{border-left-color:var(--ok)}.tool.bank{border-left-color:#8a5cc7}.tool b{color:var(--ink)}
+.hint{display:block;margin-top:3px;padding:5px 8px;border-radius:6px;background:color-mix(in srgb,var(--run) 16%,transparent);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12.5px}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.sec h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}.kv span:nth-child(odd){color:var(--mute)}
+.pathc{display:flex;flex-wrap:wrap;gap:3px}.pathc span{font:11px ui-monospace,Menlo,monospace;background:var(--line);padding:1px 6px;border-radius:5px}
+.x{background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:3px 10px;cursor:pointer}
 </style></head><body><main>
 <header><h1>main.py <span id="status" class="pill">…</span></h1><div><select id="file"></select></div></header>
 <div class="stats">
@@ -186,6 +214,7 @@ details pre{font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;wor
 </div>
 <div class="card" style="margin-top:14px"><h2>Döngü detayı: ne gönderildi, ne geri geldi, ne karar verildi</h2><div id="loop" class="muted">henüz yok</div></div>
 </main>
+<div id="viewer" onclick="if(event.target===this)closeV()"><div class="box" id="vbox"></div></div>
 <script>
 const STEPS=[
  ["start","Başlangıç"],["extract","1 · Extract (Claude)"],["cross","2 · Çapraz kontrol"],["compile","3 · Derle"],
@@ -248,26 +277,71 @@ async function tick(){
   const fails=lp.rows.filter(r=>r.status!=="PASS");
   $("local").innerHTML=`<div><b>${n}${lp.total?" / "+lp.total:""}</b> görüşme bitti · <span style="color:var(--ok)">${p} geçti</span> · <span style="color:var(--bad)">${f} kaldı</span>${er?` · ${er} hata`:""} <span class="muted">(${lp.dir})</span></div>
   ${lp.total?`<div class="bar"><i style="width:${Math.min(100,n/lp.total*100)}%"></i></div>`:""}
-  <div class="chips">${lp.rows.map(r=>`<span class="chip ${r.status}" title="${esc(r.family)}">${esc(r.id)}·${r.rep}</span>`).join("")}</div>
-  <div class="fails">${fails.slice(-8).reverse().map(r=>`<div><b>${esc(r.id)}·${r.rep}</b> ${r.status}: ${esc((r.failed[0]||r.error||"").slice(0,220))}</div>`).join("")}</div>`}
+  <div class="chips">${lp.rows.map(r=>`<span class="chip ${r.status}" title="${esc(r.family)} · tıkla: konuşmayı aç" onclick="openV('${encodeURIComponent(r.file)}')">${esc(r.id)}·${r.rep}</span>`).join("")}</div>
+  <div class="fails">${fails.slice(-8).reverse().map(r=>`<div><button class="open ${r.status}" onclick="openV('${encodeURIComponent(r.file)}')">aç</button> <b>${esc(r.id)}·${r.rep}</b> ${r.status}: ${esc((r.failed[0]||r.error||"").slice(0,220))}</div>`).join("")}</div>`}
  if(ev.length!==lastLen){lastLen=ev.length;const box=$("log"),stick=box.scrollTop+box.clientHeight>=box.scrollHeight-20;
   box.innerHTML=ev.map(e=>{const x={...e};delete x.t;delete x.kind;const body=e.kind==="note"?e.text:Object.entries(x).map(([k,v])=>`${k}=${typeof v==="object"?JSON.stringify(v):v}`).join("  ");
    return `<div><span class="t">[${String(e.t).padStart(6)}s]</span> <span class="k ${e.kind}">${e.kind}</span> ${esc(body)}</div>`}).join("");
   if(stick)box.scrollTop=box.scrollHeight}
 }
-let lastWork="";
+let lastWork="",WORK=null;
+function closeV(){$("viewer").style.display="none"}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeV()});
+function short(o,n){const t=typeof o==="string"?o:JSON.stringify(o);return t.length>n?t.slice(0,n)+"…":t}
+function chatHTML(tr,showCode){
+ return (tr||"").split("\n").map(line=>{
+  let m;
+  if((m=line.match(/^CUSTOMER: ([\s\S]*)/)))return `<div class="msg cus"><small>MÜŞTERİ</small>${esc(m[1])}</div>`;
+  if((m=line.match(/^AGENT: ([\s\S]*)/)))return `<div class="msg agt"><small>AJAN</small>${esc(m[1])}</div>`;
+  if((m=line.match(/^TOOL CALL (\S+): ([\s\S]*)/))){if(m[1]==="code_exec"&&!showCode)return "";
+   let a=m[2];try{const j=JSON.parse(a);delete j.customer_id;a=m[1]==="code_exec"?short(j.code||"",300):JSON.stringify(j)}catch(e){}
+   return `<div class="tool bank">→ <b>${esc(m[1])}</b> ${esc(a)}</div>`}
+  if((m=line.match(/^TOOL RESULT (\S+): ([\s\S]*)/))){let body=m[2],hint="";
+   try{const j=JSON.parse(body);if(j.what_to_do_next){hint=j.what_to_do_next;delete j.what_to_do_next}body=JSON.stringify(j)}catch(e){const k=body.indexOf('"what_to_do_next"');if(k>0){hint=body.slice(k+19).replace(/^\s*:\s*"/,"");body=body.slice(0,k)}}
+   return `<div class="tool res">← <b>${esc(m[1])}</b> ${esc(short(body,300))}${hint?`<span class="hint">🔧 Hook'un ajana talimatı: ${esc(hint)}</span>`:""}</div>`}
+  if((m=line.match(/^ENGINE: ([\s\S]*)/)))return `<div class="tool">⚙ motor: ${esc(m[1])}</div>`;
+  return line.trim()?`<div class="tool">${esc(line)}</div>`:""}).join("")}
+function ledgerHTML(l){if(!l)return "<span class='muted'>yok</span>";
+ const pr=(l.promises||[]).map(p=>`${p.product_id} · ${p.amount} · ${p.date}`).join("<br>")||"—";
+ return `<div class="kv"><span>outcome</span><b>${esc(l.outcome??"—")} / ${esc(l.reason??"—")}</b><span>sözler</span><span>${pr}</span>
+  <span>notlar</span><span>${esc((l.notes||[]).map(n=>`${n.product_id}: ${n.reason}`).join(", ")||"—")}</span>
+  <span>transfer</span><span>${esc((l.transfers||[]).map(t=>t.queue||JSON.stringify(t)).join(", ")||"—")}</span>
+  <span>callback</span><span>${esc((l.callbacks||[]).map(c=>`${c.date} ${c.time}`).join(", ")||"—")}</span></div>`}
+async function openV(enc){
+ const path=decodeURIComponent(enc);let r;try{r=await (await fetch("/api/record?path="+encodeURIComponent(path))).json()}catch(e){alert("kayıt açılamadı");return}
+ const row=r.row||{},c=(WORK&&WORK.cases[row.id||r.case])||{},j=r.judge||{};
+ const notes=[];if(WORK)for(const [tag,R] of Object.entries(WORK.rounds||{}))for(const n of ((R.result||{}).notes||[]))if(n.includes(row.id))notes.push(`${tag}: ${n}`);
+ const st=row.status||"?";
+ const draw=(code)=>{$("vbox").innerHTML=`<div class="head"><div><b style="font-size:17px">${esc(row.id||r.case)}</b> · koşu ${row.rep} · ${esc(c.title||"")}
+   <span class="pill ${st==="PASS"?"ok":"bad"}">${st}</span> <span class="muted">${row.turns||"?"} müşteri turu</span></div>
+   <div><label class="muted" style="font-size:12px"><input type="checkbox" id="codechk" ${code?"checked":""}> kod adımlarını göster</label> <button class="x" onclick="closeV()">kapat ✕</button></div></div>
+  <div class="cols"><div><div class="sec"><h4>Konuşma (araç çağrıları ve hook talimatlarıyla)</h4><div class="chat">${chatHTML(r.transcript,code)}</div></div></div>
+  <div>
+   <div class="sec"><h4>Judge analizi</h4><div><span class="pill ${j.pass?"ok":"bad"}">${j.pass?"konuşma uygun":"konuşma kuralı ihlali"}</span></div><p style="margin:6px 0 0">${esc(j.reason||"(judge gerekçesi yok)")}</p></div>
+   <div class="sec"><h4>Neden düştü (banka kaydı + judge)</h4>${(row.failed||[]).length?`<ul style="margin:0;padding-left:18px">${row.failed.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"<span class='muted'>düşme sebebi yok</span>"}${row.error?`<p>${esc(row.error)}</p>`:""}</div>
+   <div class="sec"><h4>Banka kaydı: gerçekleşen</h4>${ledgerHTML(r.ledger)}</div>
+   ${c.expected?`<div class="sec"><h4>Banka kaydı: beklenen</h4>${ledgerHTML(c.expected)}</div>`:""}
+   ${(c.checks||[]).length?`<div class="sec"><h4>Judge'ın kontrol ettiği maddeler</h4><ul style="margin:0;padding-left:18px">${c.checks.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+   <div class="sec"><h4>Ajanın izlediği yol</h4><div class="pathc">${(row.path||[]).map(p=>`<span>${esc(p)}</span>`).join("›")}</div>
+    ${(row.flags||[]).length?`<h4 style="margin-top:8px">Bayraklar</h4><ul style="margin:0;padding-left:18px">${row.flags.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}</div>
+   ${notes.length?`<div class="sec"><h4>Düzelticinin bu vaka için notu</h4><ul style="margin:0;padding-left:18px">${notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+   <div class="sec"><h4>Müşteri senaryosu</h4><p style="margin:0">${esc(c.script||"")}</p>
+    <details><summary>müşteriye (simülatöre) verilen tam talimat</summary><pre>${esc(r.persona||"")}</pre></details></div>
+   <div class="sec"><h4>Değişkenler ve süre</h4><div class="kv">${Object.entries(r.variables||{}).map(([k,v])=>`<span>${esc(k)}</span><span>${esc(v)}</span>`).join("")}
+    <span>süre</span><span>müşteri ${Math.round((r.timing||{}).gemini_s||0)} s · ajan ${Math.round((r.timing||{}).freya_s||0)} s · judge ${(r.timing||{}).judge_s||"?"} s</span></div></div>
+  </div></div>`;$("codechk").onchange=e=>draw(e.target.checked)};
+ draw(false);$("viewer").style.display="block";$("viewer").scrollTop=0}
 const J=v=>esc(typeof v==="string"?v:JSON.stringify(v));
 function caseDetails(w,id,extra){const c=w.cases[id]||{};return `<details><summary><b>${esc(id)}</b> ${esc(c.title||"")} <span class="muted">${esc(c.family||"")}</span>${extra||""}</summary>
  ${c.script?`<h4>Müşteri senaryosu</h4><div>${esc(c.script)}</div>`:""}${c.checks&&c.checks.length?`<h4>Judge check'leri</h4><ul>${c.checks.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}`}
+function recBtn(r){return r.record?`<button class="open ${r.status}" onclick="openV('${encodeURIComponent(r.record)}')">${r.rep}. ${r.status==="PASS"?"✓":r.status==="FAIL"?"✗":"!"}</button>`:`<span class="muted">${r.rep}. ${r.status}</span>`}
 function renderTest(w,tag,t){
- const bad=(t.final||[]).filter(f=>!f.pass);
- let h=`<h3>Lokal test ${esc(tag)}: ${t.passed}/${t.total} <span class="muted">(${t.seconds||"?"} s)</span></h3>`;
- if(!bad.length)return h+`<div class="muted">düşen yok</div>`;
- return h+bad.map(f=>{const rows=t.rows.filter(r=>r.id===f.id);
-  return caseDetails(w,f.id,` · <span style="color:var(--bad)">${f.passes}/${f.runs}</span>`)+rows.map(r=>`<h4>Koşu ${r.rep}: ${esc(r.status)}</h4>
-   ${(r.failed||[]).length?`<ul>${r.failed.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}${r.error?`<div>${esc(r.error)}</div>`:""}
-   ${r.path?`<div class="flowline">yol: ${esc(r.path.join(" › "))}</div>`:""}${(r.flags||[]).length?`<div class="flowline">bayraklar: ${esc(r.flags.join(" · "))}</div>`:""}
-   ${r.transcript?`<details><summary>transcript</summary><pre>${esc(r.transcript)}</pre></details>`:""}`).join("")+`</details>`}).join("")}
+ const fin=t.final||[];const bad=fin.filter(f=>!f.pass);
+ let h=`<h3>Lokal test ${esc(tag)}: ${t.passed}/${t.total} <span class="muted">(${t.seconds||"?"} s · konuşmayı açmak için koşu numarasına tıkla)</span></h3>`;
+ return h+fin.map(f=>{const c=w.cases[f.id]||{};const rows=t.rows.filter(r=>r.id===f.id).sort((a,b)=>a.rep-b.rep);
+  const why=rows.filter(r=>r.status!=="PASS").map(r=>(r.failed||[])[0]||r.error||"").filter(Boolean)[0]||"";
+  return `<div class="crow"><b style="color:var(--${f.pass?"ok":"bad"})">${f.pass?"✓":"✗"}</b><span class="t"><b>${esc(f.id)}</b> ${esc(c.title||"")} <span class="muted">${esc(c.family||"")}</span>${why?`<br><span class="muted">${esc(why.slice(0,200))}</span>`:""}</span>
+   <span>${f.passes}/${f.runs}</span><span>${rows.map(recBtn).join("")}</span></div>`}).join("")}
 function renderLoop(w){
  if(!w)return `<span class="muted">bu koşunun çalışma klasörü yok</span>`;
  let h="";
@@ -289,7 +363,7 @@ function renderLoop(w){
   if(R.request){const fs=R.request.failures||[];
    h+=`<h4>→ Claude'a gönderilen (${fs.length} düşen müşteri; ${esc(R.request.from)} sürümünün CallSpec'i ve brief'in tamamıyla birlikte)</h4>
    <div class="flowline">Talimat: sadece metinleri değiştir (kurallar, cümleler, extra_rules). Tatil, bant, outcome, kuyruk, kimlik soruları, tutarlar yasak. Müşteriye özel değer yazma, kuralı gevşetme.</div>`+
-   fs.map(f=>`<details><summary><b>${esc(f.id)}</b> ${esc(f.title)} <span class="muted">${esc(f.family)}</span></summary>
+   fs.map(f=>`<details><summary><b>${esc(f.id)}</b> ${esc(f.title)} <span class="muted">${esc(f.family)}</span> ${((w.tests[R.request.from]||{}).rows||[]).filter(r=>r.id===f.id).map(recBtn).join("")}</summary>
     <h4>Ne düştü</h4><ul>${(f.failed||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
     <h4>Senaryo</h4><div>${esc(f.script)}</div><h4>Judge check'leri</h4><ul>${(f.checks||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
     <h4>Beklenen banka kaydı</h4><pre>${esc(JSON.stringify(f.expected,null,1))}</pre>
@@ -309,7 +383,7 @@ function renderLoop(w){
  return h||`<span class="muted">henüz yok</span>`}
 const _tick=tick;tick=async function(){await _tick();
  try{const d=await (await fetch("/api/state"+(chosen?"?file="+encodeURIComponent(chosen):""))).json();
-  const key=JSON.stringify(d.work||null);if(key!==lastWork){lastWork=key;$("loop").innerHTML=renderLoop(d.work)}}catch(e){}};
+  WORK=d.work;const key=JSON.stringify(d.work||null);if(key!==lastWork){lastWork=key;$("loop").innerHTML=renderLoop(d.work)}}catch(e){}};
 $("file").onchange=e=>{chosen=e.target.value;lastLen=-1;lastWork="";tick()};tick();setInterval(tick,2000);
 </script></body></html>"""
 

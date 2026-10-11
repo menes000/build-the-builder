@@ -24,9 +24,9 @@ def usage_line():
             f"({u['cache_read']/1e3:.1f}k from cache), {u['output']/1e3:.1f}k output, {u['seconds']:.0f} s in calls")
 
 
-def _ask(system, prompt, tries=4):
-    cmd = ["claude", "-p", "--model", MODEL, "--system-prompt", system, "--tools", "", "--no-session-persistence",
-           "--output-format", "json", "--effort", EFFORT, "--strict-mcp-config", "--setting-sources", "", "--disable-slash-commands"]
+def _ask(system, prompt, tries=4, model=None, effort=None):
+    cmd = ["claude", "-p", "--model", model or MODEL, "--system-prompt", system, "--tools", "", "--no-session-persistence",
+           "--output-format", "json", "--effort", effort or EFFORT, "--strict-mcp-config", "--setting-sources", "", "--disable-slash-commands"]
     last = None
     for attempt in range(tries):
         t0 = time.time()
@@ -50,6 +50,11 @@ def _ask(system, prompt, tries=4):
         last = RuntimeError(f"claude CLI exit {p.returncode}: {(text or p.stderr or p.stdout)[:300]}")
         time.sleep(3 * (attempt + 1))                   # rate limit or a busy model: back off and retry
     raise last
+
+
+def ask_json(system, prompt, model, effort="medium"):
+    """One JSON answer from a chosen model (used by main.py's cross-check, independent of the test model)."""
+    return _json(_ask(system, prompt + "\n\nAnswer with JSON only, no code fence, no text around it.", model=model, effort=effort))
 
 
 def _json(text):
