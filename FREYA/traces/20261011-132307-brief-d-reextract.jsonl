@@ -1,1 +1,5 @@
 {"t": 0.0, "kind": "start", "at": "2026-10-11T13:23:07+0300", "label": "brief-d-reextract"}
+{"t": 86.3, "kind": "model_call", "model": "claude-opus-5-5", "purpose": "extract CallSpec from brief (attempt 1)", "seconds": 86.1, "cost_usd": 0.5884025, "tokens": null}
+{"t": 86.3, "kind": "note", "text": "extraction attempt 1: 1 API mismatch(es): identity text says the first refusal closes the call but decline.explain_first is true"}
+{"t": 167.3, "kind": "model_call", "model": "claude-opus-5-5", "purpose": "extract CallSpec from brief (attempt 2)", "seconds": 81.0, "cost_usd": 0.6775491, "tokens": null}
+{"t": 167.3, "kind": "note", "text": "extraction attempt 2: CallSpec valid (23228 bytes)"}
