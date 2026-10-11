@@ -34,7 +34,7 @@ def main() -> None:
             try:
                 return real_api(method, path, body, **params)
             except Exception as e:
-                msg = str(e)
+                msg = " ".join(str(e).split())
                 transient = any(k in msg for k in ("502", "503", "504", "temporarily unavailable", "timed out", "Connection", "Remote end closed"))
                 if not transient or spent >= max_wait:
                     raise
