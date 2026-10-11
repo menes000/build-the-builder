@@ -59,3 +59,12 @@ def test_no_brief_values_in_compiler_code():
     src = "".join(Path(p).read_text() for p in (ROOT / "builder/compile").glob("*.py") if p.name != "selfcheck.py")  # selfcheck holds sample data only
     for leak in ("2026-10-26", "4821", "collections team", "12th business", "Freya Bank"):
         assert leak not in src, leak
+
+
+def test_human_request_is_not_a_refusal(wf_a):
+    """Mehmet's OUR-09/26: 'I want a real person' during identity must not count as a refusal (v14 regression)."""
+    sec = wf_a["nodes"]["security"]
+    desc = next(e for e in sec["extraction_schema"] if e["name"] == "declined_1")["description"]
+    assert "real person" in desc and "not a refusal" in desc
+    assert "transfer_to_agent" in [t["function"]["name"] for t in sec["tools"]]
+    assert "NOT a refusal" in sec["task_message"] if "task_message" in sec else True

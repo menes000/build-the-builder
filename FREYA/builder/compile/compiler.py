@@ -286,7 +286,8 @@ def compile_workflow(spec: CallSpec) -> dict:
     decline_desc = ("The customer EXPLICITLY refuses to answer the security question (e.g. 'I won't give that', 'no'), says they do not want to talk" +
                     (", or asks what the call is about / why the bank is calling instead of answering" if idn.decline.asking_purpose_counts_as_decline else "") +
                     ". yes ONLY for such an explicit refusal in their LAST message. Leave empty when they answer, give part of an answer, ask to repeat, "
-                    "ask a short question about the question itself (e.g. 'why do you need that?', 'which account?'), chat about something else, or hesitate.")
+                    "ask a short question about the question itself (e.g. 'why do you need that?', 'which account?'), chat about something else, or hesitate. "
+                    "Leave empty when they ask for a human, a real person, an agent or a manager: that is a request, not a refusal, and it is handled separately.")
     def declined_extraction(name):
         return {"name": name, "type": "string", "min_confidence": 0.6, "enum_values": ["yes"], "description": decline_desc}
     common_sec_routes = [

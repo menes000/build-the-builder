@@ -109,7 +109,7 @@ def security_task(spec: CallSpec, after_explanation: bool = False) -> str:
     ]
     if idn.human_request:
         hr = idn.human_request
-        parts.append(f"- If the customer asks for a human: {'ask once whether you can help first. If they insist, ' if hr.ask_once_if_can_help else ''}call transfer_to_agent with queue {hr.queue}.")
+        parts.append(f"- If the customer asks for a human, a real person or an agent (also before any question is answered): this is NOT a refusal. {'Ask once whether you can help first. If they insist, ' if hr.ask_once_if_can_help else ''}call transfer_to_agent with queue {hr.queue}.")
     parts.append(f"- After the check fails: {idn.after_failed_text}")
     return "\n".join(parts) + _rules(idn.extra_rules)
 
