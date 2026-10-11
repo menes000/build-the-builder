@@ -4,7 +4,8 @@ Builds one phone agent for one brief and writes:
   submission/<name>.workflow.json   the workflow as stored on Freya (freya.export_workflow)
   traces/<time>-<name>.txt/.jsonl   the run trace; the same lines go to stdout (tee them into traces/<name>.log)
 <name> is the brief's file stem or folder name. The same brief can be built again; every run creates a new version
-of the same agent slot. Extra options (for example `--test A`) are passed to builder.main unchanged.
+of the same agent slot. After the export the team's local coverage test runs (tester/local_test.py, report only, needs GEMINI_API_KEY);
+`--no-local-test` skips it. Other options (for example `--test A`) are passed to builder.main unchanged.
 """
 import sys
 from pathlib import Path
@@ -22,6 +23,10 @@ def entry(argv: list[str]) -> int:
     brief, openapi, extra = argv[0], argv[1], argv[2:]
     name = Path(brief).name if Path(brief).is_dir() else Path(brief).stem
     name = name.removesuffix(".brief")
+    if "--no-local-test" in extra:          # the local coverage test (report only) is on by default
+        extra = [x for x in extra if x != "--no-local-test"]
+    elif "--local-test" not in extra:
+        extra = ["--local-test", *extra]
     return main([brief, "--openapi", openapi, "--slot", name, "--export", str(ROOT / "submission" / f"{name}.workflow.json"), *extra])
 
 

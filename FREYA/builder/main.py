@@ -81,6 +81,38 @@ def expand_briefs(paths: list[str]) -> list[str]:
     return out
 
 
+def local_test(spec_path: Path, export_path: Path, out_path: Path, openapi: str, slot: str, trace: Trace, timeout_s: float) -> dict | None:
+    """The team's own coverage test on the finished agent (report only). tester/ lives at the repo root, next to FREYA/."""
+    runner = next((p for p in (ROOT / "tester" / "local_test.py", ROOT.parent / "tester" / "local_test.py") if p.exists()), None)
+    if runner is None:
+        trace.note("local test skipped: tester/local_test.py not found")
+        return None
+    if not os.environ.get("GEMINI_API_KEY"):
+        trace.note("local test skipped: GEMINI_API_KEY not set")
+        return None
+    cmd = [sys.executable, str(runner), "--callspec", str(spec_path), "--export", str(export_path), "--out", str(out_path), "--openapi", openapi, "--tag", slot]
+    t0 = time.time()
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=max(60, timeout_s), cwd=str(runner.parent.parent))
+    except subprocess.TimeoutExpired:
+        trace.note(f"local test stopped: over the time budget after {round(time.time() - t0)} s")
+        return None
+    tail = (p.stdout.strip().splitlines() or [""])[-1][:200]
+    try:
+        res = json.loads(out_path.read_text())
+    except Exception:
+        trace.note(f"local test gave no result (exit {p.returncode}): {tail} {p.stderr.strip()[-300:]}")
+        return None
+    if "error" in res:
+        trace.note(f"local test error: {str(res.get('error'))[:200]} {str(res.get('detail', ''))[-200:]}")
+        return None
+    failed = sorted({f"{r['id']}: {'; '.join(r.get('failed') or [])[:160]}" for r in res.get("rows", []) if r.get("status") != "PASS"})
+    trace.test("local coverage (team tester, report only)", res.get("passed", 0), res.get("total", 0), res.get("seconds", time.time() - t0), failed, simulation_id="local")
+    if res.get("skipped_templates"):
+        trace.note(f"local test: {len(res['skipped_templates'])} case templates skipped (rule not in this brief)")
+    return res
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("briefs", nargs="+")
@@ -95,6 +127,7 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     ap.add_argument("--out-dir", default=str(ROOT / "out"))
     ap.add_argument("--export", default=None, help="where to write the exported workflow (default out/<slot>.export.workflow.json)")
+    ap.add_argument("--local-test", action="store_true", help="after the export, run the team's local coverage test (tester/local_test.py: cases generated from the CallSpec, local emulator, no Freya request) and record the result in the trace; report only, nothing is changed")
     a = ap.parse_args(argv)
 
     slot = a.slot or Path(a.briefs[0]).stem
@@ -188,6 +221,10 @@ def main(argv=None) -> int:
     export_path.parent.mkdir(parents=True, exist_ok=True)
     freya.export_workflow(ids["workflow_id"], str(export_path))
     trace.note(f"exported {export_path}")
+    if a.local_test:
+        lt = local_test(out_dir / f"{slot}.callspec.json", export_path, out_dir / f"{slot}.localtest.json", a.openapi, slot, trace, deadline - time.time() - 30)
+        if lt and "passed" in lt:
+            results["local"] = {"passed": lt["passed"], "total": lt["total"]}
     trace.end(workflow_id=ids["workflow_id"], agent_id=agent_id, export=str(export_path),
               tests={k: (f"{v['passed']}/{v['total']}" if v else "failed") for k, v in results.items()})
     print(json.dumps({"workflow_id": ids["workflow_id"], "agent_id": agent_id, "export": str(export_path)}))
