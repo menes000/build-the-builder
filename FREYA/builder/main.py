@@ -62,6 +62,25 @@ def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trac
     return r
 
 
+BRIEF_EXT = {".md", ".txt", ".pdf", ".docx", ".odt", ".rtf", ".pptx", ".xlsx", ".html", ".htm", ".json", ".csv"}
+
+
+def expand_briefs(paths: list[str]) -> list[str]:
+    """A brief may be a folder of loose material (emails, memos, code lists): take its files in name order, subfolders included."""
+    out: list[str] = []
+    for p in paths:
+        pp = Path(p)
+        if pp.is_dir():
+            files = sorted(f for f in pp.rglob("*") if f.is_file() and f.suffix.lower() in BRIEF_EXT and not f.name.startswith("."))
+            files = [f for f in files if "openapi" not in f.name.lower()]      # the tool API file is not brief text
+            if not files:
+                raise SystemExit(f"no brief files in folder {p}")
+            out += [str(f) for f in files]
+        else:
+            out.append(p)
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("briefs", nargs="+")
@@ -75,9 +94,11 @@ def main(argv=None) -> int:
     ap.add_argument("--style", default=None, help="customer speaking style for the tests (pieces, corrects, talkative, asks_back, in_words)")
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     ap.add_argument("--out-dir", default=str(ROOT / "out"))
+    ap.add_argument("--export", default=None, help="where to write the exported workflow (default out/<slot>.export.workflow.json)")
     a = ap.parse_args(argv)
 
     slot = a.slot or Path(a.briefs[0]).stem
+    a.briefs = expand_briefs(a.briefs)
     out_dir = Path(a.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     trace = Trace(str(ROOT / "traces"), label=slot)
@@ -112,7 +133,7 @@ def main(argv=None) -> int:
         freya.validate_workflow(f"{slot} dryrun", wf)
         trace.note(f"dryRun valid{tag}")
         ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
-        trace.created("workflow", slot=slot, tag=tag or "v1", **ids)
+        trace.created("workflow", wf, slot=slot, tag=tag or "v1", **ids)
         return wf, ids
 
     # 2+3. compile, check, validate, save
@@ -159,11 +180,12 @@ def main(argv=None) -> int:
         else:
             ids = freya.save_workflow(slot, prev_wf, state_file=str(ROOT / ".freya-agents.json"))
             wf = prev_wf
-            trace.created("workflow", slot=slot, tag=f"rollback after fix{rnd}", **ids)
+            trace.created("workflow", prev_wf, slot=slot, tag=f"rollback after fix{rnd}", **ids)
             break
 
     # 5. export
-    export_path = out_dir / f"{slot}.export.workflow.json"
+    export_path = Path(a.export) if a.export else out_dir / f"{slot}.export.workflow.json"
+    export_path.parent.mkdir(parents=True, exist_ok=True)
     freya.export_workflow(ids["workflow_id"], str(export_path))
     trace.note(f"exported {export_path}")
     trace.end(workflow_id=ids["workflow_id"], agent_id=agent_id, export=str(export_path),

@@ -1,0 +1,25 @@
+[    0.0s] start: at=2026-10-11T10:56:03+0300 label=brief-a
+[    0.0s] note: text=briefs=['kit/briefs/brief-a.md'] openapi=kit/tools/openapi.json slot=brief-a model=claude-opus-5-5 budget_min=25.0
+[   64.0s] model_call: model=claude-opus-5-5 purpose=extract CallSpec from brief (attempt 1) seconds=63.7 cost_usd=0.5428852000000001 tokens=None
+[   64.0s] note: text=extraction attempt 1: CallSpec valid (17365 bytes)
+[   64.0s] note: text=compiled 31 nodes -> /Users/doraalkan/Desktop/FREYA/out/brief-a.workflow.json
+[   64.3s] note: text=dryRun valid
+[   64.8s] created_on_freya: what=workflow steps=31 tools=10 slot=brief-a tag=v1 workflow_id=6235898e-6930-42fc-9eeb-039ac3f19c84 agent_id=edf14da7-35e2-4890-9c75-70439f3010d8
+PASS PUB-01 easy   Happy path     | verify > verify > get_account > promise > close_call
+PASS PUB-02 medium Third party    | schedule_callback > close_call
+PASS PUB-03 medium Identity       | verify > verify > verify > close_call
+PASS PUB-04 medium Dates          | verify > verify > get_account > promise > close_call
+PASS PUB-05 medium Hardship       | verify > verify > get_account > close_call
+PASS PUB-06 hard   Amounts        | verify > verify > get_account > promise > close_call
+PASS PUB-07 hard   Dates          | verify > verify > get_account > promise > close_call
+PASS PUB-08 medium Already paid   | verify > verify > get_account > close_call
+PASS PUB-09 medium Restructuring  | verify > verify > get_account > transfer_to_agent > close_call
+PASS PUB-10 hard   Tool failure   | verify > verify > get_account > promise > promise > close_call
+
+slowest agent turn per call: median 3 s, worst 23 s. Failed calls where the customer hung up: 0.
+
+10 / 10 passed (bank records and conversation checks). Last simulation 15373102-4e18-482a-bde8-2a197617d9e2, status completed, 134 s.
+[  204.3s] test: name=practice brief A passed=10 total=10 seconds=140 failed=[] simulation_id=15373102-4e18-482a-bde8-2a197617d9e2
+[  204.8s] note: text=exported /Users/doraalkan/Desktop/FREYA/submission/brief-a.workflow.json
+[  204.8s] end: at=2026-10-11T10:59:28+0300 total_seconds=205 workflow_id=6235898e-6930-42fc-9eeb-039ac3f19c84 agent_id=edf14da7-35e2-4890-9c75-70439f3010d8 export=/Users/doraalkan/Desktop/FREYA/submission/brief-a.workflow.json tests={'A': '10/10'}
+{"workflow_id": "6235898e-6930-42fc-9eeb-039ac3f19c84", "agent_id": "edf14da7-35e2-4890-9c75-70439f3010d8", "export": "/Users/doraalkan/Desktop/FREYA/submission/brief-a.workflow.json"}

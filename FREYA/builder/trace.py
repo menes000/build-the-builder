@@ -20,7 +20,7 @@ class Trace:
         rec = {"t": round(time.time() - self.t0, 1), "kind": kind, **data}
         with self.jsonl.open("a") as f:
             f.write(json.dumps(rec, default=str) + "\n")
-        line = f"[{rec['t']:7.1f}s] {kind}: " + " ".join(f"{k}={v}" for k, v in data.items() if k != "at")
+        line = f"[{rec['t']:7.1f}s] {kind}: " + " ".join(f"{k}={v}" for k, v in data.items())
         with self.txt.open("a") as f:
             f.write(line + "\n")
         print(line, flush=True)
@@ -31,8 +31,13 @@ class Trace:
     def model_call(self, model: str, purpose: str, seconds: float, cost_usd=None, tokens=None):
         self._write("model_call", {"model": model, "purpose": purpose, "seconds": round(seconds, 1), "cost_usd": cost_usd, "tokens": tokens})
 
-    def created(self, what: str, **ids):
-        self._write("created_on_freya", {"what": what, **ids})
+    def created(self, what: str, wf: dict | None = None, **ids):
+        """What was created on Freya: ids plus the size of the workflow (steps = nodes, tools = every tool on every node)."""
+        size = {}
+        if wf:
+            size = {"steps": len(wf.get("nodes", {})),
+                    "tools": sum(len(n.get("tools", [])) for n in wf.get("nodes", {}).values()) + len(wf.get("tools", []))}
+        self._write("created_on_freya", {"what": what, **size, **ids})
 
     def test(self, name: str, passed: int, total: int, seconds: float, failed: list[str], simulation_id: str = ""):
         self._write("test", {"name": name, "passed": passed, "total": total, "seconds": round(seconds), "failed": failed, "simulation_id": simulation_id})

@@ -42,7 +42,19 @@ cp kit/env.example env.sh     # FREYA_API_KEY, FREYA_BANK_TEAM_KEY, FREYA_WORKSP
 source env.sh
 ```
 
-## Run
+## Run (submission form)
+
+```bash
+source env.sh
+python3 builder/build.py briefs/hidden-1.md briefs/hidden-1.openapi.json 2>&1 | tee traces/hidden-1.log
+# -> submission/hidden-1.workflow.json (the exported workflow) + traces/<time>-hidden-1.txt/.jsonl
+```
+
+The first argument is a brief file or a folder of loose material (emails, memos, code lists: every file in name order);
+the second is the bank's tool API file. The name of the file or folder becomes the agent slot and the output name.
+Extra options go through to the builder unchanged, for example `--test A --fix-rounds 1` for a practice brief.
+
+## Run (developer form)
 
 ```bash
 # one brief
@@ -61,7 +73,7 @@ Outputs per run:
 |---|---|
 | `out/<slot>.callspec.json` | what the builder understood from the brief |
 | `out/<slot>.workflow.json` | the compiled workflow as sent |
-| `out/<slot>.export.workflow.json` | the workflow as stored on Freya: **this is the submission file** |
+| `submission/<name>.workflow.json` (build.py) or `out/<slot>.export.workflow.json` | the workflow as stored on Freya: **this is the submission file** |
 | `traces/<time>-<slot>.txt` / `.jsonl` | the run trace: start/end, every model call, what was created, every test |
 
 The run prints `{"workflow_id", "agent_id", "export"}` at the end.
@@ -72,6 +84,7 @@ Options: `--budget-min 25` (tests and fix rounds are skipped once the budget is 
 
 ```
 builder/
+  build.py                submission entry point: brief (file or folder) + tool API -> submission/<name>.workflow.json
   main.py                 CLI and pipeline
   trace.py                run trace
   extract/callspec.py     the CallSpec schema (Pydantic)
