@@ -39,6 +39,13 @@ class Rules:
         self.multi = spec.get("multi_product") or {}
         self.identity_fields = [q["field"] for q in spec["identity"]["questions"]]
         self.skipped = []
+        pm = ((spec.get("field_map") or {}).get("product") or {})          # canonical -> the brief's product field name
+        self.product_actual_to_canon = {v: k for k, v in pm.items()}
+        self.max_wrong = int(spec["identity"].get("max_wrong_total") or 3)
+        self.promise_reason = None                                           # a brief may give the promise outcome a reason
+        po = next((o for o in spec["closing"]["outcomes"] if o["outcome"] == spec["closing"]["promise_outcome"]), None)
+        if po and po.get("reasons") and spec["closing"]["promise_outcome"] not in (spec["closing"].get("outcomes_without_reason") or []):
+            self.promise_reason = po["reasons"][0]; self.skipped.append(f"note: the promise outcome carries a reason; assuming '{self.promise_reason}' (first in the table)")
 
     # calendar
     def business(self, d): return d.weekday() not in self.weekend and d not in self.holidays
@@ -65,6 +72,10 @@ class Rules:
         if b is None: return None
         if b.get("deadline_business_days_after_today"): return self.nth_business_after(today, int(b["deadline_business_days_after_today"]))
         if b.get("deadline_calendar_days_after_today"): return self.next_business(today + dt.timedelta(days=int(b["deadline_calendar_days_after_today"])))
+        fixed = parse_date_text(b.get("deadline_rule") or "", today.year)          # "all promises by 30 November" style
+        if fixed: return fixed if self.business(fixed) else self.next_business(fixed)
+        m = re.search(r"(\d+)\s*(business|working|calendar)\s*days?", (b.get("deadline_rule") or "").lower())
+        if m: n = int(m[1]); return self.nth_business_after(today, n) if m[2] != "calendar" else self.next_business(today + dt.timedelta(days=n))
         return None
 
     def attempts(self, product):
@@ -78,13 +89,18 @@ class Rules:
             if d > today: return d
             return self.last_business_of_week(today + dt.timedelta(days=7)) if "next week" in r else d
         if "next business day" in r: return self.next_business(today + ONE)
+        m = re.search(r"(\d+)\s*(business|working|calendar)\s*days?", r)
+        if m: n = int(m[1]); return self.nth_business_after(today, n) if m[2] != "calendar" else self.next_business(today + dt.timedelta(days=n))
+        if "tomorrow" in r: return self.next_business(today + ONE)
         if "deadline" in r or "latest date" in r: return None            # caller must use the deadline
         return "unknown"
 
     def floor(self, product):
         pt = self.products.get(product["type"])
         if not pt: return None
-        v = product.get(pt["floor_field"])
+        f = pt["floor_field"]
+        v = product.get(f)
+        if v is None: v = product.get(self.product_actual_to_canon.get(f, f))      # accounts are written with canonical field names
         return float(v) if v is not None else None
 
     def label(self, product):
@@ -102,6 +118,22 @@ class Rules:
         o = self.spec
         for k in path.split("."): o = o.get(k) if isinstance(o, dict) else None
         return o if isinstance(o, str) and o.strip() else default
+
+
+MONTHS = {m.lower(): i for i, m in enumerate(["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"], 1)}
+
+
+def parse_date_text(text, year):
+    """An ISO date or '30 November' / 'November 30' inside a rule sentence, else None."""
+    m = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", text)
+    if m: return dt.date.fromisoformat(m[1])
+    m = re.search(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\b", text) or re.search(r"\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\b", text)
+    if m:
+        a, b = m[1], m[2]; day, mon = (a, b) if a.isdigit() else (b, a)
+        if mon.lower() in MONTHS:
+            try: return dt.date(year, MONTHS[mon.lower()], int(day))
+            except ValueError: return None
+    return None
 
 
 def money(x):
@@ -122,21 +154,40 @@ def load_accounts(path):
 
 
 SYNTH_IDENTITY = {"postcode": "SW1A1AA", "birth_year": "1985", "company_number": "12345678", "founded_year": "2001", "mother_maiden_name": "KOVACS"}
+ALIASES = {"dob": "date_of_birth", "birth_date": "date_of_birth", "date_of_birth": "date_of_birth", "phone_last4": "phone_last4", "last4": "phone_last4",
+           "phone_last_4": "phone_last4", "last_four_digits": "phone_last4", "post_code": "postcode", "zip": "postcode"}
 
 
 def complete_identity(acct, rules, local_bank):
-    """Add identity fields the brief asks for that the account lacks (only possible with the local bank)."""
-    missing = [f for f in rules.identity_fields if f not in acct["identity"]]
-    if not missing: return acct, False
-    if not local_bank: return None, True
-    a = copy.deepcopy(acct)
-    for f in missing: a["identity"][f] = SYNTH_IDENTITY.get(f, "4242")
-    return a, True
+    """Identity fields the brief asks for under another name are copied (dob <- date_of_birth); fields the account lacks are synthesised
+    (only possible with the local bank)."""
+    a = copy.deepcopy(acct); changed = False
+    for f in rules.identity_fields:
+        if f in a["identity"]: continue
+        canon = ALIASES.get(f.lower())
+        src = next((k for k in a["identity"] if ALIASES.get(k.lower()) == canon and canon), None)
+        if src: a["identity"][f] = a["identity"][src]; changed = True
+    missing = [f for f in rules.identity_fields if f not in a["identity"]]
+    if missing and not local_bank: return None, True
+    for f in missing: a["identity"][f] = SYNTH_IDENTITY.get(f, "4242"); changed = True
+    a["identity"] = {k: v for k, v in a["identity"].items() if k in rules.identity_fields}   # only the brief's questions
+    return a, changed
 
 
 class Pool:
     def __init__(self, accounts, rules, local_bank):
         self.accounts, self.rules, self.local_bank, self.used = accounts, rules, local_bank, {}
+        if local_bank:                                                      # the brief's product types that no account has: clone one
+            have = {p["type"] for a in accounts for p in a["products"]}
+            for t, pt in rules.products.items():
+                if t in have or not accounts: continue
+                base = copy.deepcopy(next(a for a in accounts if len(a["products"]) == 1))
+                base["id"] += f"-{t}-syn"; p = base["products"][0]; p["type"] = t
+                canon = rules.product_actual_to_canon.get(pt["floor_field"], pt["floor_field"])
+                fl = p.get("minimum_payment") or p.get("instalment_amount") or round(float(p["past_due"]) * 0.3, 2)
+                for k in ("minimum_payment", "instalment_amount"): p.pop(k, None)
+                p[canon] = fl; p.pop("card_last4", None) if "card" not in t else None
+                self.accounts.append(base); rules.skipped.append(f"note: synthetic account {base['id']} for product type '{t}' (not in the pool)")
 
     def pick(self, pred, prefer=None, synth=None):
         """First account satisfying pred (least used first); `prefer` names an account id to try first; `synth` builds one."""
@@ -172,6 +223,9 @@ def build(rules, pool, tag="OUR", now_override=None):
              "title": title, "variables": copy.deepcopy(acct["variables"]), "identity": copy.deepcopy(acct["identity"]),
              "products": copy.deepcopy(acct["products"]), "script": script, "expected": expected, "checks": checks}
         if acct.get("faults"): c["faults"] = acct["faults"]
+        if sp.get("field_map"): c["field_map"] = sp["field_map"]          # lets the fake bank speak the brief's field names
+        c["identity_max_wrong"] = rules.max_wrong
+        if sp.get("openapi_path"): c["openapi"] = sp["openapi_path"]
         if now: c["variables"]["now"] = now
         if third_party: c["third_party"] = True
         if needs_local or acct["id"].endswith("-syn"): c["needs_local_bank"] = True
@@ -296,7 +350,8 @@ def build(rules, pool, tag="OUR", now_override=None):
 
     hint = next((h for h in sp["identity"].get("retry_hints") or [] if h.get("hint") == "day_month_swapped"), None)
     dob_field = next((q["field"] for q in sp["identity"]["questions"] if "birth" in q["field"] or q["field"] == "dob"), None)
-    a, _ = pool.pick(lambda a: single(a) and dob_field in a["identity"], prefer="PUB-07")
+    has_dob = lambda a: single(a) and any(ALIASES.get(k.lower()) == "date_of_birth" or k == dob_field for k in a["identity"])
+    a, _ = pool.pick(has_dob, prefer="PUB-07")
     if hint and dob_field and a:
         v, p, today = a["variables"], a["products"][0], today_of(a)
         dob = dt.date.fromisoformat(a["identity"][dob_field])
@@ -305,13 +360,13 @@ def build(rules, pool, tag="OUR", now_override=None):
             add("Identity", "hard", "Gives the date of birth with day and month swapped", a,
                 f"Confirms being {v['first_name']} {v['last_name']}. The first time asked for the date of birth says only '{swapped}' (month first, the way they are used to). "
                 f"If asked to say the month as a word, says 'the {dob.day}th of {dob:%B} {dob.year}'. Answers the other security questions correctly. Says they can pay the full amount today. Confirms at the read-back.",
-                ledger(need("closing.promise_outcome_obj") or {"outcome": sp["closing"]["promise_outcome"], "reason": None}, promises=[promise(p["past_due"], today)]),
+                ledger({"outcome": sp["closing"]["promise_outcome"], "reason": rules.promise_reason}, promises=[promise(p["past_due"], today)]),
                 ["after the day_month_swapped hint the agent asks for the month as a word", "the swapped answer is not treated as a wrong answer", f"promise for {money(p['past_due'])} today ({D(today)})", sms_check])
         else: skip("day/month swapped", "no account whose birthday allows a swap")
     else: skip("day/month swapped", "no day_month_swapped hint or no date-of-birth question")
 
     # ---- after verification: amounts, dates, persuasion
-    po = {"outcome": sp["closing"]["promise_outcome"], "reason": None}
+    po = {"outcome": sp["closing"]["promise_outcome"], "reason": rules.promise_reason}
     o_ref = need("persuasion.refused_close")
     floor_text = rules.text("amounts.floor_offer_text", "the rest stays overdue")
 
@@ -473,6 +528,24 @@ def build(rules, pool, tag="OUR", now_override=None):
                 ledger(o_ref), [f"attempt 1 proposes {money(full)} on {day(d1)} (not today)", f"attempt 2 proposes {money(fl)} on {day(dl)}", "no third offer after the second refusal", "no promise recorded"],
                 now=f"{D(fri)}T{base_now or '11:00'}")
 
+    # a day right before a holiday inside the deadline window: the customer names the holiday itself
+    a, _ = pool.pick(single, prefer="PUB-01")
+    if a and sp["dates"].get("offer_next_business_day", True) and rules.holidays:
+        base = today_of(a); p = a["products"][0]
+        hol = next((h for h in sorted(rules.holidays) if h > base), None)
+        if hol:
+            before = hol - ONE
+            while not rules.business(before): before -= ONE
+            dl = rules.deadline(p, before)
+            if dl and hol <= dl and rules.band(p):
+                nb = rules.next_business(hol)
+                if nb <= dl:
+                    add("Dates", "hard", f"Called on {day(before)}: names the holiday {day(hol)}", a,
+                        f"Verified. Cannot pay today. Says they can pay on {day(hol)}. Accepts the day the agent offers instead. Confirms at the read-back.",
+                        ledger(po, promises=[promise(p["past_due"], nb)]), [f"the agent does not accept {day(hol)} (not a business day)", f"the agent offers the next business day, {day(nb)}", f"promise for {money(p['past_due'])} on {day(nb)}"],
+                        now=f"{D(before)}T{base_now or '11:00'}")
+        else: skip("holiday day", "no holiday after the practice day")
+
     # paid
     pd = sp["special"].get("paid"); o = need("special.paid.close")
     a, _ = pool.pick(single, prefer="PUB-03")
@@ -578,8 +651,10 @@ def main():
     ap.add_argument("callspec"); ap.add_argument("--accounts", default=next((str(p / "public-test-set.json") for p in (ROOT / "kit", ROOT / "docs" / "build-the-builder") if p.exists()), None))
     ap.add_argument("--out"); ap.add_argument("--tag", default="OUR"); ap.add_argument("--brief", default="X", help="brief tag written into each case")
     ap.add_argument("--local-bank", action="store_true", help="allow synthetic identity fields and accounts (run with local_sim.py --bank local)")
+    ap.add_argument("--openapi", help="the brief's tool API; written into the cases so the fake bank validates requests against it")
     a = ap.parse_args()
     spec = json.load(open(a.callspec)); spec["brief_tag"] = a.brief
+    if a.openapi: spec["openapi_path"] = str(pathlib.Path(a.openapi).resolve())
     rules = Rules(spec); pool = Pool(load_accounts(a.accounts), rules, a.local_bank)
     cases = build(rules, pool, a.tag); check(cases, rules)
     out = pathlib.Path(a.out or (ROOT / "results" / (pathlib.Path(a.callspec).stem.replace(".callspec", "") + "-cases.json")))

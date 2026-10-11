@@ -38,12 +38,42 @@ Answer with JSON only, exactly these keys:
 }"""
 
 
+def read_file(f):
+    """md/txt/json as is; docx via its XML; pdf via pdftotext when installed (else a warning)."""
+    suf = f.suffix.lower()
+    if suf == ".docx":
+        import re, zipfile
+        xml = zipfile.ZipFile(f).read("word/document.xml").decode("utf8", "ignore")
+        return re.sub(r"<[^>]+>", lambda m: "\n" if m.group(0).startswith(("</w:p", "<w:br", "<w:tab")) else "", xml)
+    if suf == ".pdf":
+        import shutil, subprocess
+        if shutil.which("pdftotext"): return subprocess.run(["pdftotext", "-layout", str(f), "-"], capture_output=True, text=True).stdout
+        return f"[pdf {f.name}: install pdftotext (poppler) to read it]"
+    return f.read_text(errors="ignore")
+
+
 def read_material(paths):
     files = []
     for p in paths:
         p = pathlib.Path(p)
-        files += sorted(x for x in p.iterdir() if x.suffix.lower() in (".md", ".txt", ".json") and "openapi" not in x.name) if p.is_dir() else [p]
-    return "\n\n".join(f"===== DOCUMENT: {f.name} =====\n{f.read_text()}" for f in files), [f.name for f in files]
+        files += sorted(x for x in p.iterdir() if x.suffix.lower() in (".md", ".txt", ".json", ".docx", ".pdf") and "openapi" not in x.name.lower()) if p.is_dir() else [p]
+    return "\n\n".join(f"===== DOCUMENT: {f.name} =====\n{read_file(f)}" for f in files), [f.name for f in files]
+
+
+def field_map_vs_openapi(spec, openapi_path):
+    """Deterministic: every actual field name in the CallSpec field_map must exist in the openapi request schema of that tool, and
+    every required openapi field must be mapped. Returns problem lines."""
+    o = json.load(open(openapi_path)); out = []
+    req = (spec.get("field_map") or {}).get("req") or {}
+    for path, methods in (o.get("paths") or {}).items():
+        tool = path.rstrip("/").rsplit("/", 1)[-1]; op = methods.get("post") or methods.get("get") or {}
+        schema = ((((op.get("requestBody") or {}).get("content") or {}).get("application/json") or {}).get("schema") or {})
+        props = set((schema.get("properties") or {})); required = set(schema.get("required") or [])
+        mapped = set((req.get(tool) or {}).values())
+        if not props: continue
+        for f in mapped - props: out.append(f"field_map.req.{tool}: '{f}' is not a request field of the API ({sorted(props)})")
+        for f in required - mapped: out.append(f"field_map.req.{tool}: required API field '{f}' is not mapped (the builder will not send it)")
+    return out
 
 
 def from_callspec(c):
@@ -98,6 +128,7 @@ def main():
     second = json.loads(raw)
     mine = from_callspec(spec)
     rows = diff(mine, {k: second.get(k) for k in mine})
+    fm_problems = field_map_vs_openapi(spec, a.openapi) if a.openapi else []
     lines = [f"# Rule diff: {pathlib.Path(a.callspec).name} vs a second reading of {', '.join(names)}", "",
              f"Second reader: {llm.model_of(llm.provider('judge'))}. {len(rows)} difference(s). A difference is a candidate extraction error, not a verdict: open the brief and decide.", "",
              "| field | CallSpec (builder) | second reading | source named by the second reader |", "|---|---|---|---|"]
@@ -106,6 +137,7 @@ def main():
         key = p.split(".")[0].split("[")[0]
         lines.append(f"| `{p}` | {json.dumps(x, ensure_ascii=False)} | {json.dumps(y, ensure_ascii=False)} | {src.get(key, src.get(p, ''))} |")
     if not rows: lines.append("| (none) | | | |")
+    if a.openapi: lines += ["", f"field_map vs openapi (deterministic): {len(fm_problems)} problem(s)"] + [f"- {x}" for x in fm_problems]
     lines += ["", "Fields compared: " + ", ".join(mine)]
     out = pathlib.Path(a.out or (pathlib.Path("results") / (pathlib.Path(a.callspec).stem.replace(".callspec", "") + "-rulediff.md")))
     out.parent.mkdir(parents=True, exist_ok=True); out.write_text("\n".join(lines) + "\n")

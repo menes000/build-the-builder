@@ -15,7 +15,8 @@ Uyku kapalı (uzun koşuda DNS kopuyor), git temiz, `final/` boş, Dora'nın `bu
 ```
 Dora:  python3 builder/build.py final/hidden-1 final/hidden-1/openapi.json 2>&1 | tee traces/hidden-1.log      (~5 dk)
        → FREYA/out/hidden-1.callspec.json, FREYA/out/hidden-1.export.workflow.json, agent id
-Biz:   CALLSPEC=... EXPORT=... BRIEF=hidden-1 TAG=H1 tester/final.sh hidden-1 2 6                               (~5 dk)
+Biz:   BRIEF=H1 TAG=H1 tester/final.sh hidden-1 2 8      (callspec/export'u FREYA/out, FREYA/submission, final/ altında kendisi bulur;
+       OPENAPI=final/hidden-1/openapi.json ile sahte banka zorunlu alan/enum doğrular; STYLE=talkative ile stil)     (~5 dk)
        1 cases_from_callspec.py  CallSpec → ~30 vaka (+çok ürünlü), değerler CallSpec'ten, tarihler koddan, assert'li
        2 local_sim.py --agent local --bank local  Gemini ajan + sahte banka + gpt-5.4-mini judge, 2 tekrar
        3 results/hidden-1-report.md
@@ -42,6 +43,11 @@ Karar (2 dk, ikimiz):
 
 ## 21:20+ yedek
 İkinci koşular, erken teslim. 22:30 teslim paketi (Dora): repo + commit, `submission/hidden-1.workflow.json`, `submission/hidden-2.workflow.json`, `traces/hidden-1.log`, `traces/hidden-2.log`, form JSON → kit mailindeki adres, 23:00 son.
+
+## Ağır test (final'de, sınırsız)
+Hızlı sinyal: `final.sh hidden-1 1 8` (~3 dk). Sonra arka planda jüri kriteriyle: `final.sh hidden-1 3 10` ve stiller
+`STYLE=pieces|corrects|talkative|asks_back|in_words final.sh hidden-1 2 10`. Raporlarda 3/3 geçmeyenler ve stil bazlı düşenler.
+Koşu başında iki denetim satırı okunur: `emulator audit` (desteklenmeyen Freya özelliği) ve `bank audit` (üretilemeyen cevap alanı).
 
 ## Kırmızı çizgiler
 Freya'daki ajanı elle düzenleme ✗ · brief değerini koda/prompt'a yazma ✗ · tek build > 30 dk ✗ · kuyrukta çift simülasyon ✗ · `FREYA/` ve `kit/` bize kapalı ✗

@@ -71,6 +71,49 @@ def endpoints_of(workflow):
     return out
 
 
+SUPPORTED_OPS = {"equals", "not_equals", "greater_than", "less_than", "contains", "is_set", "is_not_set", "always", "matches_intent"}
+SUPPORTED_NODE_TYPES = {"conversation", "api_request", "code", "end_call"}
+
+
+def audit(workflow):
+    """Features of a workflow this emulator does not reproduce (or only partly). Printed at run start so a silent mismatch is not mistaken for agent behaviour."""
+    w = workflow.get("workflow", workflow); out = []
+    nodes = dict(w.get("nodes") or {}); globals_ = dict(w.get("global_nodes") or {})
+    if globals_: out.append(f"global_nodes {list(globals_)}: supported for intent/deterministic conditions; __previous__ and excluded_nodes partly")
+    if w.get("context_variables"): out.append("context_variables: not rendered into the dialogue prompt (Freya drops them on save too)")
+    def conds(c):
+        if not c: return
+        yield c
+        for x in c.get("conditions") or []: yield from conds(x)
+    for k, n in list(nodes.items()) + list(globals_.items()):
+        if n.get("node_type") not in SUPPORTED_NODE_TYPES: out.append(f"{k}: node_type {n.get('node_type')} not supported")
+        if n.get("loop_condition"): out.append(f"{k}: loop_condition (approximated: judged with the intents, loop_prompt used after a match)")
+        if (n.get("truncation_strategy") or "keep_all") != "keep_all": out.append(f"{k}: truncation_strategy {n['truncation_strategy']} not applied (full history is sent)")
+        if n.get("routing_prompt"): out.append(f"{k}: routing_prompt (appended to our routing prompt, wording differs from Freya's)")
+        for t in n.get("transitions") or []:
+            for c in conds(t.get("condition")):
+                if c.get("operator") and c["operator"] not in SUPPORTED_OPS: out.append(f"{k}: condition operator {c['operator']} unsupported")
+        for t in n.get("tools") or []:
+            f = t.get("function") or {}; cfg = t.get("config") or {}
+            if f.get("handler") == "__function__:code_exec": out.append(f"{k}: code_exec as a model tool (Freya returns no data to the model; emulated the same way)")
+            if cfg.get("interruptible") is False: out.append(f"{k}/{f.get('name')}: background tool (result arrives next turn on Freya; here immediately)")
+            if f.get("handler") not in ("__function__:api_call", "__function__:code_exec"): out.append(f"{k}/{f.get('name')}: handler {f.get('handler')} unsupported")
+            if t.get("response_mapping") is None and n.get("response_mapping"): out.append(f"{k}: node-level response_mapping on a conversation node (Freya applies tool-level only)")
+        for t in n.get("pre_actions") or []:
+            if (t.get("function") or {}).get("handler") not in ("__function__:api_call", "__function__:code_exec"): out.append(f"{k}: pre_action handler {(t.get('function') or {}).get('handler')} unsupported")
+            if t.get("response_mapping"): out.append(f"{k}: response_mapping inside a pre_action is ignored by Freya (must be node-level); emulator ignores it too")
+        for f in n.get("extraction_schema") or []:
+            if f.get("extraction_prompt"): out.append(f"{k}/{f.get('name')}: custom extraction_prompt not used (built-in prompt instead)")
+            if f.get("type") in ("date", "datetime") : pass
+        term = ((n.get("terminal") or {}).get("function") or {}).get("parameters", {}).get("properties", {})
+        if (term.get("message_mode") or {}).get("default") == "llm" and n.get("node_type") == "end_call": out.append(f"{k}: end_call message_mode llm (farewell written by the dialogue model, approximated)")
+        if term.get("interruptible"): out.append(f"{k}: terminal interruptible window not simulated")
+    for t in w.get("tools") or []:
+        at = (t.get("config") or {}).get("alwaysRunsAt") or []
+        if "each_turn" in at: out.append(f"workflow tool {t['function']['name']}: alwaysRunsAt each_turn never fires on Freya; not emulated")
+    return out
+
+
 def dig(obj, path):
     for k in path.split("."):
         if isinstance(obj, dict) and k in obj: obj = obj[k]

@@ -6,13 +6,15 @@
 set -u
 cd "$(dirname "$0")/.."
 SLOT=${1:?slot}; REPS=${2:-2}; PAR=${3:-6}
-CALLSPEC=${CALLSPEC:-FREYA/out/$SLOT.callspec.json}; EXPORT=${EXPORT:-FREYA/out/$SLOT.export.workflow.json}
+CALLSPEC=${CALLSPEC:-$(ls FREYA/out/$SLOT.callspec.json final/$SLOT.callspec.json out/$SLOT.callspec.json 2>/dev/null | head -1)}
+EXPORT=${EXPORT:-$(ls FREYA/out/$SLOT.export.workflow.json FREYA/submission/$SLOT.workflow.json final/$SLOT.workflow.json submission/$SLOT.workflow.json 2>/dev/null | head -1)}
+OPENAPI=${OPENAPI:-$(ls final/$SLOT/openapi.json final/$SLOT.openapi.json 2>/dev/null | head -1)}
 BRIEF=${BRIEF:-$SLOT}; T0=$(date +%s)
-[ -f "$CALLSPEC" ] || { echo "no $CALLSPEC"; exit 1; }; [ -f "$EXPORT" ] || { echo "no $EXPORT"; exit 1; }
-echo "== 1/3 cases from $CALLSPEC"
-python3 tester/cases_from_callspec.py "$CALLSPEC" --brief "$BRIEF" --tag "${TAG:-OUR}" --local-bank --out "results/$SLOT-cases.json" | tee "results/$SLOT-cases.log" | tail -n 12
+[ -f "$CALLSPEC" ] || { echo "no callspec for $SLOT (set CALLSPEC=)"; exit 1; }; [ -f "$EXPORT" ] || { echo "no export for $SLOT (set EXPORT=)"; exit 1; }
+echo "== 1/3 cases from $CALLSPEC ${OPENAPI:+(api rules: $OPENAPI)}"
+python3 tester/cases_from_callspec.py "$CALLSPEC" --brief "$BRIEF" --tag "${TAG:-OUR}" --local-bank ${OPENAPI:+--openapi "$OPENAPI"} --out "results/$SLOT-cases.json" | tee "results/$SLOT-cases.log" | tail -n 12
 echo "== 2/3 local run: $EXPORT, $REPS rep(s), $PAR parallel"
-python3 tester/local_sim.py "$EXPORT" --agent local --bank local --cases "results/$SLOT-cases.json" --reps "$REPS" --parallel "$PAR" --out "results/$SLOT-local.json" | tee "results/$SLOT-local.log" | grep -E "^(PASS|FAIL|ERROR)|       - |       ! |passed|usage|cache"
+python3 tester/local_sim.py "$EXPORT" --agent local --bank local --cases "results/$SLOT-cases.json" --reps "$REPS" --parallel "$PAR" ${STYLE:+--style "$STYLE"} --out "results/$SLOT-local.json" | tee "results/$SLOT-local.log" | grep -E "^(PASS|FAIL|ERROR)|       - |       ! |passed|usage|cache|audit"
 echo "== 3/3 report"
 python3 - "$SLOT" "$T0" <<'PY'
 import json, sys, time, pathlib

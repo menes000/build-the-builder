@@ -322,6 +322,7 @@ def main():
     ap.add_argument("--parallel", type=int, default=3); ap.add_argument("--max-turns", type=int, default=40)
     ap.add_argument("--judge-view", choices=["tools", "spoken"], default="tools", help="what the judge reads: conversation plus bank tool calls, or the conversation only")
     ap.add_argument("--bank", choices=["mock", "local"], default="mock", help="mock: the organisers' bank mock (PUB accounts only). local: tester/fakebank.py with the case file's own accounts and identity fields (any brief); --agent local only")
+    ap.add_argument("--openapi", help="the brief's tool API: the fake bank then rejects missing required fields and bad enum values like a real API")
     a = ap.parse_args()
     cases = [c for c in json.load(open(a.cases)) if (not a.brief or c["brief"] == a.brief) and (not a.only or c["id"] in a.only.split(","))]
     if not cases: sys.exit("no cases selected")
@@ -329,11 +330,14 @@ def main():
     if a.bank == "local":
         if a.agent != "local": sys.exit("--bank local works with --agent local only (the agent on Freya cannot reach a bank on this machine)")
         BANK = "local"
-        base = fakebank.start(json.load(open(a.cases)))
+        base = fakebank.start(json.load(open(a.cases)), openapi=a.openapi)
         score.HOST = base; os.environ["LOCAL_BANK_HOST"] = base; os.environ.setdefault("FREYA_BANK_TEAM_KEY", "local")
-        say(f"fake bank on {base} with the accounts of {a.cases}")
+        say(f"fake bank on {base} with the accounts of {a.cases}" + (f", request rules from {a.openapi or 'the cases'}" if fakebank.STATE['api'] else ""))
+        for w in fakebank.audit(): say("  ! bank audit: " + w)
     wf = workflow_for(a.workflow_id)
     target = emulator.load_workflow(wf) if a.agent == "local" else wf
+    if a.agent == "local":
+        for w in emulator.audit(target): say("  ! emulator audit: " + w)
     if a.agent == "freya":
         try: FreyaAgent.endpoints = emulator.endpoints_of(emulator.load_workflow(wf))      # one GET, so the judge reads API names
         except Exception as e: say(f"(could not load the workflow for tool names: {e})")

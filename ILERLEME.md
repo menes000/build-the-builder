@@ -182,6 +182,25 @@ Problem tanımındaki 5 maddenin çözümü. Protokol: `docs/PAZAR-PROTOKOLU.md`
 - Brief B çok ürün (`ext-ab`, 20:22 derlemesi): 5/6. OURB-35 "söz üzerinde anlaşıldı ama okunmadı, plan istendi" → tek okuma kuralında söz kaydedilmez (önce şablon yanlıştı, düzeltildi). OURB-36 arıza ×2: not doğru, sözler korunuyor.
 - Maliyet: 30 arama ≈ 600k Gemini prompt token + 20k düşünme + 150 OpenAI çağrısı; ~2.5 dk.
 
+- **Alan adı değişikliği (11 Eki 11:50):** organizatör "tool adları aynı, alanlar/değerler değişebilir" diyor. Sahte banka artık CallSpec `field_map`'ini kullanıyor (istek gerçek→kanonik, cevap ve ürün alanları kanonik→gerçek); ledger içeride kanonik, `score.py` değişmiyor. Vaka üretici `field_map`'i her vakaya kopyalar; kimlik alanı eş anlamlıları (dob↔date_of_birth, last4↔phone_last4) hesaptan kopyalanır; vakanın kimliği sadece brief'in sorduğu alanlar. Self-test: client_ref/sum/pay_date/items/arrears adlarıyla uçtan uca geçti.
+
+### Gizli brief/API boşluk taraması (11 Eki 12:00–12:40) — 11 eksik bulundu, hepsi kapatıldı
+| # | Eksik | Çözüm | Test |
+|---|---|---|---|
+| 1 | Sahte banka openapi'yi doğrulamıyordu (zorunlu alan, enum, GET) | `fakebank.load_openapi`: eksik zorunlu alan → 400, enum dışı → hata, GET+query | sentetik API: queue enum, zorunlu text |
+| 2 | Yanlış cevap limiti sabit 3 | vaka `identity_max_wrong` (CallSpec `identity.max_wrong_total`) | limit 2 ile kilit |
+| 3 | Floor alanı yeni adla / yeni ürün tipi | `field_map.product` ile çeviri; brief'in havuzda olmayan ürün tipi için sentetik hesap | `min_due`, `overdraft` |
+| 4 | Tek takvim günü | ek `now`: tatilden önceki iş günü (müşteri tatili söyler), Cuma, akşam | Brief C: 30 Ekim → 2 Kasım tatili |
+| 5 | Deadline/deneme kuralı varyantları sessizce atlanıyordu | "by 30 November" sabit tarih, "N business/calendar days" ayrıştırma; atlananlar listeleniyor | "3 business days" → 19 Ekim |
+| 6 | Emülatör desteklemediği özellikte sessiz | `emulator.audit()` koşu başında uyarı (global node, loop_condition, truncation, bg tool, code_exec tool, operatör) | 3 workflow: uyarı yok |
+| 7 | Cevap şeması farklıysa ledger yolu çöker | `fakebank.audit()`: openapi cevap alanlarından üretemediklerini listeler | `status` alanı uyarısı |
+| 8 | rule_diff pdf/docx okumuyordu | docx XML, pdf `pdftotext` | — |
+| 9 | field_map doğrulanmıyordu | `field_map_vs_openapi` (LLM'siz): eşlenmeyen zorunlu alan / API'de olmayan ad | ext-c: temiz |
+| 10 | promise outcome'una reason tanımlanırsa yanlış beklenti | `closing.outcomes_without_reason`'a göre; ilk reason varsayılır, not düşülür | `arranged` |
+| 11 | final.sh yolları sabitti | `FREYA/out`, `FREYA/submission`, `final/`, `submission/` fallback; `OPENAPI`, `STYLE` env | — |
+Sentetik "tuhaf brief" (alan adları değişik, overdraft, sabit deadline, 2 yanlış cevap, promise/arranged): 29 vaka üretildi, assert'ler geçti. Brief C openapi doğrulamasıyla 3 vaka PASS.
+Kalan bilinen sınırlar aşağıda.
+
 **Sınırlar:** (1) şablonlar bilinen kural ailelerini test eder; şemada olmayan kural tipi için LLM senaryo önerisi yazılmadı (zaman). (2) Sahte banka brief'i uygulamaz (mock gibi). (3) `needs_local_bank` vakalar resmi yola gidemez. (4) Judge ve extraction gpt-5.4-mini, Freya'nınkiler farklı; kalibrasyon Gemini judge ile yapıldı (26/28).
 
 ### Dora'nın builder self-test isteği (11 Eki 11:16) → cevap
