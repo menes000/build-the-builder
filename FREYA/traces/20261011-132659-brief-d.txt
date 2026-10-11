@@ -1,0 +1,8 @@
+[    0.0s] start: at=2026-10-11T13:26:59+0300 label=brief-d
+[    0.0s] note: text=briefs=['../test-briefs/brief-d/01-email-thread.md', '../test-briefs/brief-d/02-policy.md', '../test-briefs/brief-d/03-memo.md', '../test-briefs/brief-d/04-code-list.md'] openapi=../test-briefs/brief-d/openapi.json slot=brief-d model=claude-opus-5-5 budget_min=25
+[    0.0s] note: text=using CallSpec from out/brief-d.callspec.json (no extraction)
+[    0.0s] note: text=compiled 32 nodes -> /Users/doraalkan/Desktop/freya-hecaton/FREYA/out/brief-d.workflow.json
+[    0.9s] note: text=dryRun valid
+[    2.9s] created_on_freya: what=workflow steps=32 tools=10 slot=brief-d tag=v1 workflow_id=2b2daf7c-ef9f-4d5b-b2b9-1690b184e3fb agent_id=7843f2bc-8dc7-4446-90de-643a09eda877
+[    3.6s] note: text=exported /Users/doraalkan/Desktop/freya-hecaton/FREYA/submission/brief-d.workflow.json
+[    3.6s] end: at=2026-10-11T13:27:03+0300 total_seconds=4 workflow_id=2b2daf7c-ef9f-4d5b-b2b9-1690b184e3fb agent_id=7843f2bc-8dc7-4446-90de-643a09eda877 export=/Users/doraalkan/Desktop/freya-hecaton/FREYA/submission/brief-d.workflow.json tests={}
