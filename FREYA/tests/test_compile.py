@@ -6,6 +6,7 @@ from pathlib import Path
 from conftest import ROOT, tool
 
 sys.path.insert(0, str(ROOT))
+from builder.build_from_spec import build  # noqa: E402
 from builder.compile.selfcheck import facts_preview  # noqa: E402
 
 
@@ -68,3 +69,53 @@ def test_human_request_is_not_a_refusal(wf_a):
     assert "real person" in desc and "not a refusal" in desc
     assert "transfer_to_agent" in [t["function"]["name"] for t in sec["tools"]]
     assert "NOT a refusal" in sec["task_message"] if "task_message" in sec else True
+
+
+def _variant(tmp_path, **changes):
+    """Brief A's CallSpec with a few structured fields changed; returns the compiled workflow."""
+    import copy
+    spec = json.loads((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    for path, value in changes.items():
+        d = spec
+        keys = path.split(".")
+        for k in keys[:-1]:
+            d = d[int(k)] if k.isdigit() else d[k]
+        d[keys[-1]] = value
+    f = tmp_path / "spec.json"
+    f.write_text(json.dumps(spec))
+    wf, problems = build(str(f), str(ROOT / "kit/tools/openapi.json"))
+    assert not problems, problems
+    return wf
+
+
+def test_variants_from_brief_d(tmp_path):
+    """The eight rule variants brief D exposed: each has a structured field and the compiler uses it."""
+    wf = _variant(tmp_path, **{"products.0.floor_percent": 50, "products.0.floor_round_up_to_whole": True,
+                               "third_party.callback.max_business_days_ahead": 2, "amounts.today_question": "Are you able to clear this today?",
+                               "dates.weekend_named_offer": "previous_business_day", "dates.vague_period_fallback": "attempt1",
+                               "confirm.max_tries_on_failure": 3, "identity.decline.explain_first": False,
+                               "multi_product.no_promise_reason_priority": ["dispute", "hardship", "service_error", "refused"]})
+    v = facts_preview(wf, "2026-10-14T11:00", [{"product_id": "p1", "type": "credit_card", "card_last4": "9015", "past_due": 510.5, "days_late": 16, "minimum_payment": 153.0}])
+    f = json.loads(v["facts_json"])[0]
+    assert f["floor"] == 256.0                                             # ceil(0.5 * 510.5), whole pound, not minimum_payment
+    assert "15 October" in v["callback_text"] and "16 October" in v["callback_text"]   # next business day or the one after
+    assert v["debt_statement"].endswith("Are you able to clear this today?")
+    assert "last business day before it" in v["calendar_text"]
+    neg = wf["nodes"]["negotiate"]["task_message"]
+    assert "attempt-1 date from ACCOUNT (the full amount" in neg and "up to 3 tries" in neg
+    sec = wf["nodes"]["security"]["transitions"]
+    assert any(t["target_node"] == "close_declined" and "declined_1" in json.dumps(t) for t in sec)   # no explanation step
+    svc = next(t for t in wf["nodes"]["negotiate"]["transitions"] if t["target_node"] == "close_service_error")
+    assert '"operand": 2' in json.dumps(svc)                               # failure count > 2 = three tries
+    assert "'dispute', 'hardship'" in json.dumps(wf["nodes"]["decide_outcome"])
+
+
+def test_band_needs_exactly_one_deadline_number(tmp_path):
+    import pytest
+    spec = json.loads((ROOT / "fixtures/callspec_brief_a.json").read_text())
+    spec["dates"]["bands"][0]["deadline_business_days_after_today"] = None
+    f = tmp_path / "bad.json"
+    f.write_text(json.dumps(spec))
+    with pytest.raises(Exception) as e:
+        build(str(f), str(ROOT / "kit/tools/openapi.json"))
+    assert "exactly one of" in str(e.value)

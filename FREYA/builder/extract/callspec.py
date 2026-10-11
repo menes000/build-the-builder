@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ----------------------------------------------------------------------------- shared
@@ -44,6 +44,7 @@ class RetryHint(BaseModel):
 class DeclinePolicy(BaseModel):
     explain_once_text: str = Field(description="The exact sentence the agent SAYS the first time the customer will not answer, in the agent's voice, e.g. 'These questions protect your account, so I have to ask them before I can continue.'")
     asking_purpose_counts_as_decline: bool = True
+    explain_first: bool = Field(True, description="True: the first refusal gets the explanation once and the second refusal closes. False: the first refusal closes the call at once")
     close: Outcome
 
 
@@ -85,6 +86,7 @@ class CallbackWindow(BaseModel):
     time_to: str = Field(description="HH:MM, inclusive")
     must_be_later_than_now: bool = True
     ask_again_once_if_outside: bool = True
+    max_business_days_ahead: int = Field(1, description="How many business days after today may be offered: 1 = only the next business day, 2 = the next business day or the one after it")
 
 
 class ThirdParty(BaseModel):
@@ -104,7 +106,9 @@ class ThirdParty(BaseModel):
 
 class ProductType(BaseModel):
     type: str = Field(description="Value of `type` in get_account, e.g. credit_card")
-    floor_field: str = Field(description="Field of the product that holds the floor amount, e.g. minimum_payment")
+    floor_field: str = Field(description="Field of the product that holds the floor amount, e.g. minimum_payment. When the floor is a percentage of the overdue amount, write past_due here and set floor_percent")
+    floor_percent: Optional[float] = Field(None, description="If the floor is a percentage of past_due (e.g. 40 for 40 %), the percentage; the floor is then computed from past_due")
+    floor_round_up_to_whole: bool = Field(False, description="True when a percentage floor is rounded UP to a whole currency unit")
     spoken_label: str = Field(description="How to name it in words; may use {card_last4}, e.g. 'credit card ending {card_last4}'")
 
 
@@ -114,8 +118,14 @@ class Band(BaseModel):
     days_late_max: int
     deadline_rule: str = Field(description="Human rule, e.g. 'the 12th business day after today'")
     deadline_business_days_after_today: Optional[int] = Field(None, description="If the rule is 'Nth business day after today', N")
-    deadline_calendar_days_after_today: Optional[int] = Field(None, description="If the rule is 'N calendar days after today', N")
+    deadline_calendar_days_after_today: Optional[int] = Field(None, description="If the rule is 'N calendar days after today', N (a non-business day rolls forward to the next business day)")
     persuasion_attempts: int
+
+    @model_validator(mode="after")
+    def _one_deadline_number(self):
+        if (self.deadline_business_days_after_today is None) == (self.deadline_calendar_days_after_today is None):
+            raise ValueError(f"band {self.name}: exactly one of deadline_business_days_after_today / deadline_calendar_days_after_today must be set (rule: {self.deadline_rule!r})")
+        return self
 
 
 class Dates(BaseModel):
@@ -126,6 +136,8 @@ class Dates(BaseModel):
     promise_date_rule: str = Field(description="e.g. 'today or later, a business day, not after the deadline'")
     weekend_or_holiday_rule: str = Field(description="What to offer when the customer names a non-business day, e.g. 'the next business day'")
     offer_next_business_day: bool = True
+    weekend_named_offer: Literal["next_business_day", "previous_business_day"] = Field("next_business_day", description="When the customer names a weekend day or holiday: offer the next business day after it, or the last business day before it (if that is before today, the next business day)")
+    vague_period_fallback: Literal["deadline", "attempt1"] = Field("deadline", description="After one ask for the exact day with no answer: propose the deadline, or the attempt-1 date")
     vague_period_rule: str = Field(description="What to do with 'next week' etc.: ask once for the exact day, then propose the deadline")
     next_weekday_rule: str = Field(description="How 'next <weekday>' and 'this <weekday>' are read")
     after_deadline_rule: str = Field(description="What to do when the customer asks for a date after the deadline")
@@ -138,6 +150,7 @@ class Amounts(BaseModel):
     floor_rule: str = Field(description="What the floor is per product type, in words")
     floor_offer_once: bool = True
     floor_offer_text: str = Field(description="What must be said when offering the floor, e.g. 'the rest stays overdue'")
+    today_question: str = Field("", description="The exact question that asks whether they can pay today, if the brief dictates its wording (default: 'Can you make this payment today?')")
     customer_amount_rule: str = Field(description="Accept amounts from floor to full; below floor: say cannot record, offer floor once")
     extra_rules: list[str] = []
 
@@ -213,6 +226,7 @@ class Confirm(BaseModel):
     promise_immutable_text: str = Field("", description="What to say if the customer wants to change a recorded promise")
     say_recorded_only_after_ok: bool = True
     retry_once_on_failure: bool = True
+    max_tries_on_failure: int = Field(2, description="How many create_promise calls in total before giving up on a technical failure (2 = one retry)")
     failed_twice_close: Outcome
     after_record_sentence: str = Field(description="Exact sentence after a recorded promise, e.g. the text-message sentence")
     extra_rules: list[str] = []
@@ -242,6 +256,8 @@ class MultiProduct(BaseModel):
     state_all_products_first: bool = True
     per_product_bands: bool = True
     ask_today_for_all_once: bool = True
+    today_question_all: str = Field("", description="Exact wording of the one question for all products, if dictated (default: 'Can you pay all of them today?')")
+    no_promise_reason_priority: list[str] = Field([], description="If the brief ranks note reasons for the closing reason (e.g. dispute before hardship before refused), the reasons in priority order")
     product_order_rule: str = Field("", description="e.g. 'in the order get_account returned them'")
     attempts_per_product: bool = True
     one_date_for_all_rule: str = Field("", description="What to do when one date is named for all and it passes one product's deadline")

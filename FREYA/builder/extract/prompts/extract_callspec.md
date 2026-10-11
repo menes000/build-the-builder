@@ -21,3 +21,20 @@ You are given one or more brief files from a bank. Together they specify how an 
 
 ## Output
 Write the JSON to the output path you were given. Output only valid JSON that satisfies the schema; no comments, no markdown. If a field does not apply, give the schema's default (an empty list, empty string, or false), never null.
+
+
+## Rule variants that have their own field (use the field, never only the text)
+- A floor that is a PERCENTAGE of the overdue amount: `products[].floor_field = "past_due"` plus `floor_percent` (and
+  `floor_round_up_to_whole` if it rounds up to a whole unit). The text in `amounts.floor_rule` must say the same.
+- A band deadline in CALENDAR days: `deadline_calendar_days_after_today`; in business days: `deadline_business_days_after_today`.
+  Exactly one of the two per band; the validator rejects a band with neither.
+- The exact wording of the "can you pay today" question, if the brief dictates it: `amounts.today_question`
+  (one product) and `multi_product.today_question_all` (all products at once).
+- A callback allowed on the next business day OR the one after it: `third_party.callback.max_business_days_ahead = 2`.
+- A first refusal of the security questions that closes the call at once, without an explanation: `identity.decline.explain_first = false`.
+- More than one retry of create_promise on a technical failure: `confirm.max_tries_on_failure` (3 = two retries).
+- A ranking of note reasons for the closing reason with several products: `multi_product.no_promise_reason_priority`.
+- A weekend/holiday date that is moved to the LAST business day before it: `dates.weekend_named_offer = "previous_business_day"`.
+- A vague period that falls back to the attempt-1 date instead of the deadline: `dates.vague_period_fallback = "attempt1"`.
+Every number or choice that appears in a text rule must also be in its structured field. If a rule fits no field at all,
+put it in the nearest `extra_rules` list and say so in `source_notes`.

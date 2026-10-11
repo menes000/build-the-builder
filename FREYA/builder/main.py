@@ -65,6 +65,22 @@ def run_cases(agent_id: str, brief: str, cases: str, out_json: Path, trace: Trac
 BRIEF_EXT = {".md", ".txt", ".pdf", ".docx", ".odt", ".rtf", ".pptx", ".xlsx", ".html", ".htm", ".json", ".csv"}
 
 
+def freya_retry(fn, what: str, trace: Trace, deadline: float, tries: int = 8, wait_s: float = 15):
+    """Freya's API answers 502/503/504 or times out for a minute or two now and then. Retry instead of losing the run."""
+    import urllib.error
+    for i in range(1, tries + 1):
+        try:
+            return fn()
+        except (RuntimeError, urllib.error.URLError, TimeoutError, OSError) as e:
+            msg = str(e)
+            transient = any(code in msg for code in ("502", "503", "504", "timed out", "Connection", "temporarily unavailable"))
+            if not transient or i == tries or time.time() + wait_s > deadline:
+                raise
+            trace.note(f"{what}: Freya answered '{msg[:80]}', retry {i}/{tries - 1} in {wait_s:.0f} s")
+            time.sleep(wait_s)
+            wait_s = min(wait_s * 1.5, 60)
+
+
 def expand_briefs(paths: list[str]) -> list[str]:
     """A brief may be a folder of loose material (emails, memos, code lists): take its files in name order, subfolders included."""
     out: list[str] = []
@@ -163,9 +179,9 @@ def main(argv=None) -> int:
         wf_path = out_dir / f"{slot}{tag}.workflow.json"
         wf_path.write_text(json.dumps(wf, indent=1))
         trace.note(f"compiled{tag} {len(wf['nodes'])} nodes -> {wf_path}")
-        freya.validate_workflow(f"{slot} dryrun", wf)
+        freya_retry(lambda: freya.validate_workflow(f"{slot} dryrun", wf), "dryRun", trace, deadline)
         trace.note(f"dryRun valid{tag}")
-        ids = freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json"))
+        ids = freya_retry(lambda: freya.save_workflow(slot, wf, state_file=str(ROOT / ".freya-agents.json")), "save", trace, deadline)
         trace.created("workflow", wf, slot=slot, tag=tag or "v1", **ids)
         return wf, ids
 
@@ -211,7 +227,7 @@ def main(argv=None) -> int:
             spec, results = new_spec, new_results
             (out_dir / f"{slot}.callspec.json").write_text(spec.model_dump_json(indent=1))
         else:
-            ids = freya.save_workflow(slot, prev_wf, state_file=str(ROOT / ".freya-agents.json"))
+            ids = freya_retry(lambda: freya.save_workflow(slot, prev_wf, state_file=str(ROOT / ".freya-agents.json")), "save (rollback)", trace, deadline)
             wf = prev_wf
             trace.created("workflow", prev_wf, slot=slot, tag=f"rollback after fix{rnd}", **ids)
             break
@@ -219,7 +235,7 @@ def main(argv=None) -> int:
     # 5. export
     export_path = Path(a.export) if a.export else out_dir / f"{slot}.export.workflow.json"
     export_path.parent.mkdir(parents=True, exist_ok=True)
-    freya.export_workflow(ids["workflow_id"], str(export_path))
+    freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, deadline)
     trace.note(f"exported {export_path}")
     if a.local_test:
         lt = local_test(out_dir / f"{slot}.callspec.json", export_path, out_dir / f"{slot}.localtest.json", a.openapi, slot, trace, deadline - time.time() - 30)

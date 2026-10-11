@@ -1,0 +1,24 @@
+[    0.0s] start: at=2026-10-11T12:52:13+0300 label=brief-d
+[    0.0s] note: text=briefs=['../test-briefs/brief-d/01-email-thread.md', '../test-briefs/brief-d/02-policy.md', '../test-briefs/brief-d/03-memo.md', '../test-briefs/brief-d/04-code-list.md'] openapi=../test-briefs/brief-d/openapi.json slot=brief-d model=claude-opus-5-5 budget_min=25
+[   95.6s] model_call: model=claude-opus-5-5 purpose=extract CallSpec from brief (attempt 1) seconds=95.3 cost_usd=0.6083408 tokens=None
+[   95.6s] note: text=extraction attempt 1: CallSpec valid (24643 bytes)
+[   95.6s] note: text=compiled 32 nodes -> /Users/doraalkan/Desktop/freya-hecaton/FREYA/out/brief-d.workflow.json
+Traceback (most recent call last):
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/build.py", line 34, in <module>
+    sys.exit(entry(sys.argv[1:]))
+             ~~~~~^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/build.py", line 30, in entry
+    return main([brief, "--openapi", openapi, "--slot", name, "--export", str(ROOT / "submission" / f"{name}.workflow.json"), *extra])
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/main.py", line 173, in main
+    wf, ids = compile_and_save(spec, "")
+              ~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/main.py", line 166, in compile_and_save
+    freya.validate_workflow(f"{slot} dryrun", wf)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/kit/freya.py", line 48, in validate_workflow
+    def validate_workflow(name, workflow): return api("POST", "/api/v2/workflow", {"name": name, "workflow": workflow}, dryRun="true")
+                                                  ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/kit/freya.py", line 19, in api
+    raise RuntimeError(f"{method} {path} -> {e.code}: {e.read().decode()[:1500]}") from None
+RuntimeError: POST /api/v2/workflow -> 504: error code: 504
+
