@@ -80,6 +80,11 @@ Write, compactly but completely (aim for 2,000-4,000 words):
 Write the file with the Write tool to exactly this path: {plan}
 """
 
+COMPACT_HEAD = """COMPACT BUILD: build only the core of the design: the main path and its essential branches (each tool's success
+and failure, the caller's main choices, every way the call ends). At most 10 nodes. Put the remaining rules of the design as
+short lines in `system_prompt` instead of extra nodes. Write the workflow first; keep thinking short.
+"""
+
 JSON_INSTRUCTIONS_HEAD = """The design below was written from the bank's case documents by the first step of this builder; it is
 authoritative. Turn it into the Freya workflow, following it exactly.
 Keep the workflow compact: one node per step of the design (merge trivial steps), shared rules once in `system_prompt`,
@@ -149,7 +154,7 @@ def check_workflow(wf: dict, api_urls: set[str]) -> list[str]:
 
 
 def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Path, slot: str, trace, model: str | None,
-                   validate, rounds: int = 3) -> dict:
+                   validate, rounds: int = 3, compact: bool = False) -> dict:
     """Returns the workflow dict. `validate(wf)` is Freya's dryRun (raises on rejection)."""
     from .extract.extractor import _ask_claude
     model = model or os.environ.get("BUILDER_MODEL", "claude-opus-5-5")
@@ -172,7 +177,7 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
     if not plan.exists() or len(plan.read_text().strip()) < 500:
         raise RuntimeError("free-form build: no design written from the case documents")
     trace.note(f"free-form design written: {plan} ({len(plan.read_text())} chars)")
-    base = (JSON_INSTRUCTIONS_HEAD + "\n" + INSTRUCTIONS.replace("{out}", str(out)).replace("{notes}", str(notes))
+    base = ((COMPACT_HEAD if compact else "") + JSON_INSTRUCTIONS_HEAD + "\n" + INSTRUCTIONS.replace("{out}", str(out)).replace("{notes}", str(notes))
             + "\n\n## The design (authoritative)\n" + plan.read_text() + "\n"
             + api_block + _kit_docs() + "\n")
     feedback = ""
@@ -188,7 +193,8 @@ def build_freeform(brief_paths: list[str], openapi_path: str, tools, out_dir: Pa
             + "\n## Problems to fix\n- " + "\n- ".join(feedback) + f"\n\nFix every problem and write the complete corrected workflow again to {out}.")
         t0 = time.time()
         asyncio.run(_ask_claude(prompt, out, out_dir.resolve(), model, trace,
-                                purpose=f"free-form: write the workflow JSON from the design (round {rnd})", max_turns=40))
+                                purpose=f"free-form: write the workflow JSON from the design (round {rnd})", max_turns=40,
+                                effort="low" if compact else "medium", max_thinking_tokens=8_000 if compact else 16_000))
         if not out.exists():
             feedback = ["No workflow file was written to the output path."]
             trace.note(f"free-form round {rnd}: no file written ({time.time() - t0:.0f} s)")

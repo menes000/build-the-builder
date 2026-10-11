@@ -89,7 +89,7 @@ def _brief_text(brief_paths: list[str]) -> str:
 
 
 async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace, purpose: str, max_turns: int = 12,
-                      timeout_s: float | None = None) -> str:
+                      timeout_s: float | None = None, effort: str | None = None, max_thinking_tokens: int | None = None) -> str:
     """One Claude session that may only read files and write its answer file (no sub-agents, no shell)."""
     from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, query
 
@@ -100,6 +100,8 @@ async def _ask_claude(prompt: str, out_path: Path, cwd: Path, model: str, trace,
         permission_mode="dontAsk", max_turns=max_turns,
         setting_sources=[],
         env={"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"},     # the builder reads only the case, not a developer's memory
+        **({"effort": effort} if effort else {}),
+        **({"max_thinking_tokens": max_thinking_tokens} if max_thinking_tokens else {}),
     )
     t0 = time.time()
     text = []

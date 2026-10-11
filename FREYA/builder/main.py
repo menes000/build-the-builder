@@ -134,6 +134,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("briefs", nargs="+")
     ap.add_argument("--openapi", default=None, help="the bank's tool API file (default: an OpenAPI file inside the case folder, else the kit's)")
+    ap.add_argument("--compact", action="store_true", help="free-form build: only the core flow (fewer nodes, short thinking)")
     ap.add_argument("--mock-url", default=None, help="the team's own mock of the bank's services: every tool calls this address")
     ap.add_argument("--slot")
     ap.add_argument("--spec")
@@ -176,7 +177,8 @@ def main(argv=None) -> int:
     if not a.spec and not template_fits({t.name for t in api_tools}):
         trace.note(f"tool API has {sorted(t.name for t in api_tools)}; the collections template needs {sorted(TEMPLATE_TOOLS)} -> free-form build")
         wf = build_freeform(a.briefs, a.openapi, api_tools, out_dir, slot, trace, a.model,
-                            validate=lambda w: freya_retry(lambda: freya.validate_workflow(f"{slot} dryrun", w), "dryRun", trace, deadline))
+                            validate=lambda w: freya_retry(lambda: freya.validate_workflow(f"{slot} dryrun", w), "dryRun", trace, deadline),
+                            compact=a.compact)
         wf_path = out_dir / f"{slot}.workflow.json"
         wf_path.write_text(json.dumps(wf, indent=1, ensure_ascii=False))
         trace.note(f"free-form workflow: {len(wf['nodes'])} nodes -> {wf_path}")
