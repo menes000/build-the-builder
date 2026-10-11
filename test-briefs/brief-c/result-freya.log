@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/Users/enes/Desktop/freya-hecaton/tester/run_coverage.py", line 43, in <module>
+    exec(compile(rewritten(), "run_cases.py", "exec"), {"__name__": "__main__", "__file__": str(KIT / "tools" / "run_cases.py")})
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "run_cases.py", line 127, in <module>
+  File "run_cases.py", line 67, in main
+    rows, sim_id, it_id, status, took, med = run_once(a.agent_id, cases, ids)
+                                             ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "run_cases.py", line 94, in run_once
+    r = score_ledger(c, led)
+                        ^^^^
+  File "/Users/enes/Desktop/freya-hecaton/docs/build-the-builder/freya.py", line 103, in run_simulation
+    s = api("GET", f"/api/v2/simulations/{sim_id}"); s = s.get("simulation") or s
+  File "/Users/enes/Desktop/freya-hecaton/docs/build-the-builder/freya.py", line 19, in api
+    raise RuntimeError(f"{method} {path} -> {e.code}: {e.read().decode()[:1500]}") from None
+RuntimeError: GET /api/v2/simulations/03edd2b4-8fcc-49c6-ad95-d7c4196ba2d8 -> 503: {"success":false,"data":{"message":"API key validation is temporarily unavailable. Retry shortly.","result":null}}
+exit 1

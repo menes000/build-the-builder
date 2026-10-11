@@ -38,6 +38,26 @@ def rewritten():
     return src.replace(OLD, "session_for(c)").replace("\ndef run_once(", HELPER + "def run_once(", 1)
 
 
+def harden_freya():
+    """The platform answers 502/503/504 in bursts; the kit's client raises at once. Retry those for a few minutes (polling is idempotent;
+    a simulation that was already started is not started twice because the retry wraps single GET/POST calls, not the runner)."""
+    import time, freya
+    raw = freya.api
+
+    def api(method, path, body=None, **params):
+        last = None
+        for attempt in range(8):
+            try: return raw(method, path, body, **params)
+            except RuntimeError as e:
+                msg = str(e)
+                if not any(c in msg for c in ("-> 502", "-> 503", "-> 504", "-> 500")) or (method == "POST" and "simulations" in path and attempt > 0 and "chat" not in path):
+                    raise                                   # not transient, or a POST that may have created something
+                last = e; time.sleep(min(10 * (attempt + 1), 45))
+        raise last
+    freya.api = api
+
+
 if __name__ == "__main__":
+    harden_freya()
     sys.argv[0] = "run_cases.py"
     exec(compile(rewritten(), "run_cases.py", "exec"), {"__name__": "__main__", "__file__": str(KIT / "tools" / "run_cases.py")})
