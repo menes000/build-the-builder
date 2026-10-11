@@ -47,6 +47,7 @@ def facts_code(spec: CallSpec) -> str:
         "TODAY_Q": (spec.amounts.today_question or "").strip(), "TODAY_Q_ALL": (spec.multi_product.today_question_all or "").strip(),
         "WEEKEND_OFFER": spec.dates.weekend_named_offer,
         "MULTI": spec.multi_product.enabled,
+        "PER_PRODUCT_ATT1": bool(spec.multi_product.per_product_question_is_attempt1),
         "DEBT_RULE": spec.debt_statement_rule,
         "DEBT_INTRO": (spec.debt_intro_sentence or "").strip(),
         "PF": (spec.field_map or {}).get("product") or {},
@@ -297,7 +298,7 @@ try:
                       + ', ' + str(f['days_late']) + ' days late, band ' + f['band'] + ', floor ' + (('work it out from this rule: ' + FLOOR_RULE) if FLOOR_TEXT_MODE else money(f['floor']))
                       + ', deadline ' + dl_t + '.')
             plan = '  Refusal plan for ' + f['label'] + ' (the note_refusal tool tells you which attempt you are on; use ONLY after a flat refusal; a date or amount the customer proposes is handled by the DATES list and the amount rules instead; exactly ' + str(f['attempts']) + ' persuasion attempt' + ('s' if f['attempts'] != 1 else '') + ', then stop' + ('; do NOT ask again whether they can pay today, that was asked once for all products' if MULTI else '') + '):'
-            if MULTI:
+            if MULTI and len(facts) > 1 and PER_PRODUCT_ATT1:
                 plan += '\n    open this product with exactly this question, which IS attempt 1 (never ask about today for this product): "For your ' + f['label'] + ', the past-due amount is ' + money(f['past']) + '. Can you pay it on ' + a1_t + '?"'
             else:
                 plan += '\n    attempt 1 -> propose ' + money(f['past']) + ' (or the floor' + ('' if FLOOR_TEXT_MODE else ' ' + money(f['floor'])) + ' if they already said the amount is too much) on ' + a1_t + '.'
@@ -305,7 +306,7 @@ try:
                 plan += '\n    attempt 2 -> propose the floor' + ('' if FLOOR_TEXT_MODE else ' ' + money(f['floor'])) + ' on the deadline ' + dl_t + ', and say the rest stays overdue.'
             for k in range(3, f['attempts'] + 1):
                 plan += '\n    attempt ' + str(k) + ' -> propose the floor' + ('' if FLOOR_TEXT_MODE else ' ' + money(f['floor'])) + ' on the deadline ' + dl_t + '.'
-            plan += '\n    after attempt ' + str(f['attempts']) + ' is refused -> stop proposing' + (', call add_note with reason refused for this product' if MULTI else ', call transition_to_close_refused') + '.'
+            plan += '\n    after attempt ' + str(f['attempts']) + ' is refused -> stop proposing' + (', call add_note with reason refused for this product' if (MULTI and len(facts) > 1) else ', call transition_to_close_refused') + '.'
             ol.append(plan)
         vars['offers_text'] = '\n'.join(ol)
         f0 = facts[0]
@@ -552,7 +553,7 @@ try:
             except Exception:
                 pass
             d['promise_state'] = 'recorded'
-            d['what_to_do_next'] = 'The promise is recorded.' + ('' if MULTI else ' Say nothing more in this turn: the confirmation is spoken for you.')
+            d['what_to_do_next'] = 'The promise is recorded.' + ('' if (MULTI and len(facts) > 1) else ' Say nothing more in this turn: the confirmation is spoken for you.')
         elif str(vars.get('promise_duplicate') or '') == 'yes':
             d['promise_state'] = 'duplicate'
             d['error'] = 'this product already has a recorded promise'
@@ -575,7 +576,7 @@ try:
                 pass
             if n >= PROMISE_TRIES:
                 d['promise_state'] = 'failed_twice'
-                d['what_to_do_next'] = 'The service failed again. Nothing was recorded for this product.' + (' Call add_note for this product with reason service_error, then continue with the other products or close.' if MULTI else ' Tell the customer you could not record it.')
+                d['what_to_do_next'] = 'The service failed again. Nothing was recorded for this product.' + (' Call add_note for this product with reason service_error, then continue with the other products or close.' if (MULTI and len(facts) > 1) else ' Tell the customer you could not record it.')
             else:
                 d['promise_state'] = 'failed_once'
                 d['what_to_do_next'] = 'The service failed and nothing was recorded. Call create_promise again now, once, with exactly the same values. Do not say it is recorded.'
@@ -587,7 +588,7 @@ try:
             if facts and all(f['pid'] in handled for f in facts):
                 vars['all_products_done'] = 'yes'
                 d['all_products_done'] = 'yes'
-                d['what_to_do_next'] = str(d.get('what_to_do_next') or '') + (' Every product now has a promise or a note: say goodbye in one sentence and call transition_to_close_done.' if MULTI else '')
+                d['what_to_do_next'] = str(d.get('what_to_do_next') or '') + (' Every product now has a promise or a note: say goodbye in one sentence and call transition_to_close_done.' if (MULTI and len(facts) > 1) else '')
             else:
                 d['all_products_done'] = 'no'
         except Exception:
@@ -870,7 +871,7 @@ except Exception:
 '''
 
 
-def decide_outcome_code(spec: CallSpec, promise_farewell: str, farewells: dict | None = None) -> str:
+def decide_outcome_code(spec: CallSpec, promise_farewell: str, farewells: dict | None = None, promise_farewell_single: str = "") -> str:
     """Final outcome from state. Overrides the hint when a transfer or a promise happened."""
     c = spec.closing
     mp = spec.multi_product
@@ -885,7 +886,7 @@ def decide_outcome_code(spec: CallSpec, promise_farewell: str, farewells: dict |
         "PROMISE_OUTCOME": c.promise_outcome, "XFER_OUTCOME": transferred_outcome, "XFER_REASON": transfer_reason_by_queue,
         "PAID_OUTCOME": paid_outcome, "NO_PROMISE_OUTCOME": no_promise_outcome, "MULTI": mp.enabled, "REASON_PRIORITY": list(mp.no_promise_reason_priority or []),
         "CLOSE_BY_FIRST": bool(mp.closing_by_first_product),
-        "PROMISE_FAREWELL": promise_farewell, "NAME_TOKEN": "NAME", "FAREWELLS": farewells or {},
+        "PROMISE_FAREWELL": promise_farewell, "PROMISE_FAREWELL_SINGLE": promise_farewell_single or promise_farewell, "NAME_TOKEN": "NAME", "FAREWELLS": farewells or {},
     }
     header = "import json\n" + "\n".join(f"{k} = {_lit(v)}" for k, v in params.items())
     return header + r'''
@@ -916,7 +917,7 @@ try:
     elif promises:
         outcome = PROMISE_OUTCOME
         reason = ''
-        farewell = PROMISE_FAREWELL
+        farewell = PROMISE_FAREWELL_SINGLE if str(vars.get('n_products') or '') == '1' else PROMISE_FAREWELL
     elif MULTI and notes:
         if all(str(n.get('reason')) == 'paid' for n in notes):
             outcome = PAID_OUTCOME
@@ -977,7 +978,7 @@ def refusal_pre(spec: CallSpec) -> str:
     known1 = not att1_text_mode and not floor_text_mode
     params = {
         "MULTI": multi, "FLOOR_TEXT": floor_text,
-        "OPENING_IS_ATTEMPT1": bool(multi and spec.multi_product.ask_today_for_all_once),
+        "OPENING_IS_ATTEMPT1": bool(multi and spec.multi_product.ask_today_for_all_once and spec.multi_product.per_product_question_is_attempt1),
         "KNOWN1": known1, "ATT1_FULL": bool(ps.attempt1_uses_full_amount),
         "KNOWN2": bool(ps.attempt2_uses_floor_on_deadline) and not floor_text_mode,
         "FLOOR_RULE": spec.amounts.floor_rule if floor_text_mode else "", "ATT1_RULE": ps.attempt1_date_rule if att1_text_mode else "",
@@ -1019,7 +1020,7 @@ try:
     key = 'attempts_used_' + pid
     # with several products the product's opening question already IS attempt 1 (the 'today?' question was asked once
     # for all); with one product the 'today?' question is not an attempt, so the first refusal starts attempt 1
-    start = 1 if OPENING_IS_ATTEMPT1 else 0
+    start = 1 if (OPENING_IS_ATTEMPT1 and len(facts) > 1) else 0          # one product: the 'today?' question is never an attempt
     try:
         n = int(vars.get(key) or start) + 1
     except Exception:
@@ -1033,7 +1034,7 @@ try:
         if n > allowed:
             state = 'exhausted'
             instr = ('Attempts used up for ' + f['label'] + ' (' + str(allowed) + ' allowed). Do NOT propose anything more. '
-                     + ('Call add_note with reason refused for product ' + pid + ' and move to the next product.' if MULTI else 'Call transition_to_close_refused now.'))
+                     + ('Call add_note with reason refused for product ' + pid + ' and move to the next product.' if (MULTI and len(facts) > 1) else 'Call transition_to_close_refused now.'))
         elif n == 1 and KNOWN1:
             state = 'continue'
             amt = f['floor'] if (tm or not ATT1_FULL) else f['past']

@@ -189,6 +189,11 @@ def negotiate_task(spec: CallSpec) -> str:
             f"- {mp.transfer_rule}" if mp.transfer_rule else "",
             "- When note_refusal says the attempts for a product are used up, call add_note with reason refused for that product and move to the next product.",
             "- When every product has a promise or a note, call transition_to_close_done.",
+            "",
+            "IF ACCOUNT LISTS ONLY ONE PRODUCT (common): the rules about several products do not apply. Never call add_note. "
+            "Already paid: say the paid sentence, then call transition_to_close_paid. Not my debt: call transition_to_close_dispute. "
+            "Attempts used up: call transition_to_close_refused. create_promise failed and nothing was recorded: call transition_to_close_service_error. "
+            "After a recorded promise say nothing more: the confirmation is spoken for you.",
         ]
     if not mp.enabled:
         parts += ["", "IF ACCOUNT LISTS MORE THAN ONE PRODUCT (possible even if unusual)",
@@ -197,6 +202,17 @@ def negotiate_task(spec: CallSpec) -> str:
               f"{spec.dates.next_weekday_rule}", "{{weekday_text}}"]
     extra = a.extra_rules + p.extra_rules + sp.extra_rules + cf.extra_rules + spec.dates.extra_rules + (mp.extra_rules if mp.enabled else [])
     return _speak_safe("\n".join(x for x in parts if x is not None) + ("\n\nOTHER RULES" + _rules(extra) if extra else ""))
+
+
+def wrap_up_task(spec: CallSpec) -> str:
+    sp = spec.special
+    return "\n".join([
+        "Every product now has a promise or a note. The customer asked for a payment plan or for a person.",
+        f"- For {' or '.join(sp.restructuring.triggers)}: call transfer_to_agent with queue {sp.restructuring.queue} now.",
+        f"- For a person: call transfer_to_agent with queue {sp.human.queue} now.",
+        "- If they no longer want it, or say goodbye: call transition_to_close_done.",
+        "- No tool can record a promise or a note here. Never say goodbye yourself; the closing words are spoken for you.",
+    ])
 
 
 def after_promise_task(spec: CallSpec) -> str:

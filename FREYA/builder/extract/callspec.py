@@ -265,6 +265,7 @@ class MultiProduct(BaseModel):
     per_product_bands: bool = True
     ask_today_for_all_once: bool = True
     today_question_all: str = Field("", description="Exact wording of the one question for all products, if dictated (default: 'Can you pay all of them today?'). Placeholders: {total}, {today}, {tomorrow}")
+    per_product_question_is_attempt1: bool = Field(True, description="True when, after the one 'pay all today' question, the first question asked for each product already counts as persuasion attempt 1 (Brief-B style). False when that per-product question is not an attempt")
     closing_by_first_product: bool = Field(False, description="True when, with no promise, the closing follows the FIRST product's note only (paid -> paid outcome, else no_promise with that reason), ignoring the other notes")
     no_promise_reason_priority: list[str] = Field([], description="If the brief ranks note reasons for the closing reason (e.g. dispute before hardship before refused), the reasons in priority order")
     product_order_rule: str = Field("", description="e.g. 'in the order get_account returned them'")

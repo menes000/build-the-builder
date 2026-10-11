@@ -69,6 +69,12 @@ def conv(name, task, tools=(), transitions=(), on_enter=None, extraction=(), max
     return n
 
 
+def _confirm_line(after_record_sentence: str) -> str:
+    """'Your promise is recorded.' + the brief's sentence, unless the brief's sentence already speaks of the promise."""
+    s = (after_record_sentence or "").strip()
+    return s if s.lower().startswith(("your promise", "the promise", "your payment promise")) else f"Your promise is recorded. {s}".strip()
+
+
 def _dedupe_sentences(text: str) -> str:
     """Spoken closing lines are built from a fixed part plus a sentence from the CallSpec; when the extracted sentence
     already contains the fixed part, drop the shorter repeat (the judge reads every repeated sentence literally)."""
@@ -242,7 +248,7 @@ def compile_workflow(spec: CallSpec) -> dict:
     # ---- closing nodes: hint (outcome, reason, farewell); decide_outcome may override
     name_tok = "NAME"
     thanks = f"Thank you for your time, {name_tok}. Goodbye."
-    promise_farewell = f"Your promise is recorded. {cf.after_record_sentence} {thanks}"
+    promise_farewell = f"{_confirm_line(cf.after_record_sentence)} {thanks}"
     closes: dict[str, tuple[str, str, str]] = {
         "close_promise": (spec.closing.promise_outcome, "", promise_farewell),
         "close_service_error": (cf.failed_twice_close.outcome, cf.failed_twice_close.reason, f"I am sorry, I could not record your promise because of a technical problem. {thanks}"),
@@ -379,24 +385,35 @@ def compile_workflow(spec: CallSpec) -> dict:
                 if n:
                     conds.append(gt("add_note_success_count", n - 1))
                 combos.append({"logic": "and", "conditions": conds})
-        promise_route = go("close_promise", "Every product has a promise or a note", {"logic": "or", "conditions": [eq("all_products_done", "yes")] + combos})
-        service_route = []
+        all_done = {"logic": "or", "conditions": [eq("all_products_done", "yes")] + combos}
+        promise_route = [
+            # one product on this call: exactly the one-product flow (confirmation node, no notes)
+            go("after_promise", "The promise was recorded (one product)", {"logic": "and", "conditions": [eq("promise_state", "recorded"), eq("n_products", "1")]}),
+            # several products, all handled, but the customer asked for a plan or a person: let the transfer happen
+            go("wrap_up", "Every product is handled and the customer asked for a plan or a person",
+               {"logic": "and", "conditions": [all_done, {"logic": "or", "conditions": [eq("situation", "plan"), eq("situation", "human")]}]}),
+            go("close_promise", "Every product has a promise or a note", all_done),
+        ]
+        service_route = [go("close_service_error", "The promise service failed (one product)", {"logic": "and", "conditions": [eq("promise_state", "failed_twice"), eq("n_products", "1")]})]
     else:
         # after a recorded promise the call moves to a node WITHOUT create_promise: the confirmation sentence is spoken
         # deterministically, the customer can still ask for a person or a plan (transfer), and nothing can be re-recorded
-        promise_route = go("after_promise", "The promise was recorded (one product)", {"logic": "or", "conditions": [{"logic": "and", "conditions": [eq("promise_state", "recorded"), eq("n_products", "1")]}]})
+        promise_route = [go("after_promise", "The promise was recorded (one product)", {"logic": "or", "conditions": [{"logic": "and", "conditions": [eq("promise_state", "recorded"), eq("n_products", "1")]}]})]
         service_route = [go("close_service_error", "The promise service failed twice", grp(eq("promise_state", "failed_twice"), gt("create_promise_failure_count", max(1, int(spec.confirm.max_tries_on_failure or 2)) - 1)))]
         # several products although the brief did not say so: close when every product has a promise (counters), else the model closes
         combos = []
         for k in range(2, 6):
             combos.append({"logic": "and", "conditions": [eq("n_products", str(k)), gt("create_promise_success_count", k - 1)]})
         service_route.append(go("close_promise", "Every product has a promise", {"logic": "or", "conditions": combos}))
-    neg_transitions = [promise_route] + service_route + xfer_routes
+    neg_transitions = promise_route + service_route + xfer_routes
     if mp.enabled:
         neg_transitions += [
             tool_tr("close_done", "Every product has a promise or a note and the call can end"),
             tool_tr("close_hardship", f"A customer with {', '.join(hs.triggers)} declined the {hs.offer_queue} team"),
-            tool_tr("close_refused", "The customer said twice they do not want to talk"),
+            tool_tr("close_refused", "The customer said twice they do not want to talk, or (one product) the persuasion attempts are used up"),
+            tool_tr("close_paid", f"ONE product only: the customer says {' or '.join(sp.paid.triggers)}"),
+            tool_tr("close_dispute", f"ONE product only: the customer says {' or '.join(sp.dispute.triggers)}"),
+            tool_tr("close_service_error", "ONE product only: create_promise failed and nothing was recorded"),
         ]
     else:
         neg_transitions += [
@@ -422,10 +439,10 @@ def compile_workflow(spec: CallSpec) -> dict:
         max_turns=60 if mp.enabled else 40, cap_to="close_refused")
     closes["close_on_goodbye"] = None  # placeholder, replaced below
 
-    if not mp.enabled:
+    if True:
         nodes["after_promise"] = conv(
             "after_promise", prompts.after_promise_task(spec),
-            on_enter={"type": "tts", "text": f"Your promise is recorded. {cf.after_record_sentence} Is there anything else?"}, first_only=True,
+            on_enter={"type": "tts", "text": f"{_confirm_line(cf.after_record_sentence)} Is there anything else?"}, first_only=True,
             tools=[transfer_to_agent], extraction=[situation],
             transitions=[
                 go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done"))),
@@ -433,7 +450,17 @@ def compile_workflow(spec: CallSpec) -> dict:
                 bye_tr("close_promise"),
             ],
             max_turns=6, cap_to="close_promise")
-        closes["close_promise"] = (spec.closing.promise_outcome, "", f"Thank you for your time, {name_tok}. Goodbye.")
+        if not mp.enabled:
+            closes["close_promise"] = (spec.closing.promise_outcome, "", f"Thank you for your time, {name_tok}. Goodbye.")
+    if mp.enabled:
+        nodes["wrap_up"] = conv(
+            "wrap_up", prompts.wrap_up_task(spec), tools=[transfer_to_agent], extraction=[situation],
+            transitions=[
+                go("close_on_transfer", "Transferred", grp(eq("xfer_state", "done"))),
+                tool_tr("close_done", "The customer no longer wants the transfer, or says goodbye"),
+                bye_tr("close_done"),
+            ],
+            max_turns=6, cap_to="close_done")
 
     nodes["third_party"] = conv(
         "third_party", prompts.third_party_task(spec), first_only=True,
@@ -478,7 +505,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         "xfer_" + sp.restructuring.queue: closes[f"close_xfer_{sp.restructuring.queue}"][2],
         "xfer_" + sp.human.queue: closes[f"close_xfer_{sp.human.queue}"][2],
     }
-    nodes["decide_outcome"] = code_node("decide_outcome", codegen.decide_outcome_code(spec, promise_farewell if mp.enabled else f"Thank you for your time, {name_tok}. Goodbye.", farewells), "goodbye")
+    nodes["decide_outcome"] = code_node("decide_outcome", codegen.decide_outcome_code(spec, promise_farewell if mp.enabled else f"Thank you for your time, {name_tok}. Goodbye.", farewells, f"Thank you for your time, {name_tok}. Goodbye."), "goodbye")
     nodes["goodbye"] = {
         "name": "goodbye", "node_type": "end_call", "on_enter": {"type": "silent"},
         "disable_inactivity_monitor": True, "transitions": [],

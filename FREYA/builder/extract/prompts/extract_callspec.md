@@ -60,3 +60,6 @@ above. The code then stops computing that quantity and the agent applies the rul
   after), write `{greeting}` in `opening.first_sentence` and fill `opening.greetings` with start times.
 - If wrong security answers are counted per question, set `identity.max_wrong_per_question`; `identity.max_wrong_total`
   stays the total limit the brief states.
+
+- `multi_product.per_product_question_is_attempt1`: true when, after the one question for all products, the first
+  question for each product already counts as persuasion attempt 1; false when the brief says it is not an attempt.

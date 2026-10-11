@@ -23,10 +23,12 @@ def test_single_product_shape(wf_a):
 
 def test_multi_product_shape(wf_ab):
     n = wf_ab["nodes"]
-    assert "after_promise" not in n
+    assert "after_promise" in n and "wrap_up" in n                         # one-product customers and plan/human after the last note
     assert "add_note" in [t["function"]["name"] for t in n["negotiate"]["tools"]]
-    first = n["negotiate"]["transitions"][0]
-    assert first["target_node"] == "close_promise" and len(first["condition"]["conditions"]) > 10  # counter combos
+    tr = n["negotiate"]["transitions"]
+    assert tr[0]["target_node"] == "after_promise" and '"n_products", "operator": "equals", "operand": "1"' in json.dumps(tr[0])
+    assert tr[1]["target_node"] == "wrap_up"
+    assert tr[2]["target_node"] == "close_promise" and len(tr[2]["condition"]["conditions"]) > 10  # counter combos
 
 
 def test_dates_brief_a(wf_a):
@@ -229,3 +231,27 @@ def test_closing_lines_do_not_repeat_a_sentence(tmp_path):
     assert txt.count("could not verify your identity") == 1
     from builder.compile.compiler import _dedupe_sentences
     assert _dedupe_sentences("Thank you. Goodbye. Thank you. Goodbye.") == "Thank you. Goodbye."
+
+
+
+def test_one_product_customer_on_a_multi_agent(wf_ab):
+    """Mehmet's finding: a multi-product agent treated one-product customers as several (attempt count, notes, closing)."""
+    from conftest import FACTS_1, run_hook
+    t = next(x for x in wf_ab["nodes"]["negotiate"]["tools"] if x["function"]["name"] == "note_refusal")
+    v = {"facts_json": json.dumps(FACTS_1)}
+    out = []
+    for _ in range(3):
+        run_hook(t["pre_process_code"], v, body={"product_id": "p1", "amount_too_much": "false", "customer_id": "c"})
+        r = {"data": {}, "header": {}}; run_hook(t["post_process_code"], v, result=r)
+        out.append((r["data"]["refusal_state"], r["data"]["what_to_do_next"]))
+    assert "Attempt 1 of 2" in out[0][1] and "Attempt 2 of 2" in out[1][1]   # the 'today?' question is not an attempt
+    assert out[2][0] == "exhausted" and "transition_to_close_refused" in out[2][1] and "add_note" not in out[2][1]
+    tools = [x["function"]["name"] for x in wf_ab["nodes"]["negotiate"]["tools"]]
+    tr_tools = json.dumps(wf_ab["nodes"]["negotiate"]["transitions"])
+    assert "close_paid" in tr_tools and "close_dispute" in tr_tools and "close_service_error" in tr_tools
+
+
+def test_confirmation_line_not_doubled(tmp_path):
+    wf = _variant(tmp_path, **{"confirm.after_record_sentence": "Your promise is noted. A reminder will be sent the day before the payment date."})
+    tts = wf["nodes"]["after_promise"]["on_enter"]["text"]
+    assert tts.startswith("Your promise is noted.") and "is recorded" not in tts
