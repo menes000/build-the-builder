@@ -1,7 +1,7 @@
 """Provider choice and a disk cache for the deterministic model calls of the tester (extraction, routing, judge).
 
 Providers: "gemini" (tester/gemini.py) or "openai" (tester/openai_client.py).
-    EXTRACT_PROVIDER, ROUTE_PROVIDER, JUDGE_PROVIDER   default: openai for extract and judge when OPENAI_API_KEY is set, else gemini;
+    EXTRACT_PROVIDER, ROUTE_PROVIDER, JUDGE_PROVIDER   default: gemini for all (openai only when set explicitly);
                                                       routing stays on gemini (closest to Freya's own router)
     LLM_CACHE=0                                        switch the cache off
 Cache: results/llm-cache.json, keyed by provider + model + prompt + input. Only extraction is cached (LLM_CACHE_KINDS=extract,route,judge widens it);
@@ -23,7 +23,7 @@ def provider(kind):
     if os.environ.get("LLM_BACKEND") == "claude": return "gemini"      # gemini.py routes to Claude then
     env = os.environ.get(f"{kind.upper()}_PROVIDER")
     if env: return env
-    if kind in ("extract", "judge") and os.environ.get("OPENAI_API_KEY"): return "openai"
+    # every role on Gemini by default, the model the organisers' simulator and judge run on (EXTRACT_PROVIDER / JUDGE_PROVIDER=openai switch back)
     return "gemini"
 
 

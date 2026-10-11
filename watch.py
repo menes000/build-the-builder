@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent
 TRACES = ROOT / "traces"
 LOCAL = ROOT / "results" / "local"
+RUNS = ROOT / "runs"
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -92,7 +93,12 @@ def work_files(events: list[dict]) -> dict | None:
     for f in sorted(w.glob("fix*.json")):
         tag, part = f.stem.split(".", 1)
         rounds.setdefault(tag, {})[part] = load(f)
-    return {"dir": str(w), "cases": cases, "tests": tests, "rounds": rounds,
+    chats = []
+    for f in sorted((w / "chats").glob("*.json")) if (w / "chats").exists() else []:
+        c = load(f) or {}
+        chats.append({"file": str(f), "n": c.get("n"), "model": c.get("model"), "purpose": c.get("purpose"), "seconds": c.get("seconds"),
+                      "prompt_chars": len(c.get("prompt") or ""), "reply_chars": len(c.get("reply") or ""), "output_chars": len(c.get("output_file") or "")})
+    return {"dir": str(w), "cases": cases, "tests": tests, "rounds": rounds, "chats": chats,
             "crosscheck": load(w / "crosscheck.json"), "recheck": {"request": load(w / "recheck.request.json"), "result": load(w / "recheck.result.json")}}
 
 
@@ -116,6 +122,12 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/record":
             p = Path((parse_qs(u.query).get("path") or [""])[0]).resolve()
             if not p.is_relative_to(LOCAL.resolve()) or p.suffix != ".json" or not p.exists():   # only the local test's own records
+                self.send_error(404)
+                return
+            body, ctype = p.read_bytes(), "application/json"
+        elif u.path == "/api/chat":
+            p = Path((parse_qs(u.query).get("path") or [""])[0]).resolve()
+            if not p.is_relative_to(RUNS.resolve()) or p.suffix != ".json" or not p.exists():
                 self.send_error(404)
                 return
             body, ctype = p.read_bytes(), "application/json"
@@ -212,6 +224,7 @@ details pre{font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;wor
   <div class="card"><h2>Olaylar</h2><div class="log" id="log"></div></div>
  </div>
 </div>
+<div class="card" style="margin-top:14px"><h2>Model konuşmaları: gönderilen prompt ve gelen cevap (tıkla)</h2><div id="chats" class="muted">henüz yok</div></div>
 <div class="card" style="margin-top:14px"><h2>Döngü detayı: ne gönderildi, ne geri geldi, ne karar verildi</h2><div id="loop" class="muted">henüz yok</div></div>
 </main>
 <div id="viewer" onclick="if(event.target===this)closeV()"><div class="box" id="vbox"></div></div>
@@ -284,7 +297,21 @@ async function tick(){
    return `<div><span class="t">[${String(e.t).padStart(6)}s]</span> <span class="k ${e.kind}">${e.kind}</span> ${esc(body)}</div>`}).join("");
   if(stick)box.scrollTop=box.scrollHeight}
 }
-let lastWork="",WORK=null;
+let lastWork="",WORK=null,lastChats="";
+function renderChats(w){const cs=(w&&w.chats)||[];if(!cs.length)return "<span class='muted'>bu koşuda kayıtlı model konuşması yok (main.py'nin yeni sürümüyle başlayan koşularda olur)</span>";
+ return cs.map(c=>`<div class="crow"><b>${c.n}</b><span class="t">${esc(c.purpose||"")}<br><span class="muted">${esc(c.model||"")} · ${c.seconds} s · gönderilen ${Math.round(c.prompt_chars/1000)}k karakter · cevap ${Math.round((c.reply_chars+c.output_chars)/1000)}k</span></span>
+  <button class="open" onclick="openChat('${encodeURIComponent(c.file)}')">aç</button></div>`).join("")}
+function splitPrompt(p){const parts=[];const re=/^(#{2,}\s.+|===== .+ =====)$/gm;let last=0,title="Talimat",m;
+ while((m=re.exec(p))){if(m.index>last)parts.push([title,p.slice(last,m.index)]);title=m[0].replace(/^#+\s*|=====/g,"").trim();last=m.index+m[0].length}
+ parts.push([title,p.slice(last)]);return parts.filter(([t,b])=>b.trim())}
+async function openChat(enc){let c;try{c=await (await fetch("/api/chat?path="+encodeURIComponent(decodeURIComponent(enc)))).json()}catch(e){alert("açılamadı");return}
+ const parts=splitPrompt(c.prompt||"");let out=c.output_file||"";try{out=JSON.stringify(JSON.parse(out),null,1)}catch(e){}
+ $("vbox").innerHTML=`<div class="head"><div><b style="font-size:17px">${esc(c.purpose||"")}</b> <span class="muted">${esc(c.model||"")} · ${c.seconds} s</span></div><button class="x" onclick="closeV()">kapat ✕</button></div>
+ <div class="cols"><div><div class="sec"><h4>→ Modele gönderilen (bölümlere ayrılmış; uzun bölümler kapalı)</h4>
+  ${parts.map(([t,b],i)=>`<details ${b.length<4000||/failure|disagree|current task|talimat|task:/i.test(t)?"open":""}><summary><b>${esc(t)}</b> <span class="muted">${Math.round(b.length/100)/10}k karakter</span></summary><pre>${esc(b.trim())}</pre></details>`).join("")}</div></div>
+ <div><div class="sec"><h4>← Modelin cevabı (konuşma metni)</h4><pre style="white-space:pre-wrap">${esc(c.reply||"(metin yok: model cevabını dosyaya yazdı)")}</pre></div>
+  ${out?`<div class="sec"><h4>← Modelin yazdığı dosya</h4><details ${out.length<6000?"open":""}><summary>${Math.round(out.length/100)/10}k karakter</summary><pre>${esc(out)}</pre></details></div>`:""}</div></div>`;
+ $("viewer").style.display="block";$("viewer").scrollTop=0}
 function closeV(){$("viewer").style.display="none"}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeV()});
 function short(o,n){const t=typeof o==="string"?o:JSON.stringify(o);return t.length>n?t.slice(0,n)+"…":t}
@@ -383,7 +410,7 @@ function renderLoop(w){
  return h||`<span class="muted">henüz yok</span>`}
 const _tick=tick;tick=async function(){await _tick();
  try{const d=await (await fetch("/api/state"+(chosen?"?file="+encodeURIComponent(chosen):""))).json();
-  WORK=d.work;const key=JSON.stringify(d.work||null);if(key!==lastWork){lastWork=key;$("loop").innerHTML=renderLoop(d.work)}}catch(e){}};
+  WORK=d.work;const ck=JSON.stringify((d.work||{}).chats||[]);if(ck!==lastChats){lastChats=ck;$("chats").innerHTML=renderChats(d.work)}const key=JSON.stringify(d.work||null);if(key!==lastWork){lastWork=key;$("loop").innerHTML=renderLoop(d.work)}}catch(e){}};
 $("file").onchange=e=>{chosen=e.target.value;lastLen=-1;lastWork="";tick()};tick();setInterval(tick,2000);
 </script></body></html>"""
 

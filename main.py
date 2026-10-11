@@ -26,7 +26,8 @@ Options:
     --spec PATH        skip extraction, start from this CallSpec (development)
     --name NAME        slot and output name (default: the brief's folder or file name)
     --model NAME       Claude model for extraction and fixes (default claude-opus-5-5)
-    --only 20,24       test only these generated customers (number or full id); the full set is kept in cases.all.json
+    --only 20,24       test only these generated customers: numbers, full ids, a level (hard), families (Refusal,Multi) or level:family (hard:Refusal);
+                       the full set is kept in cases.all.json
     --claude-test      run the local test on the Claude subscription (claude CLI, Haiku) instead of Gemini; without it: Gemini
 
 Needs: FREYA_API_KEY (+ FREYA_WORKSPACE_ID), a Claude login or ANTHROPIC_API_KEY, GEMINI_API_KEY for the local test,
@@ -59,7 +60,37 @@ from builder.extract.tools import field_map, lint_spec, parse_openapi  # noqa: E
 from builder.main import expand_briefs, freya_retry  # noqa: E402
 from builder.trace import Trace  # noqa: E402
 
-STATE_FILE = str(FREYA_DIR / ".freya-agents.json")      # the same slot is updated in place (the workspace holds 200 workflows)
+STATE_FILE = str(FREYA_DIR / ".freya-agents.json")
+CHATS: dict = {"dir": None, "n": 0}                      # every model conversation of this run is kept in <work>/chats/
+
+
+def record_chat(model: str, purpose: str, prompt: str, reply: str, seconds: float, output: str = ""):
+    if not CHATS["dir"]:
+        return
+    CHATS["n"] += 1
+    slug = re.sub(r"[^a-z0-9]+", "-", purpose.lower())[:50].strip("-")
+    (CHATS["dir"] / f"{CHATS['n']:02d}-{slug}.json").write_text(json.dumps(
+        {"n": CHATS["n"], "model": model, "purpose": purpose, "seconds": round(seconds, 1), "prompt": prompt, "reply": reply, "output_file": output},
+        indent=1, ensure_ascii=False))
+
+
+def _install_chat_recorder():
+    """Wrap the builder's Claude call so that what was sent and what came back are saved (FREYA/ stays unchanged)."""
+    import builder.extract.extractor as ex
+    import builder.test.fixer as fx
+    orig = ex._ask_claude
+
+    async def recorded(prompt, out_path, cwd, model, trace, purpose):
+        t0 = time.time()
+        reply = await orig(prompt, out_path, cwd, model, trace, purpose)
+        out = Path(out_path)
+        record_chat(model, purpose, prompt, reply, time.time() - t0, out.read_text() if out.exists() else "")
+        return reply
+    ex._ask_claude = fx._ask_claude = recorded
+    globals()["_ask_claude"] = recorded
+
+
+_install_chat_recorder()      # the same slot is updated in place (the workspace holds 200 workflows)
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -169,6 +200,7 @@ def cross_check(spec: CallSpec, brief_args: list[str], openapi: str, trace: Trac
         model = llm.model_of(llm.provider("judge"))
         second = json.loads(llm.generate("judge", rule_diff.PROMPT, [("user", text)], json_mode=True))
     trace.model_call(model=model, purpose=f"cross-check: second, independent reading of {', '.join(names)}", seconds=time.time() - t0)
+    record_chat(model, "cross-check: second, independent reading of the brief", rule_diff.PROMPT + "\n\n" + text, json.dumps(second, indent=1, ensure_ascii=False), time.time() - t0)
     mine = rule_diff.from_callspec(json.loads(spec.model_dump_json()))
     src = second.get("sources") or {}
     return [(p, x, y, src.get(p.split(".")[0].split("[")[0], "")) for p, x, y in rule_diff.diff(mine, {k: second.get(k) for k in mine})]
@@ -329,7 +361,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-test", action="store_true")
     ap.add_argument("--no-publish", action="store_true")
     ap.add_argument("--spec")
-    ap.add_argument("--only", help="test only these generated customers: numbers (20,24) or full ids")
+    ap.add_argument("--only", help="test only these generated customers: numbers (20,24), full ids, a level (hard) or families (Refusal,Multi)")
     ap.add_argument("--claude-test", action="store_true", help="local test on the Claude subscription (claude CLI) instead of Gemini")
     ap.add_argument("--model", default=os.environ.get("BUILDER_MODEL", "claude-opus-5-5"))
     a = ap.parse_args(argv)
@@ -344,6 +376,8 @@ def main(argv=None) -> int:
     budget = Budget(a.budget_min)
     work = ROOT / "runs" / name / time.strftime("%Y%m%d-%H%M%S")
     work.mkdir(parents=True, exist_ok=True)
+    CHATS["dir"] = work / "chats"
+    CHATS["dir"].mkdir(exist_ok=True)
     export = ROOT / "submission" / f"{name}.workflow.json"
     trace = Trace(str(ROOT / "traces"), label=name)
     trace.note(f"main.py brief={a.brief} files={len(briefs)} openapi={a.openapi} name={name} model={a.model} budget_min={a.budget_min} "
@@ -395,7 +429,14 @@ def main(argv=None) -> int:
         cases = make_cases(spec_path, openapi, work / "cases.json", re.sub(r"\W", "", name.upper())[:6] or "T", trace)
     if cases and a.only:
         want = [x.strip() for x in a.only.split(",") if x.strip()]
-        pick = [c for c in cases if any(c["id"] == w or c["id"].endswith(f"-{w.zfill(2)}") for w in want)]
+        def chosen(c, w):                       # a number, a full id, a level (hard, medium) or a family (Refusal, Multi, Dates...)
+            w2 = w.lower()
+            if ":" in w2:                       # level:family, both must match (hard:Refusal)
+                lv, fam = w2.split(":", 1)
+                return lv == str(c.get("level", "")).lower() and fam == str(c.get("family", "")).lower()
+            return (c["id"] == w or (w.isdigit() and c["id"].endswith(f"-{w.zfill(2)}"))
+                    or w2 == str(c.get("level", "")).lower() or w2 == str(c.get("family", "")).lower())
+        pick = [c for c in cases if any(chosen(c, w) for w in want)]
         save(work / "cases.all.json", cases)
         trace.note(f"--only {a.only}: testing {len(pick)} of {len(cases)} customers: " + "; ".join(f"{c['id']} {c['title']}" for c in pick))
         cases = pick
