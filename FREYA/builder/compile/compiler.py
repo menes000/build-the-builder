@@ -298,7 +298,7 @@ def compile_workflow(spec: CallSpec) -> dict:
     # first refusal -> an explanation node (spoken once, deterministically); second refusal there -> declined
     nodes["security"] = conv(
         "security", prompts.security_task(spec),
-        on_enter={"type": "tts", "text": f"Thank you, {spec.address_customer_as}. Before I continue, I need to ask you {len(idn.questions)} security questions. {first_q.ask}"},
+        on_enter={"type": "tts", "text": f"{_sentence(idn.intro_text) if idn.intro_text else f'Thank you, {spec.address_customer_as}. Before I continue, I need to ask you {len(idn.questions)} security questions.'} {first_q.ask}"},
         first_only=True, tools=sec_tools, extraction=[declined_extraction("declined_1")],
         transitions=common_sec_routes + [
             go("security_explain" if idn.decline.explain_first else "close_declined",
@@ -363,7 +363,7 @@ def compile_workflow(spec: CallSpec) -> dict:
         # after a recorded promise the call moves to a node WITHOUT create_promise: the confirmation sentence is spoken
         # deterministically, the customer can still ask for a person or a plan (transfer), and nothing can be re-recorded
         promise_route = go("after_promise", "The promise was recorded (one product)", {"logic": "or", "conditions": [{"logic": "and", "conditions": [eq("promise_state", "recorded"), eq("n_products", "1")]}]})
-        service_route = [go("close_service_error", "The promise service failed twice", grp(eq("promise_state", "failed_twice"), gt("create_promise_failure_count", max(2, int(spec.confirm.max_tries_on_failure or 2)) - 1)))]
+        service_route = [go("close_service_error", "The promise service failed twice", grp(eq("promise_state", "failed_twice"), gt("create_promise_failure_count", max(1, int(spec.confirm.max_tries_on_failure or 2)) - 1)))]
         # several products although the brief did not say so: close when every product has a promise (counters), else the model closes
         combos = []
         for k in range(2, 6):

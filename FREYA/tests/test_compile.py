@@ -90,7 +90,7 @@ def _variant(tmp_path, **changes):
 
 def test_variants_from_brief_d(tmp_path):
     """The eight rule variants brief D exposed: each has a structured field and the compiler uses it."""
-    wf = _variant(tmp_path, **{"products.0.floor_percent": 50, "products.0.floor_round_up_to_whole": True,
+    wf = _variant(tmp_path, **{"products.0.floor_field": "past_due", "products.0.floor_percent": 50, "products.0.floor_round_up_to_whole": True,
                                "third_party.callback.max_business_days_ahead": 2, "amounts.today_question": "Are you able to clear this today?",
                                "dates.weekend_named_offer": "previous_business_day", "dates.vague_period_fallback": "attempt1",
                                "confirm.max_tries_on_failure": 3, "identity.decline.explain_first": False,
@@ -136,3 +136,25 @@ def test_consistency_checks_flag_text_without_field():
     assert len(errs) == 5, errs
     for key in ("floor_percent", "weekend_named_offer", "vague_period_fallback", "max_business_days_ahead", "max_tries_on_failure"):
         assert any(key in e for e in errs), key
+
+
+def test_variants_from_brief_e(tmp_path):
+    """Brief E: percentage of the floor field, placeholders in the first question, calendar-day callbacks with Saturday,
+    no retry, closing by the first product, a dictated identity intro, both days offered for a weekend date."""
+    wf = _variant(tmp_path, **{"products.1.floor_percent": 50, "products.1.floor_round_up_to_whole": True,
+                               "amounts.today_question": "Can you pay {amount} by tomorrow, {tomorrow}?",
+                               "third_party.callback.max_business_days_ahead": 3, "third_party.callback.calendar_days": True, "third_party.callback.saturday_allowed": True,
+                               "confirm.max_tries_on_failure": 1, "multi_product.closing_by_first_product": True,
+                               "identity.intro_text": "Before we go on, I must let you know that this call is recorded.",
+                               "dates.weekend_named_offer": "both"})
+    v = facts_preview(wf, "2026-10-14T11:00", [{"product_id": "p1", "type": "personal_loan", "past_due": 540.0, "days_late": 5, "instalment_amount": 333.0}])
+    f = json.loads(v["facts_json"])[0]
+    assert f["floor"] == 167.0                                              # ceil(333 / 2): percentage of the floor field, not of past_due
+    assert v["debt_statement"].endswith("Can you pay 540 by tomorrow, Thursday 15 October 2026?")
+    assert "17 October" in v["callback_text"] and "18 October" not in v["callback_text"]   # Saturday yes, Sunday no
+    assert "let the customer choose" in v["calendar_text"]
+    assert "must let you know that this call is recorded" in wf["nodes"]["security"]["on_enter"]["text"]
+    svc = next(t for t in wf["nodes"]["negotiate"]["transitions"] if t["target_node"] == "close_service_error")
+    assert '"operand": 0' in json.dumps(svc)                                # no retry: the first failure closes
+    assert "do not call it again" in wf["nodes"]["negotiate"]["task_message"]
+    assert "CLOSE_BY_FIRST = True" in json.dumps(wf["nodes"]["decide_outcome"])

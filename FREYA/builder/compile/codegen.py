@@ -42,7 +42,8 @@ def facts_code(spec: CallSpec) -> str:
         "PTYPES": ptypes,
         "CB_FROM": cb.time_from, "CB_TO": cb.time_to,
         "CB_TODAY": cb.allow_today, "CB_NBD": cb.allow_next_business_day, "CB_LATER": cb.must_be_later_than_now,
-        "CB_DAYS": max(1, int(cb.max_business_days_ahead or 1)),
+        "CB_DAYS": max(1, int(cb.max_business_days_ahead or 1)), "CB_CAL": bool(cb.calendar_days), "CB_SAT": bool(cb.saturday_allowed),
+        "CLOSE_BY_FIRST": bool(spec.multi_product.closing_by_first_product),
         "TODAY_Q": (spec.amounts.today_question or "").strip(), "TODAY_Q_ALL": (spec.multi_product.today_question_all or "").strip(),
         "WEEKEND_OFFER": spec.dates.weekend_named_offer,
         "MULTI": spec.multi_product.enabled,
@@ -149,10 +150,18 @@ try:
         cb.append('today, ' + tag(today) + ', from ' + start + ' until ' + CB_TO)
         cbd.append(today.isoformat())
     if CB_NBD:
-        for k in range(1, CB_DAYS + 1):
-            nbd = nth_bd(today, k)
-            cb.append(tag(nbd) + ', from ' + CB_FROM + ' until ' + CB_TO)
-            cbd.append(nbd.isoformat())
+        if CB_CAL:
+            for k in range(1, CB_DAYS + 1):
+                dd = today + datetime.timedelta(days=k)
+                ok = isbd(dd) or (CB_SAT and dd.weekday() == 5 and dd.isoformat() not in HOLS)
+                if ok:
+                    cb.append(tag(dd) + ', from ' + CB_FROM + ' until ' + CB_TO)
+                    cbd.append(dd.isoformat())
+        else:
+            for k in range(1, CB_DAYS + 1):
+                nbd = nth_bd(today, k)
+                cb.append(tag(nbd) + ', from ' + CB_FROM + ' until ' + CB_TO)
+                cbd.append(nbd.isoformat())
     vars['callback_text'] = ' or '.join(cb)
     vars['cb_dates'] = ','.join(cbd)
     # this / next weekday table
@@ -177,7 +186,10 @@ try:
             dl = int(float(pf(p, 'days_late') or 0))
             floor = float(pf(p, pt.get('floor') or '') or 0) if pt else 0.0
             if pt.get('pct'):
-                x = past * float(pt['pct']) / 100.0
+                base = past if (not pt.get('floor') or pt.get('floor') == 'past_due') else float(pf(p, pt.get('floor')) or 0)
+                if not base:
+                    base = past
+                x = base * float(pt['pct']) / 100.0
                 floor = float(math.ceil(x)) if pt.get('whole') else math.ceil(x * 100 - 1e-9) / 100.0
             if not floor:
                 for fk in ('minimum_payment', 'instalment_amount'):
@@ -238,7 +250,16 @@ try:
                     parts.append('allowed' + who + (' (today)' if d == today else ''))
                 else:
                     kind = 'a bank holiday' if d.isoformat() in HOLS else 'a weekend day'
-                    if WEEKEND_OFFER == 'previous_business_day':
+                    if WEEKEND_OFFER == 'both':
+                        pv = d - ONE
+                        while not isbd(pv):
+                            pv = pv - ONE
+                        nx = min(next_bd(d), dl_d)
+                        if pv >= today and pv <= dl_d:
+                            parts.append(kind + ', not allowed, offer the last business day before it, ' + say(pv) + ', or the next business day, ' + say(nx) + ', and let the customer choose')
+                        else:
+                            parts.append(kind + ', not allowed, offer the next business day ' + say(nx))
+                    elif WEEKEND_OFFER == 'previous_business_day':
                         pv = d - ONE
                         while not isbd(pv):
                             pv = pv - ONE
@@ -290,6 +311,21 @@ try:
             q = TODAY_Q_ALL or 'Can you pay all of them today?'
         else:
             q = TODAY_Q or 'Can you make this payment today?'
+        if '{' in q:
+            total = sum(float(f['past']) for f in facts)
+            tmr = next_bd(today + ONE)
+            def fill(m):
+                k = m.group(1).lower()
+                if 'tomorrow' in k:
+                    return say(tmr)
+                if 'today' in k:
+                    return say(today)
+                if 'deadline' in k or 'latest' in k:
+                    return say(datetime.date.fromisoformat(facts[0]['deadline']))
+                if 'total' in k or 'amount' in k or 'sum' in k or 'past' in k or 'full' in k:
+                    return money(total)
+                return m.group(0)
+            q = re.sub(r'\{([^}]*)\}', fill, q)
         vars['outcome'] = VERIFIED_DEFAULT[0]
         vars['reason'] = VERIFIED_DEFAULT[1]
         intro = DEBT_INTRO if DEBT_INTRO else 'I am calling about an overdue payment.'
@@ -455,7 +491,7 @@ def promise_post(spec: CallSpec) -> str:
     multi = spec.multi_product.enabled
     F = ((spec.field_map or {}).get("resp", {}).get("create_promise") or {})
     immutable = spec.confirm.promise_immutable_text or "A recorded promise cannot be changed on this call; you can change it in the mobile app."
-    return "MULTI = " + _lit(multi) + "\nPROMISE_TRIES = " + _lit(max(2, int(spec.confirm.max_tries_on_failure or 2))) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nIMMUTABLE = " + _lit(immutable) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
+    return "MULTI = " + _lit(multi) + "\nPROMISE_TRIES = " + _lit(max(1, int(spec.confirm.max_tries_on_failure or 2))) + "\nPROMISE_OUTCOME = " + _lit(spec.closing.promise_outcome) + "\nAFTER_RECORD = " + _lit(spec.confirm.after_record_sentence) + "\nIMMUTABLE = " + _lit(immutable) + "\nF = " + _lit({k: F.get(k, k) for k in ("ok", "error")}) + r'''
 import json
 try:
     if isinstance(result, dict):
@@ -818,6 +854,7 @@ def decide_outcome_code(spec: CallSpec, promise_farewell: str, farewells: dict |
     params = {
         "PROMISE_OUTCOME": c.promise_outcome, "XFER_OUTCOME": transferred_outcome, "XFER_REASON": transfer_reason_by_queue,
         "PAID_OUTCOME": paid_outcome, "NO_PROMISE_OUTCOME": no_promise_outcome, "MULTI": mp.enabled, "REASON_PRIORITY": list(mp.no_promise_reason_priority or []),
+        "CLOSE_BY_FIRST": bool(mp.closing_by_first_product),
         "PROMISE_FAREWELL": promise_farewell, "NAME_TOKEN": "NAME", "FAREWELLS": farewells or {},
     }
     header = "import json\n" + "\n".join(f"{k} = {_lit(v)}" for k, v in params.items())
@@ -857,7 +894,20 @@ try:
             farewell = FAREWELLS.get('paid') or farewell
         else:
             first = ''
-            reasons = [str(n.get('reason')) for n in notes if str(n.get('reason')) != 'paid']
+            if CLOSE_BY_FIRST:
+                try:
+                    facts0 = json.loads(str(vars.get('facts_json') or '[]'))
+                except Exception:
+                    facts0 = []
+                pid0 = str(facts0[0].get('pid')) if facts0 else ''
+                nn = [n for n in notes if str(n.get('pid')) == pid0] or notes[:1]
+                first = str(nn[0].get('reason')) if nn else ''
+                if first == 'paid':
+                    outcome = PAID_OUTCOME
+                    reason = ''
+                    farewell = FAREWELLS.get('paid') or farewell
+                    first = ''
+            reasons = [str(n.get('reason')) for n in notes if str(n.get('reason')) != 'paid'] if not first else [first]
             for r in REASON_PRIORITY:
                 if r in reasons:
                     first = r

@@ -1,0 +1,9 @@
+{"t": 0.0, "kind": "start", "at": "2026-10-11T14:48:51+0300", "label": "brief"}
+{"t": 0.0, "kind": "note", "text": "briefs=['../test-briefs/brief-e/brief.md'] openapi=../test-briefs/brief-e/openapi.json slot=brief model=claude-opus-5-5 budget_min=6.0"}
+{"t": 104.9, "kind": "model_call", "model": "claude-opus-5-5", "purpose": "extract CallSpec from brief (attempt 1)", "seconds": 104.6, "cost_usd": 0.7110668, "tokens": null}
+{"t": 104.9, "kind": "note", "text": "extraction attempt 1: CallSpec valid (26212 bytes)"}
+{"t": 105.0, "kind": "note", "text": "compiled 30 nodes -> /Users/doraalkan/Desktop/freya-hecaton/FREYA/out/brief.workflow.json"}
+{"t": 165.4, "kind": "note", "text": "dryRun: Freya answered 'POST /api/v2/workflow -> 504: error code: 504\n', retry 1/7 in 15 s"}
+{"t": 180.9, "kind": "note", "text": "dryRun valid"}
+{"t": 181.4, "kind": "created_on_freya", "what": "workflow", "steps": 30, "tools": 10, "slot": "brief", "tag": "v1", "workflow_id": "8bf3baa4-7007-4575-9fc9-6ac31f68a62d", "agent_id": "4eed44e0-b36b-42ea-8a41-644bac38d010"}
+{"t": 241.6, "kind": "note", "text": "export: Freya answered 'GET /api/v2/workspaces -> 504: error code: 504\n', retry 1/7 in 15 s"}

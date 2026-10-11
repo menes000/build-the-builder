@@ -24,8 +24,18 @@ Write the JSON to the output path you were given. Output only valid JSON that sa
 
 
 ## Rule variants that have their own field (use the field, never only the text)
-- A floor that is a PERCENTAGE of the overdue amount: `products[].floor_field = "past_due"` plus `floor_percent` (and
-  `floor_round_up_to_whole` if it rounds up to a whole unit). The text in `amounts.floor_rule` must say the same.
+- A floor that is a PERCENTAGE of some field: `products[].floor_percent` applies to the value of `floor_field`
+  (`past_due` for "x % of the overdue amount", `instalment_amount` for "half the instalment"); `floor_round_up_to_whole`
+  if it rounds up to a whole unit. The text in `amounts.floor_rule` must say the same.
+- A callback window in CALENDAR days or one that allows Saturdays: `third_party.callback.calendar_days`, `saturday_allowed`,
+  with `max_business_days_ahead` as the number of days.
+- The exact sentence spoken after the name is confirmed and before the first security question (for example a recording
+  notice): `identity.intro_text`.
+- With several products and no promise, a closing that follows the first product's note only: `multi_product.closing_by_first_product`.
+- A weekend/holiday date where both the business day before and after are offered: `dates.weekend_named_offer = "both"`.
+- create_promise with NO retry on failure: `confirm.max_tries_on_failure = 1`.
+- `amounts.today_question` / `multi_product.today_question_all` may contain the placeholders {amount}, {total}, {today},
+  {tomorrow}, {deadline}; the code fills them.
 - A band deadline in CALENDAR days: `deadline_calendar_days_after_today`; in business days: `deadline_business_days_after_today`.
   Exactly one of the two per band; the validator rejects a band with neither.
 - The exact wording of the "can you pay today" question, if the brief dictates it: `amounts.today_question`

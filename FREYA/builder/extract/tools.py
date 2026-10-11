@@ -183,8 +183,20 @@ def consistency_checks(spec) -> list[str]:
     errs = []
     low = lambda t: (t or "").lower()
     fl = low(spec.amounts.floor_rule) + " " + " ".join(low(x) for x in spec.amounts.extra_rules)
-    if re.search(r"\b\d+(\.\d+)?\s*(%|percent|per cent)", fl) and not any(p.floor_percent for p in spec.products):
-        errs.append("amounts.floor_rule speaks of a percentage but no product has floor_percent: set products[].floor_percent (and floor_field = past_due)")
+    if re.search(r"\b\d+(\.\d+)?\s*(%|percent|per cent)|\bhalf\b|\bquarter\b|\bthird\b", fl) and not any(p.floor_percent for p in spec.products):
+        errs.append("amounts.floor_rule speaks of a percentage or a fraction but no product has floor_percent: set products[].floor_percent (applied to floor_field)")
+    cbt = low(spec.third_party.callback.day_rule) + " " + " ".join(low(x) for x in spec.third_party.extra_rules)
+    if ("calendar day" in cbt or "saturday is allowed" in cbt or "saturday allowed" in cbt) and not (spec.third_party.callback.calendar_days or spec.third_party.callback.saturday_allowed):
+        errs.append("the callback window text counts calendar days or allows Saturday but callback.calendar_days / saturday_allowed are false")
+    it = " ".join(low(x) for x in spec.identity.extra_rules) + " " + " ".join(low(x) for x in spec.opening.extra_rules)
+    if re.search(r"(immediately|right) after the name is confirmed.*say", it) and not spec.identity.intro_text:
+        errs.append("a text rule dictates a sentence right after the name is confirmed but identity.intro_text is empty")
+    mc = low(spec.multi_product.closing_rule)
+    if "first product" in mc and not spec.multi_product.closing_by_first_product:
+        errs.append("multi_product.closing_rule follows the first product but closing_by_first_product is false")
+    w2 = low(spec.dates.weekend_or_holiday_rule)
+    if re.search(r"(both|before and after|before it and|choose)", w2) and spec.dates.weekend_named_offer != "both" and re.search(r"(after|next)", w2) and re.search(r"(before|previous)", w2):
+        errs.append("dates.weekend_or_holiday_rule offers both the day before and after but weekend_named_offer is not 'both'")
     for b in spec.dates.bands:
         r = low(b.deadline_rule)
         if "calendar" in r and b.deadline_calendar_days_after_today is None:

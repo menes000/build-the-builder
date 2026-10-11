@@ -1,0 +1,32 @@
+[    0.0s] start: at=2026-10-11T14:48:51+0300 label=brief
+[    0.0s] note: text=briefs=['../test-briefs/brief-e/brief.md'] openapi=../test-briefs/brief-e/openapi.json slot=brief model=claude-opus-5-5 budget_min=6.0
+[  104.9s] model_call: model=claude-opus-5-5 purpose=extract CallSpec from brief (attempt 1) seconds=104.6 cost_usd=0.7110668 tokens=None
+[  104.9s] note: text=extraction attempt 1: CallSpec valid (26212 bytes)
+[  105.0s] note: text=compiled 30 nodes -> /Users/doraalkan/Desktop/freya-hecaton/FREYA/out/brief.workflow.json
+[  165.4s] note: text=dryRun: Freya answered 'POST /api/v2/workflow -> 504: error code: 504
+', retry 1/7 in 15 s
+[  180.9s] note: text=dryRun valid
+[  181.4s] created_on_freya: what=workflow steps=30 tools=10 slot=brief tag=v1 workflow_id=8bf3baa4-7007-4575-9fc9-6ac31f68a62d agent_id=4eed44e0-b36b-42ea-8a41-644bac38d010
+[  241.6s] note: text=export: Freya answered 'GET /api/v2/workspaces -> 504: error code: 504
+', retry 1/7 in 15 s
+Traceback (most recent call last):
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/build.py", line 34, in <module>
+    sys.exit(entry(sys.argv[1:]))
+             ~~~~~^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/build.py", line 30, in entry
+    return main([brief, "--openapi", openapi, "--slot", name, "--export", str(ROOT / "submission" / f"{name}.workflow.json"), *extra])
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/main.py", line 238, in main
+    freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, deadline)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/main.py", line 73, in freya_retry
+    return fn()
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/builder/main.py", line 238, in <lambda>
+    freya_retry(lambda: freya.export_workflow(ids["workflow_id"], str(export_path)), "export", trace, deadline)
+                        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/kit/freya.py", line 67, in export_workflow
+    w = api("GET", f"/api/v2/workflow/{workflow_id}", workspaceId=workspace_id())["workflow"]
+        ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/doraalkan/Desktop/freya-hecaton/FREYA/kit/freya.py", line 19, in api
+    raise RuntimeError(f"{method} {path} -> {e.code}: {e.read().decode()[:1500]}") from None
+RuntimeError: GET /api/v2/workflow/8bf3baa4-7007-4575-9fc9-6ac31f68a62d -> 504: error code: 504
+
