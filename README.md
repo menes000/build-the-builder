@@ -19,6 +19,14 @@
 
 ---
 
+## The problem
+
+A bank wants software to answer its phone calls. Before that software can talk to a single customer, someone has to read the bank's material and turn it into a working agent: who to ask for, what to say, which dates are allowed, what to do when a service fails. The material is spread across a dozen documents, written months apart, and the documents contradict each other. **Done by hand, one bank takes days.**
+
+Our builder does that work by itself, and checks its own work.
+
+---
+
 ## The heart of it: a builder that corrects itself
 
 Writing an agent once is easy. Writing one that is **right** is the hard part. So our builder does not stop after the first draft. It tests its own agent, reads why customers failed, fixes itself and keeps the fix **only if it really helps**. All inside one command, with no human in the loop.
@@ -59,69 +67,24 @@ fix1: rejected, 2/10 -> 0/10, newly failing: DENEME-04, DENEME-18; keeping v1
 
 ---
 
-## The problem
+## A team of agents inside one build
 
-A bank wants software to answer its phone calls. Before that software can talk to a single customer, someone has to read the bank's material and turn it into a working agent: who to ask for, what to say, which dates are allowed, what to do when a service fails. The material is spread across a dozen documents, written months apart, and the documents contradict each other. **Done by hand, one bank takes days.**
+The builder is not one model call. One build runs a small team of agents, each with one job, and they check each other.
 
-Our builder does that work by itself, and checks its own work.
-
----
-
-## Fallback: a call type outside the template
-
-The CallSpec describes one family of calls. When a bank's tool API has none of the tools that family needs, the builder does not crash. It **falls back to a free-form path**: Claude reads the whole case pack, writes a design note, then the workflow; the builder checks it (JSON, lint, code compiles, URLs only inside the tool API, Freya dryRun) and sends every problem back until Freya accepts it.
-
-### The final case went through the fallback
-
-The hidden final case was a different kind of call: **an inbound credit-card statement call, in Turkish.** The agent finds the right card, reads the statement debt in **lira, dollars, euros and pounds**, says when it is due, can **move the statement week** and **e-mail the statement PDF**, and hands callers who want to pay or speak to a person to an agent. The material was mails, two versions of an analysis document, meeting transcripts, a service contract, an IVR sheet, an FAQ and a flow drawing, and they did not agree.
-
-<table>
-<tr>
-<td align="center"><h2>7</h2>services in a tool API written from the contract</td>
-<td align="center"><h2>12</h2>conflicts between sources found and resolved</td>
-<td align="center"><h2>31</h2>nodes in the Turkish workflow</td>
-<td align="center"><h2>1st</h2>round accepted by Freya</td>
-</tr>
-</table>
-
-<p align="center"><img src="assets/agent.svg" alt="The agent the builder designed" width="100%"></p>
-
-- **Amounts and dates in code:** exact Turkish text with amounts in words, kuruş, sent and peni, and the right suffix; "the due date has passed" is decided from `now`.
-- **The card number is never rebuilt from speech:** a pre-hook maps the caller's choice to the masked number the bank returned.
-- **Write calls run once, only after a clear yes**, and every service error has its own path.
-
-<details>
-<summary><b>The 12 conflicts the builder resolved (latest decision wins)</b></summary>
-
-| Topic | Decision |
-|---|---|
-| Silence | the 3rd silence ends the call |
-| Out of scope | ask before transferring to the main menu |
-| Angry caller | three calming replies, then an agent |
-| Tries used up | a fixed sentence, then the main menu |
-| Duplicate cards | ask for the last six digits, then the full number |
-| Card digits | only the last four are ever spoken |
-| Currencies | always said with their full names |
-| No-debt sentence | follows the 8 October rule; missing currency blocks are left out |
-| Week change limit | once a year, no pre-check service; any refusal goes to an agent |
-| Joint-card warning | said before "Onaylıyor musunuz?" |
-| E-mail lookup | done before the offer |
-| E-mail address | only the registered address |
-
-Full note: [`FREYA/out/final.freeform.notes.md`](FREYA/out/final.freeform.notes.md)
-</details>
+| Agent | Model | Job |
+|---|---|---|
+| **Extractor** | Claude Opus | Reads every brief file and fills the CallSpec. |
+| **Second reader** | GPT | Reads the raw brief on its own. Where the two readings disagree, the extractor re-reads the brief and justifies each field. |
+| **Customer agents** | Gemini | Play the generated customers in five styles: talkative, corrects themselves, says numbers in pieces, asks questions back, says amounts in words. |
+| **Agent under test** | emulated locally | The compiled workflow, run step by step: routing, extraction, code nodes, hooks and bank calls. |
+| **Judge** | GPT-5.4 mini | Reads the transcript and the bank's records and checks policy and outcome against each case. |
+| **Fixer** | Claude Opus | Gets the failed transcripts, the record diffs and the judge's reasons. Rewrites texts, never values. |
 
 ---
 
-## Our own bank: the mock
+## Testing locally, so the loop can run
 
-The final case also asked teams to host the bank's services themselves. [`mock/`](mock/) is a **Cloudflare Worker** with all 7 services. It uses the exact paths, field names and request and response shapes of the integration document, and it returns the stored answer, HTTP status included, for every test customer.
-
----
-
-## Testing without waiting for the platform
-
-Freya allows one simulation at a time per workspace, and the platform was limited during the final. So we built a **local test bench** that runs a whole test set in parallel in minutes.
+A self-correcting loop is only as good as its tests, and only as fast as them. On the platform, simulations run one at a time per workspace and ten cases take 3 to 11 minutes. That is too slow to test, fix and retest inside a single build. So we built our own **local test bench**: it runs the agent, the customers, the bank and the judge on our machine, **in parallel**, and a full set finishes in minutes. It is what makes the loop possible.
 
 <p align="center"><img src="assets/testbench.svg" alt="Local test bench" width="100%"></p>
 
@@ -144,6 +107,12 @@ Freya allows one simulation at a time per workspace, and the platform was limite
 
 ---
 
+## When a call does not fit the template
+
+The CallSpec covers one family of calls. If a bank's tool API has none of the tools that family needs, the builder does not crash. It falls back to a free-form path: Claude designs the workflow from the documents, and the builder keeps sending structural problems back until Freya accepts it. The hidden final case, an inbound statement call in Turkish served by our own Cloudflare Worker mock ([`mock/`](mock/)), went through this path. Its design note is in [`FREYA/out/final.freeform.notes.md`](FREYA/out/final.freeform.notes.md).
+
+---
+
 ## Repository
 
 ```
@@ -154,7 +123,7 @@ FREYA/                     the builder
 ├── builder/extract/       reading material · CallSpec extraction · contract → OpenAPI
 ├── builder/compile/       compiler · code generation · lint · self-check
 ├── builder/test/          practice runs and the fixer
-├── builder/freeform.py    fallback for call types outside the template
+├── builder/freeform.py    fallback for calls outside the template
 ├── submission/            exported workflows (final.workflow.json is our entry)
 ├── traces/                one trace per run
 └── out/                   everything a run wrote: OpenAPI, design note, workflow
@@ -177,9 +146,6 @@ cd FREYA
 
 # the self-correcting run on a brief
 python3 ../main.py kit/briefs/brief-a.md kit/tools/openapi.json --cross-check
-
-# the final case, against our mock
-python3 builder/build.py ../final/case https://freya-mock.freya-hecaton.workers.dev 2>&1 | tee traces/final.log
 
 # a practice brief, with tests and a fix round
 python3 builder/build.py kit/briefs/brief-a.md kit/tools/openapi.json --test A --fix-rounds 1
