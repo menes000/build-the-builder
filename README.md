@@ -19,45 +19,7 @@
 
 ## ⚡ In one picture
 
-```mermaid
-flowchart LR
-    subgraph IN["📂 What the bank sends"]
-        direction TB
-        A1["specs & analysis docs"]
-        A2["mails & memos"]
-        A3["meeting transcripts"]
-        A4["service contract"]
-        A5["flow drawing (PDF)"]
-    end
-
-    subgraph B["🧠 Our builder"]
-        direction TB
-        R["READ<br/>every format → text"]
-        P{"PLAN<br/>do I know<br/>this call type?"}
-        T["TEMPLATE MODE<br/>CallSpec → compiler"]
-        F["FREE-FORM MODE<br/>design → workflow"]
-        C["CHECK<br/>lint · code · URLs · dryRun"]
-        R --> P
-        P -- yes --> T
-        P -- no --> F
-        T --> C
-        F --> C
-        C -- problems --> F
-    end
-
-    subgraph OUT["📞 What comes out"]
-        direction TB
-        O1["phone agent on Freya"]
-        O2["exported workflow JSON"]
-        O3["trace of every step"]
-    end
-
-    IN --> R
-    C --> OUT
-
-    style B fill:#fff1e8,stroke:#fb651e,stroke-width:2px
-    style P fill:#fb651e,color:#fff,stroke:#fb651e
-```
+<p align="center"><img src="assets/overview.svg" alt="How the builder works" width="100%"></p>
 
 ```bash
 python3 FREYA/builder/build.py <case folder | zip | brief>  <mock_url | openapi.json>
@@ -112,53 +74,7 @@ The builder looks at the bank's tool API and decides on its own how to build.
 
 ## 🔍 Inside a build
 
-### Template mode
-
-```mermaid
-flowchart TB
-    BR["📄 brief files"] --> EX["🤖 EXTRACT<br/>Claude fills the CallSpec"]
-    API["🔌 tool API"] --> FM["field map<br/>exact → synonym → loose match"]
-    EX --> CS[("CallSpec<br/>identity · bands · deadlines<br/>holidays · floors · outcomes")]
-    FM --> CO
-    CS --> CO["⚙️ COMPILE<br/>deterministic Python"]
-    CO --> WF["workflow<br/>code nodes for dates & amounts<br/>hooks that check every promise"]
-    WF --> CK["✅ lint · run every snippet · Freya dryRun"]
-    CK --> PUB["☁️ publish on Freya"]
-    PUB --> TS["🧪 practice customers"]
-    TS -- "failures" --> FX["🤖 FIX<br/>Claude revises texts<br/>never values"]
-    FX --> CO
-    TS -- "better or done" --> EXP["📦 export + trace"]
-
-    style CS fill:#fff1e8,stroke:#fb651e
-    style CO fill:#16140f,color:#fff
-```
-
-### Free-form mode
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant B as 🏗️ Builder
-    participant C as 🤖 Claude
-    participant F as ☁️ Freya
-
-    B->>B: read every file (md, txt, pdf, docx, xlsx)
-    B->>C: service contract
-    C-->>B: OpenAPI for the bank's services
-    B->>C: all case documents + Freya workflow docs
-    C-->>B: design note (flow, branches, resolved conflicts)
-    B->>C: design + tool API
-    C-->>B: workflow JSON
-    loop until it passes
-        B->>B: JSON · lint · code compiles · URLs only inside the tool API
-        B->>F: dryRun
-        F-->>B: accepted / rejected + reasons
-        B->>C: every problem found
-        C-->>B: corrected workflow
-    end
-    B->>F: save, publish, export
-    B->>B: trace: every model call, time, cost, ids
-```
+<p align="center"><img src="assets/modes.svg" alt="Template mode and free-form mode" width="100%"></p>
 
 ---
 
@@ -181,34 +97,7 @@ The material: mails, two versions of an analysis document, meeting transcripts, 
 
 ### The agent it designed
 
-```mermaid
-flowchart TB
-    START(["📞 call starts<br/>customerNumber · now"]) --> L["cards.list"]
-    L --> PC{"prepare_cards<br/>(code)"}
-    PC -- "no card" --> E1(["end: no card"])
-    PC -- "one card" --> BAL["cards.balance"]
-    PC -- "several cards" --> SEL["select_card<br/>index → masked number<br/>via pre-hook"]
-    SEL --> BAL
-    BAL --> RD["build_reading (code)<br/>₺ $ € £ in Turkish words<br/>due date from now"]
-    RD --> SAY["read_debt"]
-    SAY -- "another card" --> SEL
-    SAY --> EM["contact.email.get"]
-    EM --> OF{"offer"}
-    OF -- "e-mail" --> PDF["statement.pdf.send<br/>registered address only<br/>after an explicit yes"]
-    OF -- "move week" --> WG["statement.week.get"]
-    WG --> WD["statement.week.decide<br/>preview dates"]
-    WD --> WC["statement.week.change<br/>once, after an explicit yes"]
-    OF -- "done" --> E2(["end: main menu"])
-    PDF --> E2
-    WC --> E2
-
-    G["🌐 global routes, from any step:<br/>payment · dispute · wants a person · third party<br/>non-Turkish speech · silence · angry caller · tries used up"]
-    G -.-> AG(["👤 hand over to an agent"])
-
-    style START fill:#16140f,color:#fff
-    style G fill:#fff1e8,stroke:#fb651e
-    style AG fill:#fb651e,color:#fff
-```
+<p align="center"><img src="assets/agent.svg" alt="The agent the builder designed" width="100%"></p>
 
 ### Design choices that matter
 
@@ -245,33 +134,13 @@ Full note: [`FREYA/out/final.freeform.notes.md`](FREYA/out/final.freeform.notes.
 
 The final case also asked teams to host the bank's services themselves. [`mock/`](mock/) is a **Cloudflare Worker** with all 7 services. It uses the exact paths, field names and request and response shapes of the integration document, and it returns the stored answer, HTTP status included, for every test customer.
 
-```mermaid
-flowchart LR
-    SC["🧑 simulated customer"] <--> AG["📞 phone agent<br/>on Freya"]
-    AG -- "tool calls" --> MK["🛰️ our mock<br/>Cloudflare Worker"]
-    MK --> DB[("test customers")]
-    CHK["mock/check_mock.py"] -. "every stored answer<br/>must come back" .-> MK
-    style MK fill:#F38020,color:#fff
-```
-
 ---
 
 ## 🧪 Testing without waiting for the platform
 
 Freya allows one simulation at a time per workspace, and the platform was limited during the final. So we built a **local test bench** that runs a whole test set in parallel in minutes.
 
-```mermaid
-flowchart LR
-    CS[("CallSpec")] --> GEN["🎲 cases_from_callspec<br/>~37 customers<br/>dates & amounts in code"]
-    WF["workflow JSON"] --> EMU
-    GEN --> EMU["🖥️ emulator<br/>routing · extraction · dialogue<br/>code nodes · hooks"]
-    EMU <--> FB["🏦 fakebank<br/>faults · limits · field maps<br/>OpenAPI validation"]
-    GEN --> CUST["🗣️ simulated customer<br/>pieces · corrections · talkative<br/>questions back · words"]
-    CUST <--> EMU
-    EMU --> J["⚖️ judge"]
-    J --> REP["📊 PASS / FAIL<br/>failed checks · flags · path"]
-    REP -. "--local-test" .-> BLD["builder fix loop"]
-```
+<p align="center"><img src="assets/testbench.svg" alt="Local test bench" width="100%"></p>
 
 | Tool | What it does |
 |---|---|

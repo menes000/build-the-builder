@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16140f"/><stop offset="1" stop-color="#2a1a10"/></linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fb651e"/></marker>
+    <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffffff" fill-opacity=".6"/></marker>
+  </defs>
+  <rect width="1200" height="320" rx="20" fill="url(#bg)"/>
+
+  <!-- left: inputs -->
+  <text x="40" y="52" font-size="12" fill="#fb651e" letter-spacing="2.5" font-weight="700">THE BANK SENDS</text>
+  <g font-size="14" fill="#ffffff" fill-opacity=".9">
+    <rect x="40" y="70" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="56" y="92">specs &amp; analysis</text>
+    <rect x="40" y="114" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="56" y="136">mails &amp; memos</text>
+    <rect x="40" y="158" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="56" y="180">meeting transcripts</text>
+    <rect x="40" y="202" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="56" y="224">service contract</text>
+    <rect x="40" y="246" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="56" y="268">flow drawing (PDF)</text>
+  </g>
+  <path d="M262 175 H296" stroke="#fb651e" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- builder panel -->
+  <rect x="304" y="34" width="596" height="262" rx="16" fill="#fb651e" fill-opacity=".07" stroke="#fb651e" stroke-width="1.5"/>
+  <text x="326" y="62" font-size="12" fill="#fb651e" letter-spacing="2.5" font-weight="700">OUR BUILDER</text>
+
+  <rect x="326" y="142" width="116" height="66" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="384" y="170" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">READ</text>
+  <text x="384" y="190" text-anchor="middle" font-size="11.5" fill="#fff" fill-opacity=".6">any format → text</text>
+  <path d="M442 175 H470" stroke="#ffffff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <polygon points="532,117 590,175 532,233 474,175" fill="#fb651e"/>
+  <text x="532" y="171" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">known</text>
+  <text x="532" y="187" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">call type?</text>
+
+  <path d="M561 146 L622 113" stroke="#ffffff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+  <text x="580" y="118" font-size="11" fill="#fff" fill-opacity=".7">yes</text>
+  <path d="M561 204 L622 237" stroke="#ffffff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+  <text x="582" y="240" font-size="11" fill="#fff" fill-opacity=".7">no</text>
+
+  <rect x="626" y="80" width="150" height="62" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="701" y="106" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">TEMPLATE</text>
+  <text x="701" y="126" text-anchor="middle" font-size="11.5" fill="#fff" fill-opacity=".6">CallSpec → compiler</text>
+
+  <rect x="626" y="208" width="150" height="62" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="701" y="234" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">FREE-FORM</text>
+  <text x="701" y="254" text-anchor="middle" font-size="11.5" fill="#fff" fill-opacity=".6">design → workflow</text>
+
+  <path d="M776 111 L800 150" stroke="#ffffff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+  <path d="M776 239 L800 200" stroke="#ffffff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <rect x="796" y="142" width="90" height="66" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="841" y="170" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">CHECK</text>
+  <text x="841" y="190" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".6">lint · dryRun</text>
+
+  <path d="M841 208 C841 262 820 274 782 262" stroke="#fb651e" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#a)"/>
+  <text x="808" y="288" font-size="11" fill="#fb651e">problems → fix</text>
+
+  <path d="M904 175 H938" stroke="#fb651e" stroke-width="2.5" marker-end="url(#a)"/>
+
+  <!-- right: outputs -->
+  <text x="950" y="96" font-size="12" fill="#fb651e" letter-spacing="2.5" font-weight="700">OUT COMES</text>
+  <g font-size="14" fill="#ffffff" fill-opacity=".9">
+    <rect x="950" y="114" width="210" height="34" rx="8" fill="#fb651e" fill-opacity=".18" stroke="#fb651e" stroke-opacity=".6"/><text x="966" y="136">phone agent on Freya</text>
+    <rect x="950" y="158" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="966" y="180">exported workflow</text>
+    <rect x="950" y="202" width="210" height="34" rx="8" fill="#ffffff" fill-opacity=".06" stroke="#ffffff" stroke-opacity=".15"/><text x="966" y="224">trace of every step</text>
+  </g>
+</svg>

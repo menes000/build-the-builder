@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 250" width="1200" height="250" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16140f"/><stop offset="1" stop-color="#2a1a10"/></linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fb651e"/></marker>
+    <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ffffff" fill-opacity=".6"/></marker>
+  </defs>
+  <rect width="1200" height="250" rx="20" fill="url(#bg)"/>
+  <text x="40" y="44" font-size="12" fill="#fb651e" letter-spacing="2.5" font-weight="700">LOCAL TEST BENCH · A WHOLE TEST SET IN MINUTES, IN PARALLEL</text>
+
+  <rect x="40" y="96" width="170" height="70" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="125" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">case generator</text>
+  <text x="125" y="144" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".6">~37 customers from CallSpec</text>
+  <path d="M210 131 H244" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <!-- simulation cluster -->
+  <rect x="250" y="66" width="560" height="130" rx="14" fill="#fb651e" fill-opacity=".07" stroke="#fb651e" stroke-width="1.5"/>
+  <rect x="270" y="96" width="150" height="70" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="345" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">customer</text>
+  <text x="345" y="144" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".6">talkative · corrects · pieces</text>
+  <path d="M424 131 H452" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-start="url(#w)" marker-end="url(#w)"/>
+
+  <rect x="456" y="96" width="150" height="70" rx="10" fill="#fb651e" fill-opacity=".18" stroke="#fb651e"/>
+  <text x="531" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">emulator</text>
+  <text x="531" y="144" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".75">runs the Freya workflow</text>
+  <path d="M610 131 H638" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-start="url(#w)" marker-end="url(#w)"/>
+
+  <rect x="642" y="96" width="150" height="70" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="717" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">fake bank</text>
+  <text x="717" y="144" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".6">faults · limits · OpenAPI</text>
+  <text x="530" y="186" text-anchor="middle" font-size="11" fill="#fb651e">conversation · tool calls · bank records</text>
+
+  <path d="M810 131 H844" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+  <rect x="850" y="96" width="130" height="70" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="915" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">judge</text>
+  <text x="915" y="144" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".6">policy · outcome</text>
+  <path d="M980 131 H1014" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <rect x="1020" y="96" width="140" height="70" rx="10" fill="#ffffff"/>
+  <text x="1090" y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#16140f">report</text>
+  <text x="1090" y="144" text-anchor="middle" font-size="11" fill="#16140f" fill-opacity=".7">PASS / FAIL + why</text>
+
+  <path d="M1090 166 C1090 214 620 220 560 200" stroke="#fb651e" stroke-width="1.8" stroke-dasharray="5 4" fill="none" marker-end="url(#a)"/>
+  <text x="1088" y="236" text-anchor="end" font-size="11" fill="#fb651e">--local-test → the builder's fix loop</text>
+</svg>
