@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="1200" height="340">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16140f"/>
+      <stop offset="1" stop-color="#2a1a10"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fb651e" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#fb651e" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#fb651e" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="340" rx="24" fill="url(#bg)"/>
+  <g stroke="#ffffff" stroke-opacity=".05">
+    <path d="M0 68H1200M0 136H1200M0 204H1200M0 272H1200"/>
+    <path d="M150 0V340M300 0V340M450 0V340M600 0V340M750 0V340M900 0V340M1050 0V340"/>
+  </g>
+
+  <!-- Freya icon -->
+  <g transform="translate(440 46) scale(0.12)" fill="#ffffff">
+    <path d="M0,241.46,0,129.72A129.67,129.67,0,0,1,129.72,0L241.46,0c57.8,0,86.76,69.9,45.9,110.76L110.79,287.36C69.93,328.22,0,299.26,0,241.46Z"/>
+    <path d="M303.92,479.3c0-11.44-2.35-78.87,47.13-128.19C400.28,302.05,467.73,304,479.27,304l81.23-.18c57.07,0,101.78-20.7,142.15-61.1L832,113.37C872.61,72.68,839.63,1,782.15,1.07L702.27,0C611.09.07,557,23.7,492.42,88.18L88.14,492.45C23.18,557.31-.2,610.54,0,702.25l1,79.93c.13,57.41,71.7,90.43,112.31,49.8l129.29-129.3c40.34-40.36,61.06-85.13,61.1-142.14Z"/>
+  </g>
+
+  <text x="600" y="104" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#ffffff" fill-opacity=".55">×</text>
+
+  <!-- YC logo -->
+  <g transform="translate(658 46) scale(4.25)">
+    <path fill="#fb651e" d="M0 24V0h24v24H0z"/>
+    <path fill="#ffffff" d="M6.951 5.896l4.112 7.708v5.064h1.583v-4.972l4.148-7.799h-1.749l-2.457 4.875c-.372.745-.688 1.434-.688 1.434s-.297-.708-.651-1.434L8.831 5.896h-1.88z"/>
+  </g>
+
+  <text x="600" y="218" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="64" fill="#ffffff" letter-spacing="-1">Build the Builder</text>
+  <rect x="380" y="240" width="440" height="3" fill="url(#glow)"/>
+  <text x="600" y="286" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="24" fill="#ffffff" fill-opacity=".75">bank documents in  →  a working phone agent out</text>
+  <text x="600" y="318" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#fb651e" letter-spacing="3">TEAM MOSES · FREYA × Y COMBINATOR HACKATHON · OCTOBER 2026</text>
+</svg>
