@@ -1,0 +1,8 @@
+{
+ "accepted": true,
+ "changes": [],
+ "notes": [
+  "attempt2_rule: kept. 01-email-thread.md CPM rev. 9 section 4.8 gives attempt 2 (floor on the latest date) for overdue and serious; 02-memo-changes.md item 2 cuts serious to one attempt, so attempt 2 is for the overdue band only. The second reader says the same thing in other words.",
+  "sentences.opening (opening.first_sentence): kept. 01-email-thread.md CPM rev. 9 section 4.2 requires the first sentence to say this is Freya Bank's automated assistant and that the call is recorded; 02-memo-changes.md does not change it. The brief gives the content but not the exact words, so a sentence written from that content is needed (the field is required); null would drop the required opening."
+ ]
+}

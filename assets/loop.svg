@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16140f"/><stop offset="1" stop-color="#2a1a10"/></linearGradient>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#fb651e"/></marker>
+    <marker id="w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffffff" fill-opacity=".6"/></marker>
+  </defs>
+  <rect width="1200" height="400" rx="20" fill="url(#bg)"/>
+  <text x="40" y="44" font-size="12" fill="#fb651e" letter-spacing="2.5" font-weight="700">THE SELF-CORRECTING LOOP · ONE COMMAND, NO HUMAN IN IT</text>
+
+  <!-- row 1: build -->
+  <rect x="40" y="70" width="250" height="74" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="58" y="98" font-size="15" font-weight="700" fill="#fff">1 · EXTRACT</text>
+  <text x="58" y="119" font-size="12" fill="#fff" fill-opacity=".65">Claude reads every brief file</text>
+  <text x="58" y="135" font-size="12" fill="#fff" fill-opacity=".65">and fills the CallSpec form</text>
+  <path d="M290 107 H326" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <rect x="330" y="70" width="250" height="74" rx="10" fill="#fb651e" fill-opacity=".15" stroke="#fb651e"/>
+  <text x="348" y="98" font-size="15" font-weight="700" fill="#fff">2 · CROSS-CHECK</text>
+  <text x="348" y="119" font-size="12" fill="#fff" fill-opacity=".75">a second model reads the raw brief</text>
+  <text x="348" y="135" font-size="12" fill="#fff" fill-opacity=".75">disputed fields → Claude re-reads</text>
+  <path d="M580 107 H616" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <rect x="620" y="70" width="250" height="74" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="638" y="98" font-size="15" font-weight="700" fill="#fff">3 · COMPILE</text>
+  <text x="638" y="119" font-size="12" fill="#fff" fill-opacity=".65">deterministic CallSpec → workflow</text>
+  <text x="638" y="135" font-size="12" fill="#fff" fill-opacity=".65">every date and sum computed in code</text>
+  <path d="M870 107 H906" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <rect x="910" y="70" width="250" height="74" rx="10" fill="#16140f" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="928" y="98" font-size="15" font-weight="700" fill="#fff">4 · PUBLISH v1</text>
+  <text x="928" y="119" font-size="12" fill="#fff" fill-opacity=".65">lint · snippets · Freya dryRun</text>
+  <text x="928" y="135" font-size="12" fill="#fff" fill-opacity=".65">a valid agent exists from here on</text>
+  <path d="M1035 144 V226" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <!-- row 2: test and fix, right to left -->
+  <rect x="910" y="230" width="250" height="74" rx="10" fill="#fb651e" fill-opacity=".15" stroke="#fb651e"/>
+  <text x="928" y="258" font-size="15" font-weight="700" fill="#fff">5 · LOCAL TEST</text>
+  <text x="928" y="279" font-size="12" fill="#fff" fill-opacity=".75">~37 generated customers, fixed</text>
+  <text x="928" y="295" font-size="12" fill="#fff" fill-opacity=".75">emulator · fake bank · judge</text>
+  <path d="M910 267 H874" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+  <text x="892" y="258" text-anchor="middle" font-size="10.5" fill="#fff" fill-opacity=".55">fails</text>
+
+  <rect x="620" y="230" width="250" height="74" rx="10" fill="#fb651e" fill-opacity=".15" stroke="#fb651e"/>
+  <text x="638" y="258" font-size="15" font-weight="700" fill="#fff">6 · FIX</text>
+  <text x="638" y="279" font-size="12" fill="#fff" fill-opacity=".75">Claude revises texts, never values</text>
+  <text x="638" y="295" font-size="12" fill="#fff" fill-opacity=".75">recompile · retest the same customers</text>
+  <path d="M620 267 H552" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+
+  <polygon points="490,207 550,267 490,327 430,267" fill="#fb651e"/>
+  <text x="490" y="258" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">more pass,</text>
+  <text x="490" y="274" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">none lost?</text>
+  <text x="490" y="290" text-anchor="middle" font-size="10.5" fill="#fff" fill-opacity=".85">GATE</text>
+
+  <path d="M490 207 C490 178 700 178 742 226" stroke="#fb651e" stroke-width="2.2" fill="none" marker-end="url(#a)"/>
+  <text x="616" y="172" text-anchor="middle" font-size="11.5" fill="#fb651e" font-weight="700">yes → keep as the new best · next round</text>
+
+  <path d="M430 267 H294" stroke="#fff" stroke-opacity=".6" stroke-width="2" marker-end="url(#w)"/>
+  <text x="362" y="258" text-anchor="middle" font-size="10.5" fill="#fff" fill-opacity=".6">no → roll back</text>
+
+  <rect x="40" y="230" width="250" height="74" rx="10" fill="#ffffff"/>
+  <text x="58" y="258" font-size="15" font-weight="700" fill="#16140f">7 · PUBLISH THE BEST</text>
+  <text x="58" y="279" font-size="12" fill="#16140f" fill-opacity=".7">export + trace of every round</text>
+  <text x="58" y="295" font-size="12" fill="#16140f" fill-opacity=".7">all pass, rejected, or budget spent</text>
+
+  <line x1="40" y1="340" x2="1160" y2="340" stroke="#ffffff" stroke-opacity=".08"/>
+  <text x="600" y="370" text-anchor="middle" font-size="13" fill="#fff" fill-opacity=".7">A fix is kept only when it helps: the same customers judge every version, and one lost customer rolls it back.</text>
+</svg>

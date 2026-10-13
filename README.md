@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Result-13th%20of%20all%20teams-FB651E?style=for-the-badge" alt="13th of all teams">
   <img src="https://img.shields.io/badge/Freya-voice%20agents-16140f?style=for-the-badge" alt="Freya">
   <img src="https://img.shields.io/badge/Y%20Combinator-hackathon-FB651E?style=for-the-badge&logo=ycombinator&logoColor=white" alt="Y Combinator">
   <img src="https://img.shields.io/badge/Claude-Opus%205.5-D97757?style=for-the-badge&logo=anthropic&logoColor=white" alt="Claude">
@@ -12,100 +13,82 @@
 
 <p align="center">
   <b>A bank sends its documents. Our builder sends back a working phone agent.</b><br>
-  No hand edits. One command. Every decision written to a trace.
+  No hand edits. One command. Every decision written to a trace.<br><br>
+  <b>Finished 13th among all teams in the Freya × Y Combinator hackathon.</b>
 </p>
 
 ---
 
-## ⚡ In one picture
+## The heart of it: a builder that corrects itself
 
-<p align="center"><img src="assets/overview.svg" alt="How the builder works" width="100%"></p>
+Writing an agent once is easy. Writing one that is **right** is the hard part. So our builder does not stop after the first draft. It tests its own agent, reads why customers failed, fixes itself and keeps the fix **only if it really helps**. All inside one command, with no human in the loop.
+
+<p align="center"><img src="assets/loop.svg" alt="The self-correcting loop" width="100%"></p>
 
 ```bash
-python3 FREYA/builder/build.py <case folder | zip | brief>  <mock_url | openapi.json>
+python3 main.py <brief file or folder> <tool openapi.json>
 ```
+
+### What makes the loop work
+
+| Idea | How |
+|---|---|
+| **Two readers, not one** | After Claude fills the CallSpec, a second model (GPT) reads the raw brief on its own. Every field where the two readings disagree goes back to Claude, which re-reads the brief for exactly those fields and writes down why it kept or changed each one. |
+| **Customers with exact answers** | Test customers are generated from the CallSpec: about 30 single-product and 7 multi-product cases. Every expected date and amount is computed in code (bands, deadlines, business days, holidays, floors), so a judge has a hard answer to check against, not an opinion. |
+| **The same customers for the whole run** | The set is fixed once. Every version of the agent is measured against the same customers, so "better" means better. |
+| **Fixes change words, never facts** | The failed transcripts, the bank-record diff and the judge's reasons go to Claude. Claude may rewrite texts and instructions; the brief's values (dates, limits, amounts) stay exactly as extracted. |
+| **A gate that cannot be fooled** | A fix is accepted only if **more customers pass and none that passed before fails**. One lost customer, and the builder rolls back to the best version and stops. |
+| **Always something to submit** | Version 1 is published before testing starts, so a valid agent exists from minute one. The loop ends when all pass, a fix is rejected, or the time budget is spent. |
+| **Everything on the record** | Every round writes its request, the CallSpec diff, the test result and the decision (`fixN.decision.json`). Every model conversation is saved under `chats/`. |
+
+### The loop at work (real traces)
+
+The cross-check settling a conflict between a mail and a memo on its own:
+
+> *"attempt2_rule: kept. 01-email-thread.md CPM rev. 9 section 4.8 gives attempt 2 (floor on the latest date) for overdue and serious; 02-memo-changes.md item 2 cuts serious to one attempt, so attempt 2 is for the overdue band only. The second reader says the same thing in other words."*
+> <sub>[`runs/deneme-c/20261011-171829/recheck.result.json`](runs/deneme-c/20261011-171829/recheck.result.json)</sub>
+
+The gate stopping a fix that looked good but broke two passing customers:
+
+```
+fix1: rejected, 2/10 -> 0/10, newly failing: DENEME-04, DENEME-18; keeping v1
+```
+<sub>[`traces/20261011-163126-deneme-e.txt`](traces/20261011-163126-deneme-e.txt)</sub>
+
+> **Nothing about any bank or brief is written into the code.** Every rule, value and sentence comes from the documents at run time.
 
 ---
 
-## 🎯 The problem
+## The problem
 
 A bank wants software to answer its phone calls. Before that software can talk to a single customer, someone has to read the bank's material and turn it into a working agent: who to ask for, what to say, which dates are allowed, what to do when a service fails. The material is spread across a dozen documents, written months apart, and the documents contradict each other. **Done by hand, one bank takes days.**
 
-Our builder does that work by itself.
+Our builder does that work by itself, and checks its own work.
 
 ---
 
-## 🧠 Two modes, one builder
+## Fallback: a call type outside the template
 
-The builder looks at the bank's tool API and decides on its own how to build.
+The CallSpec describes one family of calls. When a bank's tool API has none of the tools that family needs, the builder does not crash. It **falls back to a free-form path**: Claude reads the whole case pack, writes a design note, then the workflow; the builder checks it (JSON, lint, code compiles, URLs only inside the tool API, Freya dryRun) and sends every problem back until Freya accepts it.
+
+### The final case went through the fallback
+
+The hidden final case was a different kind of call: **an inbound credit-card statement call, in Turkish.** The agent finds the right card, reads the statement debt in **lira, dollars, euros and pounds**, says when it is due, can **move the statement week** and **e-mail the statement PDF**, and hands callers who want to pay or speak to a person to an agent. The material was mails, two versions of an analysis document, meeting transcripts, a service contract, an IVR sheet, an FAQ and a flow drawing, and they did not agree.
 
 <table>
 <tr>
-<th width="50%">🧩 Template mode</th>
-<th width="50%">🚀 Free-form mode</th>
-</tr>
-<tr>
-<td valign="top">
-
-**For a call type the builder knows** (outbound collections: identity check, debt, payment promise).
-
-1. Claude fills a **CallSpec**, a fixed form of the bank's rules.
-2. A **deterministic compiler** turns it into a Freya workflow.
-3. Every date, amount, limit and holiday is **computed in code**, never guessed by the model.
-4. Practice customers run against it. A fix loop revises the texts and keeps a change only when more customers pass.
-
-</td>
-<td valign="top">
-
-**For a call type the builder has never seen.**
-
-1. Claude reads **the whole case pack**: mails, memos, transcripts, contract, PDF.
-2. It resolves conflicts between sources (**the latest decision wins**) and writes a design note.
-3. It writes the Freya workflow from that design.
-4. The builder checks it and **sends every problem back** until Freya accepts it.
-
-</td>
-</tr>
-</table>
-
-> 🔒 **Nothing about any bank or case is written into the code.** Every rule, value and sentence comes from the documents at run time.
-
----
-
-## 🔍 Inside a build
-
-<p align="center"><img src="assets/modes.svg" alt="Template mode and free-form mode" width="100%"></p>
-
----
-
-## 🏁 The final case
-
-The hidden final case was a call type nobody had practised: **an inbound credit-card statement call, in Turkish.** The phone menu has already identified the caller. The agent finds the right card, reads the statement debt in **lira, dollars, euros and pounds**, says when it is due, can **move the statement week** and can **e-mail the statement PDF**. Callers who want to pay or ask for a person are handed to an agent.
-
-The material: mails, two versions of an analysis document, meeting transcripts, a service contract, an IVR prompt sheet, an FAQ and a flow drawing. The sources did not agree with each other.
-
-### What the builder produced, in one run, with no hand edits
-
-<table>
-<tr>
-<td align="center"><h2>7</h2>services in a tool API it wrote from the contract</td>
+<td align="center"><h2>7</h2>services in a tool API written from the contract</td>
 <td align="center"><h2>12</h2>conflicts between sources found and resolved</td>
 <td align="center"><h2>31</h2>nodes in the Turkish workflow</td>
 <td align="center"><h2>1st</h2>round accepted by Freya</td>
 </tr>
 </table>
 
-### The agent it designed
-
 <p align="center"><img src="assets/agent.svg" alt="The agent the builder designed" width="100%"></p>
 
-### Design choices that matter
-
-- 🔢 **Amounts and dates are computed in code, not by the model.** Code nodes write the exact Turkish text: amounts in words, kuruş, sent and peni, the right suffix, "the due date has passed" and "the statement was cut today", all decided from `now`.
-- 💳 **The card number is never rebuilt from what the caller said.** A pre-hook maps the caller's choice to the masked number that `cards.list` returned.
-- ✋ **Write calls run once, and only after a clear yes.** This applies to `statement.week.change` and `statement.pdf.send`.
-- 🧯 **Every service error has a path.** Failure counters, return-code checks and status variables reset after use, so an old result never fires twice.
-- 🎙️ **16 closing nodes**, each with its own sentence and end reason.
+- **Amounts and dates in code:** exact Turkish text with amounts in words, kuruş, sent and peni, and the right suffix; "the due date has passed" is decided from `now`.
+- **The card number is never rebuilt from speech:** a pre-hook maps the caller's choice to the masked number the bank returned.
+- **Write calls run once, only after a clear yes**, and every service error has its own path.
 
 <details>
 <summary><b>The 12 conflicts the builder resolved (latest decision wins)</b></summary>
@@ -130,13 +113,13 @@ Full note: [`FREYA/out/final.freeform.notes.md`](FREYA/out/final.freeform.notes.
 
 ---
 
-## 🛰️ Our own bank: the mock
+## Our own bank: the mock
 
 The final case also asked teams to host the bank's services themselves. [`mock/`](mock/) is a **Cloudflare Worker** with all 7 services. It uses the exact paths, field names and request and response shapes of the integration document, and it returns the stored answer, HTTP status included, for every test customer.
 
 ---
 
-## 🧪 Testing without waiting for the platform
+## Testing without waiting for the platform
 
 Freya allows one simulation at a time per workspace, and the platform was limited during the final. So we built a **local test bench** that runs a whole test set in parallel in minutes.
 
@@ -161,35 +144,39 @@ Freya allows one simulation at a time per workspace, and the platform was limite
 
 ---
 
-## 📁 Repository
+## Repository
 
 ```
-FREYA/                  🏗️ the builder
+main.py                    the self-correcting run: extract → cross-check → compile → test → fix → gate
+FREYA/                     the builder
 ├── builder/build.py       submission entry point
 ├── builder/main.py        read → plan → build → check → publish → trace
 ├── builder/extract/       reading material · CallSpec extraction · contract → OpenAPI
 ├── builder/compile/       compiler · code generation · lint · self-check
-├── builder/freeform.py    free-form mode: design → workflow → checks → feedback
-├── builder/test/          practice runs and the fix loop
+├── builder/test/          practice runs and the fixer
+├── builder/freeform.py    fallback for call types outside the template
 ├── submission/            exported workflows (final.workflow.json is our entry)
 ├── traces/                one trace per run
 └── out/                   everything a run wrote: OpenAPI, design note, workflow
-mock/                   🛰️ Cloudflare Worker: the bank's services
-tester/                 🧪 local test bench
-test-briefs/            📝 our rehearsal briefs C–F with answer keys
-watch.py                👀 live browser view of a running build
-submission.json         📮 the submission form
+tester/                    local test bench: emulator, fake bank, case generator, judge
+mock/                      Cloudflare Worker: the bank's services
+test-briefs/               our rehearsal briefs C–F with answer keys
+watch.py                   live browser view of a running build
+submission.json            the submission form
 ```
 
 ---
 
-## ▶️ Run it
+## Run it
 
 ```bash
 pip install -r FREYA/requirements.txt
 cp FREYA/kit/env.example env.sh   # FREYA_API_KEY · FREYA_BANK_TEAM_KEY · FREYA_WORKSPACE_ID · ANTHROPIC_API_KEY
 source env.sh
 cd FREYA
+
+# the self-correcting run on a brief
+python3 ../main.py kit/briefs/brief-a.md kit/tools/openapi.json --cross-check
 
 # the final case, against our mock
 python3 builder/build.py ../final/case https://freya-mock.freya-hecaton.workers.dev 2>&1 | tee traces/final.log
