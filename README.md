@@ -44,7 +44,7 @@ python3 main.py <brief file or folder> <tool openapi.json>
 | **Two readers, not one** | After Claude fills the CallSpec, a second model (GPT) reads the raw brief on its own. Every field where the two readings disagree goes back to Claude, which re-reads the brief for exactly those fields and writes down why it kept or changed each one. |
 | **Customers with exact answers** | Test customers are generated from the CallSpec: about 30 single-product and 7 multi-product cases. Every expected date and amount is computed in code (bands, deadlines, business days, holidays, floors), so a judge has a hard answer to check against, not an opinion. |
 | **The same customers for the whole run** | The set is fixed once. Every version of the agent is measured against the same customers, so "better" means better. |
-| **Fixes change words, never facts** | The failed transcripts, the bank-record diff and the judge's reasons go to Claude. Claude may rewrite texts and instructions; the brief's values (dates, limits, amounts) stay exactly as extracted. |
+| **Fixes change words, never facts** | For each failed customer, the script, the expected outcome, the checks the judge marked as failed and the transcript go to Claude. Claude may rewrite texts and instructions; the brief's values (dates, limits, amounts) stay exactly as extracted. |
 | **A gate that cannot be fooled** | A fix is accepted only if **more customers pass and none that passed before fails**. One lost customer, and the builder rolls back to the best version and stops. |
 | **Always something to submit** | Version 1 is published before testing starts, so a valid agent exists from minute one. The loop ends when all pass, a fix is rejected, or the time budget is spent. |
 | **Everything on the record** | Every round writes its request, the CallSpec diff, the test result and the decision (`fixN.decision.json`). Every model conversation is saved under `chats/`. |
@@ -63,7 +63,7 @@ fix1: rejected, 2/10 -> 0/10, newly failing: DENEME-04, DENEME-18; keeping v1
 ```
 <sub>[`traces/20261011-163126-deneme-e.txt`](traces/20261011-163126-deneme-e.txt)</sub>
 
-> **Nothing about any bank or brief is written into the code.** Every rule, value and sentence comes from the documents at run time.
+> **Nothing about any bank or brief is written into the builder's code.** Every rule, value and sentence comes from the documents at run time.
 
 ---
 
@@ -77,8 +77,8 @@ The builder is not one model call. One build runs a small team of agents, each w
 | **Second reader** | GPT | Reads the raw brief on its own. Where the two readings disagree, the extractor re-reads the brief and justifies each field. |
 | **Customer agents** | Gemini | Play the generated customers in five styles: talkative, corrects themselves, says numbers in pieces, asks questions back, says amounts in words. |
 | **Agent under test** | emulated locally | The compiled workflow, run step by step: routing, extraction, code nodes, hooks and bank calls. |
-| **Judge** | GPT-5.4 mini | Reads the transcript and the bank's records and checks policy and outcome against each case. |
-| **Fixer** | Claude Opus | Gets the failed transcripts, the record diffs and the judge's reasons. Rewrites texts, never values. |
+| **Judge** | Gemini (GPT optional) | Reads the transcript and the bank's records and checks policy and outcome against each case. |
+| **Fixer** | Claude Opus | Gets each failed customer's script, expected outcome, failed checks and transcript. Rewrites texts, never values. |
 
 ---
 
@@ -154,12 +154,12 @@ python3 builder/build.py kit/briefs/brief-a.md kit/tools/openapi.json --test A -
 python3 ../watch.py
 ```
 
-Each run ends with `{"workflow_id", "agent_id", "export"}` and writes its trace to `FREYA/traces/`.
+Both commands end with a JSON line that holds the workflow id, the agent id and the export path. `build.py` writes its trace to `FREYA/traces/`, `main.py` to `traces/`.
 
 ---
 
 <p align="center">
   <b>Team MOSES</b><br>
-  <a href="https://github.com/Dora-19">Dora Alkan</a> · builder & mock &nbsp;|&nbsp; <a href="https://github.com/menes000">Mehmet Enes Arslan</a> · test bench<br><br>
+  <a href="https://github.com/menes000">Mehmet Enes Arslan</a> · self-correcting loop & local test bench &nbsp;|&nbsp; <a href="https://github.com/Dora-19">Dora Alkan</a> · builder (CallSpec, compiler, fallback) & mock<br><br>
   <sub>Built with Claude Code · phone agents run on Freya · made for the Freya × Y Combinator "Build the Builder" hackathon, October 2026</sub>
 </p>
